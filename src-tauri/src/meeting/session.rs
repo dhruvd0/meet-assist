@@ -390,7 +390,6 @@ impl MeetingManager {
         let store = Arc::clone(&self.store);
         let transcriber = Arc::clone(&self.transcriber);
         let app = self.app.clone();
-        let summary_lock = Arc::clone(&self.summary_lock);
         let spawned = std::thread::Builder::new()
             .name("meet-transcriber".into())
             .spawn(move || {

@@ -83,12 +83,22 @@ impl Drop for LoopbackPipeline {
 pub(crate) fn spawn_worker(
     mut sink: MeetingSink,
     rx: mpsc::Receiver<Vec<f32>>,
+    stopping: Arc<AtomicBool>,
 ) -> std::io::Result<std::thread::JoinHandle<()>> {
     std::thread::Builder::new()
         .name("meet-sysaudio".into())
         .spawn(move || {
-            while let Ok(frame) = rx.recv() {
-                sink.push_frame(&frame);
+            loop {
+                match rx.recv_timeout(std::time::Duration::from_millis(500)) {
+                    Ok(frame) => sink.push_frame(&frame),
+                    Err(mpsc::RecvTimeoutError::Disconnected) => break,
+                    // Guard against a leaked callback closure keeping the
+                    // sender alive after `stop`: bail once asked to stop.
+                    Err(mpsc::RecvTimeoutError::Timeout) if stopping.load(Ordering::Acquire) => {
+                        break
+                    }
+                    Err(mpsc::RecvTimeoutError::Timeout) => {}
+                }
             }
             sink.finish();
         })
@@ -126,6 +136,7 @@ pub struct SystemCapture {
     stream: handy_cpal::Stream,
     #[cfg(any(target_os = "macos", target_os = "windows"))]
     worker: std::thread::JoinHandle<()>,
+    stopping: Arc<AtomicBool>,
     #[cfg(any(target_os = "macos", target_os = "windows"))]
     dropped: Arc<AtomicU64>,
     #[cfg(target_os = "linux")]
@@ -183,7 +194,9 @@ impl SystemCapture {
         let dropped = Arc::new(AtomicU64::new(0));
         let failed = Arc::new(AtomicBool::new(false));
         let mut pipeline = LoopbackPipeline::new(resampler, frame, frame_tx, Arc::clone(&dropped));
-        let worker = spawn_worker(sink, frame_rx).context("spawn system audio worker")?;
+        let stopping = Arc::new(AtomicBool::new(false));
+        let worker = spawn_worker(sink, frame_rx, Arc::clone(&stopping))
+            .context("spawn system audio worker")?;
         let flag = Arc::clone(&failed);
         let stream = device
             .build_input_stream(
@@ -211,6 +224,7 @@ impl SystemCapture {
         Ok(Self {
             stream,
             worker,
+            stopping,
             dropped,
             failed,
         })
@@ -283,8 +297,10 @@ impl SystemCapture {
                 stream,
                 worker,
                 dropped,
+                stopping,
                 ..
             } = self;
+            stopping.store(true, Ordering::Release);
             // Dropping the stream tears down the tap and the callback; the
             // pipeline's Drop flushes the resampler tail and closes the
             // channel, so the worker drains, finishes the sink, and exits.
@@ -362,7 +378,7 @@ mod tests {
         let (tx, rx) = mpsc::channel();
         let sink = MeetingSink::with_speaker(vad, tx, "them");
         let (ftx, frx) = mpsc::sync_channel(FRAME_QUEUE);
-        let worker = spawn_worker(sink, frx).unwrap();
+        let worker = spawn_worker(sink, frx, Arc::new(AtomicBool::new(false))).unwrap();
         let dropped = Arc::new(AtomicU64::new(0));
         let p = LoopbackPipeline::new(
             MonoResampler::new(48_000, 16_000, 2).unwrap(),
