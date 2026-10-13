@@ -14,6 +14,7 @@ mod helpers;
 mod input;
 mod llm_client;
 mod managers;
+mod meeting;
 mod memory;
 mod overlay;
 mod paste_tx;
