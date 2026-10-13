@@ -710,6 +710,7 @@ pub fn run(cli_args: CliArgs) {
             shortcut::change_auto_submit_key_setting,
             shortcut::change_post_process_enabled_setting,
             shortcut::change_meeting_assistant_setting,
+            shortcut::change_meeting_system_audio_setting,
             shortcut::change_meeting_provider_setting,
             shortcut::change_meeting_sensitivity_setting,
             shortcut::change_meeting_observer_interval_setting,
