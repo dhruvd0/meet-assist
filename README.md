@@ -1,125 +1,84 @@
-# Handy
+# Meet Assist
 
-[![Discord](https://img.shields.io/badge/Discord-%235865F2.svg?style=for-the-badge&logo=discord&logoColor=white)](https://discord.com/invite/WVBeWsNXK4)
+**A private meeting copilot that listens to your call and nudges only you when the conversation needs it.**
 
-**A free, open source, and extensible speech-to-text application that works completely offline.**
+Meet Assist runs on your desktop. It transcribes both sides of a call locally, watches for loops, stuck moments, missing facts, and untried ideas, and shows you a quiet card with a beep. It never joins the call and never speaks into it.
 
-Handy is a cross-platform desktop application that provides simple, privacy-focused speech transcription. Press a shortcut, speak, and have your words appear in any text field. This happens on your own computer without sending any information to the cloud.
+It is a fork of [Handy](https://github.com/cjpais/Handy), the open source offline dictation app. Handy's dictation still works here. Read the [vision](docs/VISION.md) for why this exists and the [architecture](docs/ARCHITECTURE.md) for how it is built.
 
-## Why Handy?
+## Status
 
-Handy was created to fill the gap for a truly open source, extensible speech-to-text tool. As stated on [handy.computer](https://handy.computer):
+Early. The meeting subsystem is specified and being built in order:
 
-- **Free**: Accessibility tooling belongs in everyone's hands, not behind a paywall
-- **Open Source**: Together we can build further. Extend Handy for yourself and contribute to something bigger
-- **Private**: Your voice stays on your computer. Get transcriptions without sending audio to the cloud
-- **Simple**: One tool, one job. Transcribe what you say and put it into a text box
+1. Docs and vision (done)
+2. Meetings as persisted threads with microphone-only transcript
+3. Observer, intervention card, beep
+4. System audio capture (macOS first)
+5. Summaries, continue flow, onboarding
 
-## How It Works
+Until step 2 lands, this app behaves like Handy with a new name.
 
-1. **Press** a configurable keyboard shortcut: hold it to record and release to stop, or tap it to toggle recording on and off (Hold-only and Toggle-only modes are also available)
-2. **Speak** your words while the shortcut is active
-3. **Release** and Handy processes your speech using Whisper
-4. **Get** your transcribed text pasted directly into whatever app you're using
+## How it works
 
-The process is entirely local:
+1. **Start a meeting.** Button or global shortcut. A meeting is a thread; you can pause, resume, end, and continue it on another day.
+2. **It listens.** Your microphone and, where supported, system audio for the remote side. Each utterance is transcribed locally and tagged as you or them.
+3. **It watches.** Every ~20 seconds the recent transcript, your pasted context (agenda, notes), and a rolling summary go to the language model you chose with one question: should I speak up?
+4. **It nudges.** If yes, you hear a beep and see a floating card: looping, stuck, quick fact, or idea. Dismiss it or open the meeting.
+5. **It remembers.** Ending a session writes a summary. Continuing a meeting carries the summary forward.
 
-- Silence is filtered using VAD (Voice Activity Detection) with Silero
-- Transcription uses your choice of models:
-  - **Whisper models** (Small/Medium/Turbo/Large) with GPU acceleration when available
-  - **Parakeet V3** - CPU-optimized model with excellent performance and automatic language detection
-- Works on Windows, macOS, and Linux
+Everything local stays local. The language model is your choice: Anthropic, OpenAI, OpenRouter, or a local Ollama / LM Studio endpoint through the same provider settings Handy uses for post-processing.
 
-## Quick Start
+## Quick start
 
-### Installation
+### Install
 
-1. Download the latest release from the [releases page](https://github.com/cjpais/Handy/releases) or the [website](https://handy.computer)
-   - **macOS**: Also available via [Homebrew cask](https://formulae.brew.sh/cask/handy): `brew install --cask handy`
-   - **Windows**: Also available via [winget](https://github.com/microsoft/winget-pkgs): `winget install cjpais.Handy` \
-     **Note:** The Homebrew cask and winget package are not maintained by the Handy developers.
-   - **Debian/Ubuntu**: Install the downloaded `.deb` with APT so required dependencies are installed automatically:
-     ```bash
-     sudo apt install ./Handy_*.deb
-     ```
-     Do not use `dpkg -i` unless the dependencies are already installed. If you already used it, run `sudo apt --fix-broken install`.
-2. Install the application
-3. Launch Handy and grant necessary system permissions (microphone, accessibility)
-4. Configure your preferred keyboard shortcuts in Settings
-5. Start transcribing!
+Releases are not yet published for Meet Assist. Build from source (see below).
 
-### Development Setup
+### Build from source
 
-For detailed build instructions including platform-specific requirements, see [BUILD.md](BUILD.md).
+Prerequisites: [Rust](https://rustup.rs/) stable, [Bun](https://bun.sh/).
 
-## Sponsors
+```bash
+bun install
+mkdir -p src-tauri/resources/models
+curl -L -o src-tauri/resources/models/silero-vad-v6.2-F32.gguf https://huggingface.co/handy-computer/silero-vad-v6.2-gguf/resolve/main/silero-vad-v6.2-F32.gguf
+bun run tauri dev
+# macOS cmake error? prefix with CMAKE_POLICY_VERSION_MINIMUM=3.5
+```
 
-<div align="center">
-  We're grateful for the support of our sponsors who help make Handy possible:
-  <br><br>
-  <a href="https://wordcab.com">
-    <img src="sponsor-images/wordcab.png" alt="Wordcab" width="120" height="120">
-  </a>
-  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-  <a href="https://github.com/epicenter-so/epicenter">
-    <img src="sponsor-images/epicenter.png" alt="Epicenter" width="120" height="120">
-  </a>
-  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-  <a href="https://boltai.com?utm_source=handy">
-    <img src="sponsor-images/boltai.jpg" alt="Bolt AI" width="120" height="120">
-  </a>
-  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-  <a href="https://cantydigital.com.au/">
-    <img src="sponsor-images/cantydigital.png" alt="Canty Digital" width="120" height="120">
-  </a>
-</div>
+Platform-specific details are in [BUILD.md](BUILD.md).
 
-## Integrations
+### Migrating from Handy
 
-<a href="https://www.raycast.com/mattiacolombomc/handy" title="Install Handy Raycast Extension"><img src="https://www.raycast.com/mattiacolombomc/handy/install_button@2x.png?v=1.1" height="64" style="height: 64px;" alt="Install handy Raycast Extension" /></a>
+Meet Assist uses its own bundle identifier (`com.meetassist.app`), so it gets a fresh app-data directory. Handy's settings, history, and downloaded models are not picked up automatically. To reuse downloaded models, copy the `models` folder from Handy's app-data directory into Meet Assist's (paths in [Manual Model Installation](#manual-model-installation-for-proxy-users-or-network-restrictions)).
 
-Control Handy from [Raycast](https://www.raycast.com) — start/stop recording, browse transcript history, manage dictionary, switch models and languages.
+## Dictation (inherited from Handy)
 
-[Source](https://github.com/mattiacolombomc/raycast-handy) · by [@mattiacolombomc](https://github.com/mattiacolombomc)
+Press a shortcut, speak, release, and your words are pasted into the active app. Silence is trimmed with Silero VAD; transcription uses Whisper-family or Parakeet models with GPU acceleration where available. Works on macOS, Windows, and Linux.
 
-### Debug Mode
-
-Handy includes an advanced debug mode for development and troubleshooting. Access it by pressing:
+### Debug mode
 
 - **macOS**: `Cmd+Shift+D`
 - **Windows/Linux**: `Ctrl+Shift+D`
 
-### CLI Parameters
+### CLI parameters
 
-Handy supports command-line flags for controlling a running instance and customizing startup behavior. These work on all platforms (macOS, Windows, Linux). Largely this is a beta feature.
-
-**Remote control flags** (sent to an already-running instance via the single-instance plugin):
+Flags work on all platforms. Remote-control flags are sent to the running instance; startup flags change how this launch behaves.
 
 ```bash
 handy --toggle-transcription    # Toggle recording on/off
 handy --toggle-post-process     # Toggle recording with post-processing on/off
 handy --cancel                  # Cancel the current operation
-```
-
-**Startup flags:**
-
-```bash
 handy --start-hidden            # Start without showing the main window
 handy --no-tray                 # Start without the system tray icon
 handy --debug                   # Enable debug mode with verbose logging
 handy --help                    # Show all available flags
 ```
 
-Flags can be combined for autostart scenarios:
-
-```bash
-handy --start-hidden --no-tray
-```
-
-> **macOS tip:** When Handy is installed as an app bundle, invoke the binary directly:
+> **macOS tip:** When installed as an app bundle, invoke the binary directly:
 >
 > ```bash
-> /Applications/Handy.app/Contents/MacOS/Handy --toggle-transcription
+> "/Applications/Meet Assist.app/Contents/MacOS/<binary>" --toggle-transcription   # list the folder to find the binary name
 > ```
 
 ## Known Issues & Current Limitations
@@ -296,9 +255,9 @@ If you're behind a proxy, firewall, or in a restricted network environment where
 
 The typical paths are:
 
-- **macOS**: `~/Library/Application Support/com.pais.handy/`
-- **Windows**: `C:\Users\{username}\AppData\Roaming\com.pais.handy\`
-- **Linux**: `~/.config/com.pais.handy/`
+- **macOS**: `~/Library/Application Support/com.meetassist.app/`
+- **Windows**: `C:\Users\{username}\AppData\Roaming\com.meetassist.app\`
+- **Linux**: `~/.config/com.meetassist.app/`
 
 #### Step 2: Create Models Directory
 
@@ -306,10 +265,10 @@ Inside your app data directory, create a `models` folder if it doesn't already e
 
 ```bash
 # macOS/Linux
-mkdir -p ~/Library/Application\ Support/com.pais.handy/models
+mkdir -p ~/Library/Application\ Support/com.meetassist.app/models
 
 # Windows (PowerShell)
-New-Item -ItemType Directory -Force -Path "$env:APPDATA\com.pais.handy\models"
+New-Item -ItemType Directory -Force -Path "$env:APPDATA\com.meetassist.app\models"
 ```
 
 #### Step 3: Download Model Files
@@ -455,27 +414,21 @@ Adjust the executable path if needed. This override only applies to apps launche
 
 ### How to Contribute
 
-1. **Check existing issues** at [github.com/cjpais/Handy/issues](https://github.com/cjpais/Handy/issues)
-2. **Fork the repository** and create a feature branch
-3. **Test thoroughly** on your target platform
-4. **Submit a pull request** with clear description of changes
-5. **Join the discussion** - reach out at [contact@handy.computer](mailto:contact@handy.computer)
-
-The goal is to create both a useful tool and a foundation for others to build upon—a well-patterned, simple codebase that serves the community.
+See [CONTRIBUTING.md](CONTRIBUTING.md). Bug reports and fixes against the inherited dictation pipeline are welcome; meeting-subsystem work follows the [design spec](docs/superpowers/specs/2026-10-13-meeting-assistant-design.md).
 
 ## Related Projects
 
-- **[Handy CLI](https://github.com/cjpais/handy-cli)** - The original Python command-line version
-- **[handy.computer](https://handy.computer)** - Project website with demos and documentation
+- [Handy](https://github.com/cjpais/Handy), the upstream dictation app this fork is built on.
 
 ## License
 
 MIT License - see [LICENSE](LICENSE) file for details.
 
-Handy is open-source software, but the Handy name, logo, icon, and brand assets are not open-source. Unofficial forks, rewrites, and redistributions must use their own branding and must not imply endorsement or affiliation.
+Upstream Handy is open-source software, but the Handy name, logo, icon, and brand assets are not. Meet Assist is an independent fork, not endorsed by or affiliated with Handy. It uses its own name and identifier; the app icon still needs to be replaced before any public release.
 
 ## Acknowledgments
 
+- [Handy](https://github.com/cjpais/Handy) by cjpais and contributors, the dictation app Meet Assist is forked from
 - **Whisper** by OpenAI for the speech recognition model
 - **ggml** for an amazing cross-platform tensor library
 - **Silero** for great lightweight VAD
