@@ -1003,10 +1003,12 @@ impl ProjectStore {
         Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
     }
 
-    pub fn latest_line_ts(&self, meeting_id: i64) -> Result<Option<i64>> {
+    /// Highest transcript line id across the meeting's sessions (ids only
+    /// grow, so this is a reliable "anything new?" watermark).
+    pub fn latest_line_id(&self, meeting_id: i64) -> Result<Option<i64>> {
         let conn = self.conn()?;
         Ok(conn.query_row(
-            "SELECT MAX(l.ts) FROM transcript_lines l JOIN sessions s ON s.id = l.session_id WHERE s.meeting_id = ?1",
+            "SELECT MAX(l.id) FROM transcript_lines l JOIN sessions s ON s.id = l.session_id WHERE s.meeting_id = ?1",
             params![meeting_id],
             |r| r.get::<_, Option<i64>>(0),
         )?)
@@ -1432,8 +1434,8 @@ mod tests {
         s.append_line(s1.id, "me", "one", 1000).unwrap();
         s.append_line(s1.id, "me", "two", 2000).unwrap();
         let s2 = s.create_session(m.id).unwrap();
-        s.append_line(s2.id, "me", "three", 3000).unwrap();
-        assert_eq!(s.latest_line_ts(m.id).unwrap(), Some(3000));
+        let last = s.append_line(s2.id, "me", "three", 3000).unwrap();
+        assert_eq!(s.latest_line_id(m.id).unwrap(), Some(last.id));
         let since = s.lines_since(m.id, 2000).unwrap();
         assert_eq!(
             since.iter().map(|l| l.text.as_str()).collect::<Vec<_>>(),

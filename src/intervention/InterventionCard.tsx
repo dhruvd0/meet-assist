@@ -18,6 +18,8 @@ type Intervention = {
   text: string;
   reason: string;
   dismissed: boolean;
+  /** Added by the backend so the card can open its meeting. */
+  meeting_id: number;
 };
 
 const ICON: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -59,8 +61,9 @@ export const InterventionCard: React.FC = () => {
       setIv(e.payload);
       arm();
     });
+    un.catch(console.error);
     return () => {
-      un.then((f) => f());
+      un.then((f) => f()).catch(console.error);
       if (timer.current) window.clearTimeout(timer.current);
     };
   }, []);
@@ -96,7 +99,23 @@ export const InterventionCard: React.FC = () => {
           <X className="w-4 h-4" aria-hidden="true" />
         </button>
       </div>
-      <p className="text-sm leading-snug">{iv.text}</p>
+      <p className="text-sm leading-snug flex-1 overflow-hidden">{iv.text}</p>
+      <div className="flex justify-end">
+        <button
+          type="button"
+          className="text-xs font-medium text-logo-primary hover:underline cursor-pointer"
+          onClick={async () => {
+            try {
+              await invoke("focus_meeting", { meetingId: iv.meeting_id });
+            } catch (err) {
+              console.error("focus_meeting failed", err);
+              await hide();
+            }
+          }}
+        >
+          {t("meetings.intervention.open")}
+        </button>
+      </div>
     </div>
   );
 };

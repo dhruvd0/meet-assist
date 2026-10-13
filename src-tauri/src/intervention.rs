@@ -108,10 +108,20 @@ fn position_top_right(app: &AppHandle, window: &tauri::webview::WebviewWindow) {
     let _ = window.set_position(tauri::Position::Logical(tauri::LogicalPosition { x, y }));
 }
 
-/// Shows the card for `iv` without taking focus.
-pub fn show(app: &AppHandle, iv: &Intervention) {
+/// Card payload: the intervention's fields plus `meeting_id`, so the card can
+/// open its meeting.
+fn card_payload(meeting_id: i64, iv: &Intervention) -> serde_json::Value {
+    let mut v = serde_json::to_value(iv).unwrap_or_else(|_| serde_json::json!({}));
+    if let Some(obj) = v.as_object_mut() {
+        obj.insert("meeting_id".into(), serde_json::json!(meeting_id));
+    }
+    v
+}
+
+/// Shows the card for `iv` (from meeting `meeting_id`) without taking focus.
+pub fn show(app: &AppHandle, meeting_id: i64, iv: &Intervention) {
     let handle = app.clone();
-    let iv = iv.clone();
+    let iv = card_payload(meeting_id, iv);
     INTERVENTION_GENERATION.fetch_add(1, Ordering::SeqCst);
     let _ = app.run_on_main_thread(move || {
         let Some(window) = handle.get_webview_window(LABEL) else {
@@ -144,4 +154,27 @@ pub fn hide(app: &AppHandle) {
             let _ = window.hide();
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn card_payload_merges_meeting_id_into_intervention_fields() {
+        let iv = Intervention {
+            id: 7,
+            session_id: 3,
+            ts: 1000,
+            kind: "loop".into(),
+            text: "t".into(),
+            reason: "r".into(),
+            dismissed: false,
+        };
+        let v = card_payload(42, &iv);
+        assert_eq!(v["meeting_id"], 42);
+        assert_eq!(v["id"], 7);
+        assert_eq!(v["kind"], "loop");
+        assert_eq!(v["text"], "t");
+    }
 }

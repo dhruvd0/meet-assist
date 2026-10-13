@@ -147,7 +147,14 @@
     },
     "observer": {
       "toolsUnavailable": "This provider does not support tools; the assistant answers from the transcript only.",
-      "failing": "The assistant has failed {{count}} times in a row. Check the provider settings."
+      "failing": "The assistant has failed {{count}} times in a row. Check the provider settings.",
+      "readiness": {
+        "disabled": "The meeting assistant is off. Turn it on under Advanced settings.",
+        "no_provider": "No provider is set for the meeting assistant. Choose one under Advanced settings.",
+        "unsupported_provider": "{{detail}} cannot run the meeting assistant. Choose another provider under Advanced settings.",
+        "missing_api_key": "No API key for {{detail}}. Add one under Post Processing settings.",
+        "no_model": "No model is selected for {{detail}}. Pick one under Post Processing settings."
+      }
     }
   },
   "onboarding": {
@@ -790,6 +797,10 @@
     "meeting": {
       "title": "Meeting assistant",
       "description": "How the assistant watches live meetings.",
+      "enabled": {
+        "label": "Meeting assistant",
+        "description": "When on, every {{interval}} seconds the recent transcript, your project brief and meeting context are sent to the chosen provider so the assistant can decide whether to speak up."
+      },
       "provider": {
         "label": "Provider",
         "description": "Which post-processing provider answers during meetings. Empty uses the post-processing default.",

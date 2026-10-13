@@ -91,7 +91,7 @@ fn handle_inner(ctx: &ToolContext, call: &ToolCall) -> Result<Value, String> {
             }
             let path = a["path"].as_str();
             let offset = a["offset"].as_u64().unwrap_or(0) as usize;
-            let limit = a["limit"].as_u64().unwrap_or(3).clamp(1, 20) as usize;
+            let limit = a["limit"].as_u64().unwrap_or(2).clamp(1, 20) as usize;
             let chunks = ctx
                 .store
                 .read_chunks(sid, path, offset, limit)
@@ -226,6 +226,25 @@ mod tests {
             .as_str()
             .unwrap()
             .contains("five"));
+    }
+
+    #[test]
+    fn read_source_defaults_to_two_chunks() {
+        let (_d, c) = ctx();
+        let pid = c.project_id.unwrap();
+        let src = c
+            .store
+            .add_source(pid, SourceKind::Text, "Long", "")
+            .unwrap();
+        let chunks: Vec<(String, String)> =
+            (0..5).map(|i| ("".into(), format!("chunk {i}"))).collect();
+        c.store.replace_chunks(src.id, &chunks).unwrap();
+        let out: Value = serde_json::from_str(&handle_tool(
+            &c,
+            &call("read_source", json!({"source_id": src.id})),
+        ))
+        .unwrap();
+        assert_eq!(out["chunks"].as_array().unwrap().len(), 2);
     }
 
     #[test]

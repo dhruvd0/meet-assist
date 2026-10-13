@@ -224,6 +224,14 @@ async changePostProcessEnabledSetting(enabled: boolean) : Promise<Result<null, s
     else return { status: "error", error: e  as any };
 }
 },
+async changeMeetingAssistantSetting(enabled: boolean) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("change_meeting_assistant_setting", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async changeMeetingProviderSetting(providerId: string) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("change_meeting_provider_setting", { providerId }) };
@@ -1173,6 +1181,17 @@ async dismissIntervention(id: number) : Promise<Result<null, string>> {
 },
 async hideInterventionWindow() : Promise<void> {
     await TAURI_INVOKE("hide_intervention_window");
+},
+async focusMeeting(meetingId: number) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("focus_meeting", { meetingId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async getObserverReadiness() : Promise<ObserverReadiness> {
+    return await TAURI_INVOKE("get_observer_readiness");
 }
 }
 
@@ -1185,6 +1204,7 @@ interventionPayload: InterventionPayload,
 meetingCaptureWarningPayload: MeetingCaptureWarningPayload,
 meetingStatePayload: MeetingStatePayload,
 observerStatusPayload: ObserverStatusPayload,
+openMeetingPayload: OpenMeetingPayload,
 sourceStatusPayload: SourceStatusPayload,
 streamPhaseEvent: StreamPhaseEvent,
 streamTextEvent: StreamTextEvent,
@@ -1195,6 +1215,7 @@ interventionPayload: "intervention-payload",
 meetingCaptureWarningPayload: "meeting-capture-warning-payload",
 meetingStatePayload: "meeting-state-payload",
 observerStatusPayload: "observer-status-payload",
+openMeetingPayload: "open-meeting-payload",
 sourceStatusPayload: "source-status-payload",
 streamPhaseEvent: "stream-phase-event",
 streamTextEvent: "stream-text-event",
@@ -1248,6 +1269,11 @@ whats_new_last_seen_version?: string; selected_model?: string; onboarding_comple
  * None means "average all channels" (original behavior).
  */
 selected_channel?: number | null; clamshell_microphone?: string | null; selected_output_device?: string | null; translate_to_english?: boolean; selected_language?: string; overlay_position?: OverlayPosition; debug_mode?: boolean; log_level?: LogLevel; custom_words?: string[]; model_unload_timeout?: ModelUnloadTimeout; word_correction_threshold?: number; history_limit?: number; recording_retention_period?: RecordingRetentionPeriod; paste_method?: PasteMethod; clipboard_handling?: ClipboardHandling; auto_submit?: boolean; auto_submit_key?: AutoSubmitKey; post_process_enabled?: boolean; post_process_provider_id?: string; post_process_providers?: PostProcessProvider[]; post_process_api_keys?: SecretMap; post_process_models?: Partial<{ [key in string]: string }>; 
+/**
+ * Opt-in for the meeting assistant (observer). Off by default because it
+ * sends transcript, brief and context to the chosen provider.
+ */
+meeting_assistant_enabled?: boolean; 
 /**
  * Provider for the meeting observer; empty means the post-processing provider.
  */
@@ -1361,7 +1387,25 @@ sha256: string | null } } |
  */
 "Local"
 export type ModelUnloadTimeout = "never" | "immediately" | "min_2" | "min_5" | "min_10" | "min_15" | "hour_1" | "sec_15"
-export type ObserverStatusPayload = { meeting_id: number | null; tools_unavailable: boolean; consecutive_failures: number }
+/**
+ * Current observer readiness, so a view opened after the last
+ * `ObserverStatusPayload` (emitted only on change) still knows it.
+ */
+export type ObserverReadiness = { readiness: string; detail: string | null }
+export type ObserverStatusPayload = { meeting_id: number | null; tools_unavailable: boolean; consecutive_failures: number; 
+/**
+ * One of `ready|disabled|no_provider|unsupported_provider|missing_api_key|no_model`.
+ */
+readiness: string; 
+/**
+ * Provider label for readiness states that name one.
+ */
+detail: string | null }
+/**
+ * Asks the main window to open a meeting (sent when the user clicks
+ * "Open meeting" on the intervention card).
+ */
+export type OpenMeetingPayload = { meeting_id: number }
 export type OrtAcceleratorSetting = "auto" | "cpu" | "cuda" | "directml" | "rocm"
 export type OverlayPosition = "top" | "bottom"
 /**

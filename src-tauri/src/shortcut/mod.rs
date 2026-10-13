@@ -1080,6 +1080,15 @@ pub fn change_meeting_observer_interval_setting(app: AppHandle, secs: u32) -> Re
 
 #[tauri::command]
 #[specta::specta]
+pub fn change_meeting_assistant_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.meeting_assistant_enabled = enabled;
+    settings::write_settings(&app, settings);
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
 pub fn change_meeting_beep_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
     let mut settings = settings::get_settings(&app);
     settings.meeting_beep_enabled = enabled;

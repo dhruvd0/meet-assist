@@ -7,13 +7,13 @@ use crate::llm_client::{self, ToolLoopError};
 use crate::meeting::session::MeetingManager;
 use crate::meeting::store::{Intervention, ProjectStore, TranscriptLine};
 use crate::meeting::tools::{handle_tool, tool_defs, ToolContext};
-use crate::settings::{AppSettings, MeetingSensitivity};
+use crate::settings::{AppSettings, MeetingSensitivity, PostProcessProvider};
 use anyhow::Result;
 use log::{info, warn};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use specta::Type;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tauri::AppHandle;
 use tauri_specta::Event;
 
@@ -21,6 +21,15 @@ pub const COOLDOWN_MS: i64 = 60_000;
 pub const WINDOW_MS: i64 = 180_000;
 pub const MAX_TOOL_CALLS: usize = 5;
 pub const DEDUPE_RECENT: usize = 3;
+/// Max characters of the meeting's context pasted into the prompt; the model
+/// can read sources and the transcript through tools for more.
+pub const CONTEXT_MAX_CHARS: usize = 4096;
+/// Max characters of an intervention card's text.
+pub const CARD_TEXT_MAX_CHARS: usize = 280;
+/// Consecutive judge failures after which the observer slows down.
+pub const BACKOFF_AFTER_FAILURES: u32 = 5;
+/// Interval multiplier while backing off.
+pub const BACKOFF_FACTOR: u64 = 4;
 const VALID_KINDS: [&str; 4] = ["loop", "stuck", "info", "idea"];
 
 #[derive(Debug, Clone, Deserialize)]
@@ -55,7 +64,87 @@ pub fn parse_verdict(text: &str) -> Result<Verdict, String> {
         .or_else(|| t.strip_prefix("```"))
         .unwrap_or(t);
     let t = t.strip_suffix("```").unwrap_or(t).trim();
+    // Models sometimes wrap the object in prose; keep the outermost braces.
+    let t = match (t.find('{'), t.rfind('}')) {
+        (Some(a), Some(b)) if a < b => &t[a..=b],
+        _ => t,
+    };
     serde_json::from_str::<Verdict>(t).map_err(|e| format!("verdict parse: {e}"))
+}
+
+/// Truncate to at most `max` characters (never splitting a character).
+fn truncate_chars(s: &str, max: usize) -> (&str, bool) {
+    match s.char_indices().nth(max) {
+        Some((cut, _)) => (&s[..cut], true),
+        None => (s, false),
+    }
+}
+
+/// Whether the observer can run with the current settings.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Readiness {
+    Ready,
+    Disabled,
+    NoProvider,
+    /// Provider label.
+    UnsupportedProvider(String),
+    /// Provider label.
+    MissingApiKey(String),
+    /// Provider label.
+    NoModel(String),
+}
+
+impl Readiness {
+    pub fn code(&self) -> &'static str {
+        match self {
+            Readiness::Ready => "ready",
+            Readiness::Disabled => "disabled",
+            Readiness::NoProvider => "no_provider",
+            Readiness::UnsupportedProvider(_) => "unsupported_provider",
+            Readiness::MissingApiKey(_) => "missing_api_key",
+            Readiness::NoModel(_) => "no_model",
+        }
+    }
+
+    pub fn detail(&self) -> Option<String> {
+        match self {
+            Readiness::UnsupportedProvider(l)
+            | Readiness::MissingApiKey(l)
+            | Readiness::NoModel(l) => Some(l.clone()),
+            _ => None,
+        }
+    }
+}
+
+fn is_local(provider: &PostProcessProvider) -> bool {
+    let u = provider.base_url.to_ascii_lowercase();
+    u.contains("localhost") || u.contains("127.0.0.1")
+}
+
+pub fn readiness(settings: &AppSettings) -> Readiness {
+    if !settings.meeting_assistant_enabled {
+        return Readiness::Disabled;
+    }
+    let Some(provider) = settings.meeting_provider() else {
+        return Readiness::NoProvider;
+    };
+    let label = provider.label.clone();
+    if provider.id == crate::settings::APPLE_INTELLIGENCE_PROVIDER_ID
+        || !provider.base_url.trim().starts_with("http")
+    {
+        return Readiness::UnsupportedProvider(label);
+    }
+    if settings.meeting_api_key().trim().is_empty() && !is_local(provider) {
+        return Readiness::MissingApiKey(label);
+    }
+    if settings
+        .meeting_model()
+        .map(|m| m.trim().is_empty())
+        .unwrap_or(true)
+    {
+        return Readiness::NoModel(label);
+    }
+    Readiness::Ready
 }
 
 pub struct JudgeInput {
@@ -82,7 +171,39 @@ pub trait Judge: Send + Sync {
 }
 
 pub struct LlmJudge {
-    pub app: AppHandle,
+    app: AppHandle,
+    /// One HTTP client per observer, rebuilt when the provider or key changes.
+    /// Keyed by provider id, base URL and a hash of the API key.
+    client: Mutex<Option<(String, reqwest::Client)>>,
+}
+
+impl LlmJudge {
+    pub fn new(app: AppHandle) -> Self {
+        Self {
+            app,
+            client: Mutex::new(None),
+        }
+    }
+
+    fn client_for(
+        &self,
+        provider: &PostProcessProvider,
+        api_key: &str,
+    ) -> Result<reqwest::Client, String> {
+        use std::hash::{Hash, Hasher};
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        api_key.hash(&mut h);
+        let key = format!("{}|{}|{:x}", provider.id, provider.base_url, h.finish());
+        let mut slot = self.client.lock().unwrap_or_else(|p| p.into_inner());
+        if let Some((k, c)) = slot.as_ref() {
+            if *k == key {
+                return Ok(c.clone());
+            }
+        }
+        let c = llm_client::create_tool_client(provider, api_key)?;
+        *slot = Some((key, c.clone()));
+        Ok(c)
+    }
 }
 
 impl Judge for LlmJudge {
@@ -101,11 +222,14 @@ impl Judge for LlmJudge {
             .meeting_model()
             .ok_or_else(|| JudgeError::Other("no model configured".into()))?;
         let api_key = settings.meeting_api_key();
+        let client = self
+            .client_for(&provider, &api_key)
+            .map_err(JudgeError::Other)?;
         let defs = if allow_tools { tool_defs() } else { Vec::new() };
         let handler = |c: &llm_client::ToolCall| handle_tool(tools_ctx, c);
-        let fut = llm_client::send_with_tools(
+        let fut = llm_client::send_with_tools_with_client(
+            &client,
             &provider,
-            api_key,
             &model,
             input.system.clone(),
             input.user.clone(),
@@ -153,6 +277,7 @@ pub fn build_prompt(
     };
     let system = format!(
         "You are a silent meeting copilot for one participant. You read their live transcript and answer ONE question: should you speak up right now? Silence is the default answer.\n\
+         Speakers: `me` is the user you assist; `them` is everyone else on the call.\n\
          Signals: the same point restated three or more times without a decision (kind \"loop\"); a long pause or someone saying they do not know how to proceed (kind \"stuck\"); a factual question nobody answers (kind \"info\"); the discussion converging while an obvious alternative is untried (kind \"idea\").\n\
          {sensitivity_rule}\n{tools_rule}\n\
          Answer with JSON only, exactly this shape: {{\"intervene\": boolean, \"kind\": \"loop\"|\"stuck\"|\"info\"|\"idea\"|null, \"text\": string|null, \"reason\": string}}. \
@@ -172,11 +297,15 @@ pub fn build_prompt(
         None => user.push_str("(none)"),
     }
     user.push_str("\n\n## This meeting's context\n");
-    user.push_str(if context.trim().is_empty() {
-        "(none)"
+    if context.trim().is_empty() {
+        user.push_str("(none)");
     } else {
-        context
-    });
+        let (ctx, cut) = truncate_chars(context, CONTEXT_MAX_CHARS);
+        user.push_str(ctx);
+        if cut {
+            user.push_str("\n[truncated]");
+        }
+    }
     user.push_str("\n\n## Recent interventions (do not repeat)\n");
     if recent.is_empty() {
         user.push_str("(none)");
@@ -195,7 +324,9 @@ pub fn build_prompt(
 #[derive(Debug, Default, Clone)]
 pub struct ObserverState {
     pub last_intervention_ts: i64,
-    pub last_seen_line_ts: i64,
+    /// Highest transcript line id judged successfully; failed ticks leave it
+    /// alone so the same window is retried.
+    pub last_seen_line_id: i64,
     pub consecutive_failures: u32,
     pub tools_unavailable: bool,
 }
@@ -245,11 +376,10 @@ pub fn tick(
     let (Some(meeting_id), Some(session_id)) = (st.meeting_id, st.session_id) else {
         return Ok(None);
     };
-    let latest = store.latest_line_ts(meeting_id)?.unwrap_or(0);
-    if latest <= state.last_seen_line_ts {
+    let latest = store.latest_line_id(meeting_id)?.unwrap_or(0);
+    if latest <= state.last_seen_line_id {
         return Ok(None);
     }
-    state.last_seen_line_ts = latest;
 
     let meeting = store
         .get_meeting(meeting_id)?
@@ -309,13 +439,15 @@ pub fn tick(
         }
     };
     state.consecutive_failures = 0;
+    state.last_seen_line_id = latest;
     if !should_emit(&verdict, now_ms, state, &recent) {
         info!("observer: no intervention ({})", verdict.reason);
         return Ok(None);
     }
     let kind = verdict.kind.unwrap_or_default();
     let text = verdict.text.unwrap_or_default();
-    let iv = store.add_intervention(session_id, &kind, text.trim(), &verdict.reason)?;
+    let (text, _) = truncate_chars(text.trim(), CARD_TEXT_MAX_CHARS);
+    let iv = store.add_intervention(session_id, &kind, text, &verdict.reason)?;
     state.last_intervention_ts = now_ms;
     Ok(Some(iv))
 }
@@ -326,11 +458,25 @@ pub struct InterventionPayload {
     pub intervention: Intervention,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, Type, tauri_specta::Event)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Type, tauri_specta::Event)]
 pub struct ObserverStatusPayload {
     pub meeting_id: Option<i64>,
     pub tools_unavailable: bool,
     pub consecutive_failures: u32,
+    /// One of `ready|disabled|no_provider|unsupported_provider|missing_api_key|no_model`.
+    pub readiness: String,
+    /// Provider label for readiness states that name one.
+    pub detail: Option<String>,
+}
+
+/// Sleep between ticks: the interval, or `BACKOFF_FACTOR` times it after
+/// `BACKOFF_AFTER_FAILURES` consecutive failures.
+pub fn tick_delay_secs(interval_secs: u64, consecutive_failures: u32) -> u64 {
+    if consecutive_failures >= BACKOFF_AFTER_FAILURES {
+        interval_secs * BACKOFF_FACTOR
+    } else {
+        interval_secs
+    }
 }
 
 pub fn spawn_observer(
@@ -344,17 +490,39 @@ pub fn spawn_observer(
         .spawn(move || {
             let mut state = ObserverState::default();
             let mut last_meeting: Option<i64> = None;
+            let mut last_status: Option<ObserverStatusPayload> = None;
             loop {
                 let settings = crate::settings::get_settings(&app);
                 let interval = settings.meeting_observer_interval_secs.clamp(10, 120) as u64;
-                std::thread::sleep(std::time::Duration::from_secs(interval));
-                if !mm.is_live() {
-                    continue;
-                }
+                let delay = tick_delay_secs(interval, state.consecutive_failures);
+                std::thread::sleep(std::time::Duration::from_secs(delay));
+                // Re-read: settings may have changed while sleeping.
+                let settings = crate::settings::get_settings(&app);
                 let st = mm.state();
                 if st.meeting_id != last_meeting {
                     state = ObserverState::default();
                     last_meeting = st.meeting_id;
+                }
+                let ready = readiness(&settings);
+                let mut emit_status = |state: &ObserverState| {
+                    let payload = ObserverStatusPayload {
+                        meeting_id: st.meeting_id,
+                        tools_unavailable: state.tools_unavailable,
+                        consecutive_failures: state.consecutive_failures,
+                        readiness: ready.code().to_string(),
+                        detail: ready.detail(),
+                    };
+                    if last_status.as_ref() != Some(&payload) {
+                        let _ = payload.clone().emit(&app);
+                        last_status = Some(payload);
+                    }
+                };
+                emit_status(&state);
+                if !(settings.meeting_assistant_enabled && mm.is_live()) {
+                    continue;
+                }
+                if ready != Readiness::Ready {
+                    continue;
                 }
                 let now = chrono::Utc::now().timestamp_millis();
                 match tick(&store, judge.as_ref(), &mm, &settings, &mut state, now) {
@@ -368,18 +536,13 @@ pub fn spawn_observer(
                                 intervention: iv.clone(),
                             })
                             .emit(&app);
+                            crate::intervention::show(&app, mid, &iv);
                         }
-                        crate::intervention::show(&app, &iv);
                     }
                     Ok(None) => {}
                     Err(e) => warn!("observer tick error: {e:#}"),
                 }
-                let _ = (ObserverStatusPayload {
-                    meeting_id: st.meeting_id,
-                    tools_unavailable: state.tools_unavailable,
-                    consecutive_failures: state.consecutive_failures,
-                })
-                .emit(&app);
+                emit_status(&state);
             }
         });
 }
@@ -496,7 +659,7 @@ mod tests {
     fn should_emit_applies_cooldown_and_dedupe() {
         let state = ObserverState {
             last_intervention_ts: 100_000,
-            last_seen_line_ts: 0,
+            last_seen_line_id: 0,
             consecutive_failures: 0,
             tools_unavailable: false,
         };
@@ -601,6 +764,161 @@ mod tests {
         let out = tick(&store, &judge, &mm, &settings, &mut st, 200_000).unwrap();
         assert!(out.is_none());
         assert_eq!(st.consecutive_failures, 1);
+    }
+
+    #[test]
+    fn failed_tick_retries_same_window() {
+        let (_d, store, mm, _mid) = setup();
+        let judge = ScriptedJudge {
+            verdicts: Mutex::new(vec![
+                Err(JudgeError::Other("timeout".into())),
+                Ok(v(false, "loop", "")),
+            ]),
+            calls: Mutex::new(vec![]),
+        };
+        let settings = crate::settings::get_default_settings();
+        let mut st = ObserverState::default();
+        assert!(tick(&store, &judge, &mm, &settings, &mut st, 200_000)
+            .unwrap()
+            .is_none());
+        assert_eq!(st.last_seen_line_id, 0, "failure must not advance");
+        // No new lines, but the failed window is retried.
+        assert!(tick(&store, &judge, &mm, &settings, &mut st, 220_000)
+            .unwrap()
+            .is_none());
+        assert_eq!(judge.calls.lock().unwrap().len(), 2);
+        assert_eq!(st.consecutive_failures, 0);
+        assert!(st.last_seen_line_id > 0);
+    }
+
+    #[test]
+    fn tick_caps_card_text() {
+        let (_d, store, mm, mid) = setup();
+        let long = "é".repeat(400);
+        let judge = ScriptedJudge {
+            verdicts: Mutex::new(vec![Ok(v(true, "info", &long))]),
+            calls: Mutex::new(vec![]),
+        };
+        let settings = crate::settings::get_default_settings();
+        let mut st = ObserverState::default();
+        let iv = tick(&store, &judge, &mm, &settings, &mut st, 200_000)
+            .unwrap()
+            .unwrap();
+        assert_eq!(iv.text.chars().count(), CARD_TEXT_MAX_CHARS);
+        assert_eq!(
+            store.list_interventions(mid).unwrap()[0]
+                .text
+                .chars()
+                .count(),
+            CARD_TEXT_MAX_CHARS
+        );
+    }
+
+    #[test]
+    fn backoff_after_repeated_failures() {
+        assert_eq!(tick_delay_secs(20, 0), 20);
+        assert_eq!(tick_delay_secs(20, 4), 20);
+        assert_eq!(tick_delay_secs(20, 5), 80);
+        assert_eq!(tick_delay_secs(20, 9), 80);
+    }
+
+    #[test]
+    fn prompt_explains_speakers_and_caps_context() {
+        let ctx = "x".repeat(CONTEXT_MAX_CHARS + 500);
+        let p = build_prompt("", None, &ctx, &[], &[], MeetingSensitivity::Medium, true);
+        assert!(p.system.contains("`me` is the user you assist"));
+        assert!(p.system.contains("`them` is everyone else"));
+        assert!(p.user.contains("[truncated]"));
+        assert!(!p.user.contains(&"x".repeat(CONTEXT_MAX_CHARS + 1)));
+        assert!(p.user.contains(&"x".repeat(CONTEXT_MAX_CHARS)));
+        let short = build_prompt(
+            "",
+            None,
+            "agenda",
+            &[],
+            &[],
+            MeetingSensitivity::Medium,
+            true,
+        );
+        assert!(!short.user.contains("[truncated]"));
+    }
+
+    fn settings_with(id: &str, base_url: &str, key: &str, model: &str) -> AppSettings {
+        let mut s = crate::settings::get_default_settings();
+        s.meeting_assistant_enabled = true;
+        s.post_process_providers.retain(|p| p.id != id);
+        s.post_process_providers.push(PostProcessProvider {
+            id: id.into(),
+            label: format!("{id} label"),
+            base_url: base_url.into(),
+            allow_base_url_edit: true,
+            models_endpoint: None,
+            supports_structured_output: false,
+            api_format: crate::settings::PostProcessApiFormat::OpenAi,
+        });
+        s.meeting_provider_id = id.into();
+        s.post_process_api_keys.insert(id.into(), key.into());
+        if model.is_empty() {
+            s.post_process_models.remove(id);
+        } else {
+            s.post_process_models.insert(id.into(), model.into());
+        }
+        s
+    }
+
+    #[test]
+    fn readiness_reports_each_blocker() {
+        let mut off = settings_with("openai", "https://api.openai.com/v1", "k", "gpt");
+        off.meeting_assistant_enabled = false;
+        assert_eq!(readiness(&off), Readiness::Disabled);
+
+        let mut none = settings_with("openai", "https://api.openai.com/v1", "k", "gpt");
+        none.meeting_provider_id = "missing".into();
+        none.post_process_provider_id = "also-missing".into();
+        assert_eq!(readiness(&none), Readiness::NoProvider);
+
+        let apple = settings_with(
+            crate::settings::APPLE_INTELLIGENCE_PROVIDER_ID,
+            "apple-intelligence://local",
+            "",
+            "m",
+        );
+        assert_eq!(readiness(&apple).code(), "unsupported_provider");
+        let odd = settings_with("weird", "file:///x", "k", "m");
+        assert_eq!(
+            readiness(&odd),
+            Readiness::UnsupportedProvider("weird label".into())
+        );
+
+        let nokey = settings_with("openai", "https://api.openai.com/v1", " ", "gpt");
+        assert_eq!(
+            readiness(&nokey),
+            Readiness::MissingApiKey("openai label".into())
+        );
+        assert_eq!(readiness(&nokey).detail().as_deref(), Some("openai label"));
+
+        let local = settings_with("custom", "http://localhost:11434/v1", "", "llama");
+        assert_eq!(readiness(&local), Readiness::Ready);
+        let loopback = settings_with("lm", "http://127.0.0.1:1234/v1", "", "m");
+        assert_eq!(readiness(&loopback), Readiness::Ready);
+
+        let nomodel = settings_with("openai", "https://api.openai.com/v1", "k", "");
+        assert_eq!(readiness(&nomodel).code(), "no_model");
+
+        let ok = settings_with("openai", "https://api.openai.com/v1", "k", "gpt");
+        assert_eq!(readiness(&ok), Readiness::Ready);
+        assert_eq!(readiness(&ok).code(), "ready");
+    }
+
+    #[test]
+    fn parse_verdict_tolerates_surrounding_prose() {
+        let obj = "{\"intervene\":false,\"kind\":null,\"text\":null,\"reason\":\"quiet\"}";
+        let lead = parse_verdict(&format!("Here is my answer: {obj}")).unwrap();
+        assert_eq!(lead.reason, "quiet");
+        let trail = parse_verdict(&format!("{obj}\nHope that helps!")).unwrap();
+        assert_eq!(trail.reason, "quiet");
+        let fenced = parse_verdict(&format!("Sure.\n```json\n{obj}\n```\nDone.")).unwrap();
+        assert_eq!(fenced.reason, "quiet");
     }
 
     #[test]

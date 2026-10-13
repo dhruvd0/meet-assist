@@ -28,7 +28,8 @@ import { Sidebar, SidebarSection, SECTIONS_CONFIG } from "./components/Sidebar";
 import { WhatsNewGate } from "./components/whats-new";
 import { useSettings } from "./hooks/useSettings";
 import { useSettingsStore } from "./stores/settingsStore";
-import { commands } from "@/bindings";
+import { commands, events } from "@/bindings";
+import { useMeetingStore } from "./stores/meetingStore";
 import { getLanguageDirection, initializeRTL } from "@/lib/utils/rtl";
 
 type OnboardingStep = "accessibility" | "model" | "done";
@@ -165,6 +166,18 @@ function App() {
       unlisten.then((fn) => fn());
     };
   }, [t]);
+
+  // "Open meeting" on the intervention card: show the Meetings section with
+  // that meeting open (the section may not be mounted to hear it itself).
+  useEffect(() => {
+    const unlisten = events.openMeetingPayload.listen((e) => {
+      useMeetingStore.getState().openMeeting(e.payload.meeting_id);
+      setCurrentSection("meetings");
+    });
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, []);
 
   // Listen for paste failures and show a toast.
   // The technical error detail is logged to handy.log on the Rust side

@@ -1,7 +1,10 @@
 use crate::meeting::session::{MeetingManager, MeetingStatePayload};
 use crate::meeting::store::{Intervention, Meeting, MeetingDetail};
+use serde::{Deserialize, Serialize};
+use specta::Type;
 use std::sync::Arc;
-use tauri::State;
+use tauri::{Manager, State};
+use tauri_specta::Event;
 
 type Mm<'a> = State<'a, Arc<MeetingManager>>;
 
@@ -101,4 +104,44 @@ pub fn dismiss_intervention(mm: Mm<'_>, id: i64) -> Result<(), String> {
 #[specta::specta]
 pub fn hide_intervention_window(app: tauri::AppHandle) {
     crate::intervention::hide(&app);
+}
+
+/// Asks the main window to open a meeting (sent when the user clicks
+/// "Open meeting" on the intervention card).
+#[derive(Clone, Debug, Serialize, Deserialize, Type, tauri_specta::Event)]
+pub struct OpenMeetingPayload {
+    pub meeting_id: i64,
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn focus_meeting(app: tauri::AppHandle, meeting_id: i64) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.show();
+        let _ = window.unminimize();
+        let _ = window.set_focus();
+    }
+    OpenMeetingPayload { meeting_id }
+        .emit(&app)
+        .map_err(|e| e.to_string())?;
+    crate::intervention::hide(&app);
+    Ok(())
+}
+
+/// Current observer readiness, so a view opened after the last
+/// `ObserverStatusPayload` (emitted only on change) still knows it.
+#[derive(Clone, Debug, Serialize, Deserialize, Type)]
+pub struct ObserverReadiness {
+    pub readiness: String,
+    pub detail: Option<String>,
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn get_observer_readiness(app: tauri::AppHandle) -> ObserverReadiness {
+    let r = crate::meeting::observer::readiness(&crate::settings::get_settings(&app));
+    ObserverReadiness {
+        readiness: r.code().to_string(),
+        detail: r.detail(),
+    }
 }

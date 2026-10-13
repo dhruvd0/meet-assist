@@ -681,15 +681,29 @@ impl std::fmt::Display for ToolLoopError {
     }
 }
 
+/// Narrow heuristic: the error body names the `tools` field. Kept as a
+/// diagnostic for logs; the loop itself falls back on a broader rule
+/// (`should_fallback_without_tools`), because providers word this many ways.
 pub fn is_tools_rejection(status: u16, body: &str) -> bool {
     (status == 400 || status == 422) && body.to_ascii_lowercase().contains("tool")
 }
 
+/// Whether a non-2xx answer to the first tooled request should trigger the
+/// no-tools fallback. Anything but an auth failure might be the endpoint
+/// choking on `tools`/`tool_choice`, and retrying plainly costs one request;
+/// auth failures would fail the same way without tools.
+pub fn should_fallback_without_tools(status: u16) -> bool {
+    !(200..300).contains(&status) && status != 401 && status != 403
+}
+
+/// Build an OpenAI-format tool request. `tool_choice_none` keeps the tool
+/// definitions (so earlier tool messages stay valid) but forbids new calls.
 pub fn openai_tool_request(
     model: &str,
     messages: &[Value],
     tools: &[ToolDef],
     final_schema: Option<&Value>,
+    tool_choice_none: bool,
 ) -> Value {
     let mut req = serde_json::json!({ "model": model, "messages": messages, "stream": false });
     if !tools.is_empty() {
@@ -704,6 +718,9 @@ pub fn openai_tool_request(
                 })
                 .collect(),
         );
+        if tool_choice_none {
+            req["tool_choice"] = Value::String("none".into());
+        }
     }
     if let Some(schema) = final_schema {
         req["response_format"] = serde_json::json!({
@@ -757,11 +774,15 @@ pub fn openai_assistant_tool_call_message(calls: &[ToolCall], text: Option<&str>
     })
 }
 
+/// Build an Anthropic Messages tool request. `tool_choice_none` keeps the
+/// tool definitions (required once `tool_use` blocks are in the history) but
+/// forbids new calls.
 pub fn anthropic_tool_request(
     model: &str,
     system: &str,
     messages: &[Value],
     tools: &[ToolDef],
+    tool_choice_none: bool,
 ) -> Value {
     let mut req = serde_json::json!({
         "model": model, "max_tokens": ANTHROPIC_MAX_TOKENS, "system": system, "messages": messages
@@ -773,6 +794,9 @@ pub fn anthropic_tool_request(
                 .map(|t| serde_json::json!({ "name": t.name, "description": t.description, "input_schema": t.input_schema }))
                 .collect(),
         );
+        if tool_choice_none {
+            req["tool_choice"] = serde_json::json!({ "type": "none" });
+        }
     }
     req
 }
@@ -828,10 +852,24 @@ fn truncate_at_char_boundary(s: &mut String, max: usize) {
     s.truncate(cut);
 }
 
+/// Merge the reasoning-disable fields into an OpenAI-format JSON body.
+fn merge_reasoning(body: &mut Value, reasoning: &ReasoningParams) {
+    if let (Some(obj), Ok(Value::Object(fields))) =
+        (body.as_object_mut(), serde_json::to_value(reasoning))
+    {
+        for (k, v) in fields {
+            obj.insert(k, v);
+        }
+    }
+}
+
 /// Run a tool-calling conversation until the model answers without tool
-/// calls, or `max_tool_calls` is reached (then one final no-tools request
-/// demanding the answer). Returns the final assistant text.
+/// calls, or `max_tool_calls` is reached (then one final request with
+/// `tool_choice: none` demanding the answer). Returns the final assistant
+/// text. Builds a fresh client; long-lived callers should hold one and use
+/// `send_with_tools_with_client`.
 #[allow(clippy::too_many_arguments)] // mirrors the request shape; a params struct adds no clarity
+#[cfg_attr(not(test), allow(dead_code))] // the observer holds its own client
 pub async fn send_with_tools(
     provider: &PostProcessProvider,
     api_key: String,
@@ -844,12 +882,57 @@ pub async fn send_with_tools(
     handler: &(dyn Fn(&ToolCall) -> String + Sync),
 ) -> Result<String, ToolLoopError> {
     let client = create_client(provider, &api_key).map_err(ToolLoopError::Other)?;
+    send_with_tools_with_client(
+        &client,
+        provider,
+        model,
+        system_prompt,
+        user_content,
+        tools,
+        final_schema,
+        max_tool_calls,
+        handler,
+    )
+    .await
+}
+
+/// Build the HTTP client `send_with_tools_with_client` expects for a provider.
+pub fn create_tool_client(
+    provider: &PostProcessProvider,
+    api_key: &str,
+) -> Result<reqwest::Client, String> {
+    create_client(provider, api_key)
+}
+
+/// `send_with_tools` over a caller-owned client (built by `create_tool_client`
+/// with the provider's auth headers), so connections are reused across calls.
+#[allow(clippy::too_many_arguments)] // mirrors the request shape; a params struct adds no clarity
+pub async fn send_with_tools_with_client(
+    client: &reqwest::Client,
+    provider: &PostProcessProvider,
+    model: &str,
+    system_prompt: String,
+    user_content: String,
+    tools: &[ToolDef],
+    final_schema: Value,
+    max_tool_calls: usize,
+    handler: &(dyn Fn(&ToolCall) -> String + Sync),
+) -> Result<String, ToolLoopError> {
     let base = provider.base_url.trim_end_matches('/');
     let anthropic = provider.api_format == PostProcessApiFormat::Anthropic;
     let url = if anthropic {
         format!("{base}/messages")
     } else {
         format!("{base}/chat/completions")
+    };
+    let key = endpoint_key(provider, model);
+    // Anthropic-format endpoints never get reasoning fields (as in
+    // `send_anthropic_message`); OpenAI-format ones get the same fields as
+    // dictation post-processing unless this endpoint already rejected them.
+    let mut reasoning = if anthropic || is_known_rejected(&key) {
+        ReasoningParams::default()
+    } else {
+        reasoning_disable_params(provider)
     };
 
     let mut messages: Vec<Value> = Vec::new();
@@ -861,41 +944,44 @@ pub async fn send_with_tools(
     let mut calls_made = 0usize;
     let mut first_request = true;
     loop {
-        let tools_now: &[ToolDef] = if calls_made >= max_tool_calls {
-            &[]
-        } else {
-            tools
-        };
-        if calls_made >= max_tool_calls {
+        let final_turn = calls_made >= max_tool_calls;
+        if final_turn {
             messages.push(serde_json::json!({ "role": "user", "content": "Tool budget exhausted. Answer now with the final JSON only." }));
         }
-        let body = if anthropic {
-            anthropic_tool_request(model, &system_prompt, &messages, tools_now)
+        let tool_choice_none = final_turn && !tools.is_empty();
+        let schema = if provider.supports_structured_output && (final_turn || tools.is_empty()) {
+            Some(&final_schema)
         } else {
-            openai_tool_request(
-                model,
-                &messages,
-                tools_now,
-                if tools_now.is_empty() {
-                    Some(&final_schema)
-                } else {
-                    None
-                },
-            )
+            None
         };
-        let resp = client
-            .post(&url)
-            .json(&body)
-            .send()
-            .await
-            .map_err(|e| ToolLoopError::Other(e.to_string()))?;
-        let status = resp.status().as_u16();
-        let text = resp
-            .text()
-            .await
-            .map_err(|e| ToolLoopError::Other(e.to_string()))?;
+        let build = |reasoning: &ReasoningParams| {
+            if anthropic {
+                anthropic_tool_request(model, &system_prompt, &messages, tools, tool_choice_none)
+            } else {
+                let mut body =
+                    openai_tool_request(model, &messages, tools, schema, tool_choice_none);
+                merge_reasoning(&mut body, reasoning);
+                body
+            }
+        };
+        let (mut status, mut text) = post_json(client, &url, &build(&reasoning)).await?;
+        // A 400/422 on a request carrying reasoning-disable fields is most
+        // likely the endpoint rejecting them: retry once without and remember.
+        if matches!(status, 400 | 422) && !reasoning.is_empty() {
+            info!(
+                "Tool loop: endpoint rejected reasoning fields (status {status}); retrying without them"
+            );
+            reasoning = ReasoningParams::default();
+            (status, text) = post_json(client, &url, &build(&reasoning)).await?;
+            if (200..300).contains(&status) {
+                remember_rejection(key.clone());
+            }
+        }
         if !(200..300).contains(&status) {
-            if first_request && !tools_now.is_empty() && is_tools_rejection(status, &text) {
+            if first_request && !tools.is_empty() && should_fallback_without_tools(status) {
+                if !is_tools_rejection(status, &text) {
+                    debug!("Tool loop: HTTP {status} on first tooled request; treating as tools rejection");
+                }
                 return Err(ToolLoopError::ToolsRejected(text));
             }
             return Err(ToolLoopError::Other(format!("HTTP {status}: {text}")));
@@ -908,7 +994,7 @@ pub async fn send_with_tools(
         } else {
             parse_openai_tool_calls(&json)
         };
-        if calls.is_empty() {
+        if calls.is_empty() || final_turn {
             return answer.ok_or_else(|| ToolLoopError::Other("empty answer".into()));
         }
         let mut results = Vec::new();
@@ -941,6 +1027,23 @@ pub async fn send_with_tools(
             }
         }
     }
+}
+
+async fn post_json(
+    client: &reqwest::Client,
+    url: &str,
+    body: &Value,
+) -> Result<(u16, String), ToolLoopError> {
+    let resp =
+        client.post(url).json(body).send().await.map_err(|e| {
+            ToolLoopError::Other(report_reqwest_error("Tool loop request failed", &e))
+        })?;
+    let status = resp.status().as_u16();
+    let text = resp
+        .text()
+        .await
+        .map_err(|e| ToolLoopError::Other(e.to_string()))?;
+    Ok((status, text))
 }
 
 #[cfg(test)]
@@ -1261,6 +1364,7 @@ mod tests {
 mod tool_tests {
     use super::*;
     use serde_json::json;
+    use std::sync::{Arc, Mutex};
 
     fn tool() -> ToolDef {
         ToolDef {
@@ -1274,7 +1378,7 @@ mod tool_tests {
     fn openai_request_carries_tools_and_schema() {
         let msgs = vec![json!({"role":"user","content":"hi"})];
         let schema = json!({"type":"object"});
-        let req = openai_tool_request("m", &msgs, &[tool()], Some(&schema));
+        let req = openai_tool_request("m", &msgs, &[tool()], Some(&schema), false);
         assert_eq!(req["tools"][0]["type"], "function");
         assert_eq!(req["tools"][0]["function"]["name"], "search_context");
         assert_eq!(
@@ -1283,9 +1387,17 @@ mod tool_tests {
         );
         assert_eq!(req["response_format"]["type"], "json_schema");
         assert_eq!(req["stream"], false);
-        let req2 = openai_tool_request("m", &msgs, &[], None);
+        assert!(req.get("tool_choice").is_none());
+        let req2 = openai_tool_request("m", &msgs, &[], None, true);
         assert!(req2.get("tools").is_none());
         assert!(req2.get("response_format").is_none());
+        assert!(
+            req2.get("tool_choice").is_none(),
+            "no tools, no tool_choice"
+        );
+        let req3 = openai_tool_request("m", &msgs, &[tool()], None, true);
+        assert_eq!(req3["tool_choice"], "none");
+        assert!(req3["tools"].is_array());
     }
 
     #[test]
@@ -1307,7 +1419,11 @@ mod tool_tests {
     #[test]
     fn anthropic_request_and_response_shapes() {
         let msgs = vec![json!({"role":"user","content":"hi"})];
-        let req = anthropic_tool_request("m", "sys", &msgs, &[tool()]);
+        let req = anthropic_tool_request("m", "sys", &msgs, &[tool()], false);
+        assert!(req.get("tool_choice").is_none());
+        let fin = anthropic_tool_request("m", "sys", &msgs, &[tool()], true);
+        assert_eq!(fin["tool_choice"]["type"], "none");
+        assert!(fin["tools"].is_array());
         assert_eq!(req["system"], "sys");
         assert_eq!(req["tools"][0]["name"], "search_context");
         assert!(req["tools"][0]["input_schema"].is_object());
@@ -1353,5 +1469,155 @@ mod tool_tests {
         assert!(is_tools_rejection(422, "tools is not supported"));
         assert!(!is_tools_rejection(400, "invalid api key"));
         assert!(!is_tools_rejection(500, "tools"));
+    }
+
+    #[test]
+    fn fallback_rule_covers_every_failure_but_auth() {
+        for s in [400, 404, 405, 422, 500, 502] {
+            assert!(should_fallback_without_tools(s), "{s}");
+        }
+        for s in [200, 204, 401, 403] {
+            assert!(!should_fallback_without_tools(s), "{s}");
+        }
+    }
+
+    /// Serve `responses` (JSON bodies, 200 OK) in order, one connection each,
+    /// recording each request body.
+    fn scripted_server(responses: Vec<String>) -> (String, Arc<Mutex<Vec<Value>>>) {
+        use std::io::{BufRead, BufReader, Read, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        let bodies = Arc::new(Mutex::new(Vec::new()));
+        let seen = bodies.clone();
+        std::thread::spawn(move || {
+            for resp in responses {
+                let (stream, _) = listener.accept().unwrap();
+                let mut reader = BufReader::new(stream);
+                let mut len = 0usize;
+                loop {
+                    let mut line = String::new();
+                    reader.read_line(&mut line).unwrap();
+                    if line == "\r\n" || line.is_empty() {
+                        break;
+                    }
+                    let lower = line.to_ascii_lowercase();
+                    if let Some(v) = lower.strip_prefix("content-length:") {
+                        len = v.trim().parse().unwrap();
+                    }
+                }
+                let mut body = vec![0u8; len];
+                reader.read_exact(&mut body).unwrap();
+                seen.lock()
+                    .unwrap()
+                    .push(serde_json::from_slice(&body).unwrap());
+                let mut stream = reader.into_inner();
+                let out = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{resp}",
+                    resp.len()
+                );
+                stream.write_all(out.as_bytes()).unwrap();
+            }
+        });
+        (format!("http://{addr}"), bodies)
+    }
+
+    fn openai_provider(base_url: &str) -> PostProcessProvider {
+        PostProcessProvider {
+            id: "custom".into(),
+            label: "Custom".into(),
+            base_url: base_url.into(),
+            allow_base_url_edit: true,
+            models_endpoint: None,
+            supports_structured_output: false,
+            api_format: PostProcessApiFormat::OpenAi,
+        }
+    }
+
+    fn tool_calls_response(ids: &[&str]) -> String {
+        let calls: Vec<Value> = ids
+            .iter()
+            .map(|id| json!({"id": id, "type": "function", "function": {"name": "search_context", "arguments": "{\"query\":\"x\"}"}}))
+            .collect();
+        json!({"choices":[{"message":{"role":"assistant","content":null,"tool_calls":calls},"finish_reason":"tool_calls"}]}).to_string()
+    }
+
+    fn final_response() -> String {
+        json!({"choices":[{"message":{"role":"assistant","content":"{\"intervene\":false}"},"finish_reason":"stop"}]}).to_string()
+    }
+
+    #[tokio::test]
+    async fn tool_loop_sends_tool_results_then_returns_answer() {
+        let (base, bodies) = scripted_server(vec![tool_calls_response(&["c1"]), final_response()]);
+        let calls = Mutex::new(0);
+        let handler = |_c: &ToolCall| {
+            *calls.lock().unwrap() += 1;
+            "RESULT".to_string()
+        };
+        let out = send_with_tools(
+            &openai_provider(&base),
+            "k".into(),
+            "m",
+            "sys".into(),
+            "user".into(),
+            &[tool()],
+            json!({"type":"object"}),
+            5,
+            &handler,
+        )
+        .await
+        .unwrap();
+        assert_eq!(out, "{\"intervene\":false}");
+        assert_eq!(*calls.lock().unwrap(), 1);
+        let bodies = bodies.lock().unwrap();
+        assert_eq!(bodies.len(), 2);
+        let second = &bodies[1];
+        let msgs = second["messages"].as_array().unwrap();
+        assert!(msgs
+            .iter()
+            .any(|m| m["role"] == "tool" && m["tool_call_id"] == "c1" && m["content"] == "RESULT"));
+        assert!(second.get("tool_choice").is_none(), "budget not exhausted");
+        assert!(second["tools"].is_array());
+        assert!(
+            second.get("response_format").is_none(),
+            "provider lacks structured output"
+        );
+        assert_eq!(second["reasoning_effort"], "none");
+    }
+
+    #[tokio::test]
+    async fn tool_loop_final_request_forbids_tools_but_keeps_them() {
+        let (base, bodies) =
+            scripted_server(vec![tool_calls_response(&["c1", "c2"]), final_response()]);
+        let calls = Mutex::new(0);
+        let handler = |_c: &ToolCall| {
+            *calls.lock().unwrap() += 1;
+            "RESULT".to_string()
+        };
+        let out = send_with_tools(
+            &openai_provider(&base),
+            "k".into(),
+            "m",
+            "sys".into(),
+            "user".into(),
+            &[tool()],
+            json!({"type":"object"}),
+            1,
+            &handler,
+        )
+        .await
+        .unwrap();
+        assert_eq!(out, "{\"intervene\":false}");
+        assert_eq!(*calls.lock().unwrap(), 1, "second call over budget");
+        let bodies = bodies.lock().unwrap();
+        assert_eq!(bodies.len(), 2);
+        assert!(bodies[0].get("tool_choice").is_none());
+        let last = &bodies[1];
+        assert_eq!(last["tool_choice"], "none");
+        assert!(last["tools"].is_array());
+        let msgs = last["messages"].as_array().unwrap();
+        assert!(msgs
+            .iter()
+            .any(|m| m["tool_call_id"] == "c2"
+                && m["content"] == "Tool budget exhausted; answer now."));
     }
 }

@@ -489,6 +489,10 @@ pub struct AppSettings {
     pub post_process_api_keys: SecretMap,
     #[serde(default = "default_post_process_models")]
     pub post_process_models: HashMap<String, String>,
+    /// Opt-in for the meeting assistant (observer). Off by default because it
+    /// sends transcript, brief and context to the chosen provider.
+    #[serde(default)]
+    pub meeting_assistant_enabled: bool,
     /// Provider for the meeting observer; empty means the post-processing provider.
     #[serde(default = "default_meeting_provider_id")]
     pub meeting_provider_id: String,
@@ -1033,6 +1037,7 @@ pub fn get_default_settings() -> AppSettings {
         post_process_providers: default_post_process_providers(),
         post_process_api_keys: default_post_process_api_keys(),
         post_process_models: default_post_process_models(),
+        meeting_assistant_enabled: false,
         meeting_provider_id: default_meeting_provider_id(),
         meeting_sensitivity: MeetingSensitivity::default(),
         meeting_observer_interval_secs: default_meeting_observer_interval_secs(),
@@ -1376,6 +1381,7 @@ mod tests {
     fn meeting_settings_defaults_and_provider_fallback() {
         let s = get_default_settings();
         assert_eq!(s.meeting_provider_id, "");
+        assert!(!s.meeting_assistant_enabled, "assistant is opt-in");
         assert_eq!(s.meeting_sensitivity, MeetingSensitivity::Medium);
         assert_eq!(s.meeting_observer_interval_secs, 20);
         assert!(s.meeting_beep_enabled);

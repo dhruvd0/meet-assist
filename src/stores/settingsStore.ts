@@ -162,6 +162,8 @@ const settingUpdaters: {
   history_limit: (value) => commands.updateHistoryLimit(value as number),
   post_process_enabled: (value) =>
     commands.changePostProcessEnabledSetting(value as boolean),
+  meeting_assistant_enabled: (value) =>
+    commands.changeMeetingAssistantSetting(value as boolean),
   meeting_provider_id: (value) =>
     commands.changeMeetingProviderSetting(value as string),
   meeting_sensitivity: (value) =>

@@ -81,6 +81,13 @@ export const MeetingDetail: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         </Button>
         <MeetingControls meetingId={m.id} />
       </div>
+      {observer.readiness !== "ready" && live.meeting_id === m.id && (
+        <Alert variant="info">
+          {t(`meetings.observer.readiness.${observer.readiness}`, {
+            detail: observer.detail ?? "",
+          })}
+        </Alert>
+      )}
       {observer.tools_unavailable && (
         <Alert variant="info">{t("meetings.observer.toolsUnavailable")}</Alert>
       )}

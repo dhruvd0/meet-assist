@@ -240,9 +240,7 @@ fn initialize_core_logic(app_handle: &AppHandle) {
         app_handle.clone(),
         meeting_store,
         meeting_manager,
-        Arc::new(meeting::observer::LlmJudge {
-            app: app_handle.clone(),
-        }),
+        Arc::new(meeting::observer::LlmJudge::new(app_handle.clone())),
     );
     app_handle.manage(tray::TrayState::new());
 
@@ -711,6 +709,7 @@ pub fn run(cli_args: CliArgs) {
             shortcut::change_auto_submit_setting,
             shortcut::change_auto_submit_key_setting,
             shortcut::change_post_process_enabled_setting,
+            shortcut::change_meeting_assistant_setting,
             shortcut::change_meeting_provider_setting,
             shortcut::change_meeting_sensitivity_setting,
             shortcut::change_meeting_observer_interval_setting,
@@ -831,6 +830,8 @@ pub fn run(cli_args: CliArgs) {
             commands::meeting::list_interventions,
             commands::meeting::dismiss_intervention,
             commands::meeting::hide_intervention_window,
+            commands::meeting::focus_meeting,
+            commands::meeting::get_observer_readiness,
         ])
         .events(collect_events![
             managers::history::HistoryUpdatePayload,
@@ -842,6 +843,7 @@ pub fn run(cli_args: CliArgs) {
             meeting::session::MeetingCaptureWarningPayload,
             meeting::observer::InterventionPayload,
             meeting::observer::ObserverStatusPayload,
+            commands::meeting::OpenMeetingPayload,
         ]);
 
     #[cfg(debug_assertions)] // <- Only export on non-release builds

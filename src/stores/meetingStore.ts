@@ -9,12 +9,27 @@ import {
   type MeetingStatePayload,
 } from "@/bindings";
 
+export type ObserverReadinessCode =
+  | "ready"
+  | "disabled"
+  | "no_provider"
+  | "unsupported_provider"
+  | "missing_api_key"
+  | "no_model";
+
+interface ObserverView {
+  tools_unavailable: boolean;
+  consecutive_failures: number;
+  readiness: ObserverReadinessCode;
+  detail: string | null;
+}
+
 interface MeetingStore {
   meetings: Meeting[];
   activeMeetingId: number | null;
   detail: MeetingDetail | null;
   live: MeetingStatePayload;
-  observer: { tools_unavailable: boolean; consecutive_failures: number };
+  observer: ObserverView;
   loading: boolean;
 
   loadMeetings: (projectId?: number | null) => Promise<void>;
@@ -36,7 +51,12 @@ interface MeetingStore {
 }
 
 const t = (key: string) => i18n.t(key);
-const idleObserver = { tools_unavailable: false, consecutive_failures: 0 };
+const idleCounters = { tools_unavailable: false, consecutive_failures: 0 };
+const idleObserver: ObserverView = {
+  ...idleCounters,
+  readiness: "ready",
+  detail: null,
+};
 const idle: MeetingStatePayload = {
   meeting_id: null,
   session_id: null,
@@ -63,7 +83,11 @@ export const useMeetingStore = create<MeetingStore>((set, get) => ({
   },
 
   openMeeting: async (id) => {
-    set({ activeMeetingId: id, detail: null, observer: idleObserver });
+    set((s) => ({
+      activeMeetingId: id,
+      detail: null,
+      observer: { ...s.observer, ...idleCounters },
+    }));
     const res = await commands.getMeetingDetail(id);
     if (res.status !== "ok") {
       toast.error(`${t("meetings.errors.load")} ${res.error}`);
@@ -73,7 +97,11 @@ export const useMeetingStore = create<MeetingStore>((set, get) => ({
   },
 
   closeMeeting: () =>
-    set({ activeMeetingId: null, detail: null, observer: idleObserver }),
+    set((s) => ({
+      activeMeetingId: null,
+      detail: null,
+      observer: { ...s.observer, ...idleCounters },
+    })),
 
   startMeeting: async (projectId, meetingId) => {
     const res = await commands.startMeeting(projectId, meetingId);
@@ -110,8 +138,18 @@ export const useMeetingStore = create<MeetingStore>((set, get) => ({
   },
 
   refreshLive: async () => {
-    const live = await commands.meetingState();
-    set({ live });
+    const [live, ready] = await Promise.all([
+      commands.meetingState(),
+      commands.getObserverReadiness(),
+    ]);
+    set((s) => ({
+      live,
+      observer: {
+        ...s.observer,
+        readiness: ready.readiness as ObserverReadinessCode,
+        detail: ready.detail,
+      },
+    }));
     const id = get().activeMeetingId;
     if (id !== null && live.meeting_id === id && live.status) {
       set((s) =>
@@ -225,9 +263,29 @@ export const useMeetingStore = create<MeetingStore>((set, get) => ({
       });
     });
     const un5 = await events.observerStatusPayload.listen((e) => {
-      const { meeting_id, tools_unavailable, consecutive_failures } = e.payload;
-      if (meeting_id === null || meeting_id === get().activeMeetingId)
-        set({ observer: { tools_unavailable, consecutive_failures } });
+      const {
+        meeting_id,
+        tools_unavailable,
+        consecutive_failures,
+        readiness,
+        detail,
+      } = e.payload;
+      // Readiness is global; the counters belong to one meeting.
+      const counters =
+        meeting_id === null || meeting_id === get().activeMeetingId
+          ? { tools_unavailable, consecutive_failures }
+          : {};
+      set((s) => ({
+        observer: {
+          ...s.observer,
+          ...counters,
+          readiness: readiness as ObserverReadinessCode,
+          detail,
+        },
+      }));
+    });
+    const un6 = await events.openMeetingPayload.listen((e) => {
+      get().openMeeting(e.payload.meeting_id);
     });
     return () => {
       un1();
@@ -235,6 +293,7 @@ export const useMeetingStore = create<MeetingStore>((set, get) => ({
       un3();
       un4();
       un5();
+      un6();
     };
   },
 }));

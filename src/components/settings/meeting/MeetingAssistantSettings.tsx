@@ -19,6 +19,7 @@ export const MeetingAssistantSettings: React.FC = () => {
   const interval =
     getSetting("meeting_observer_interval_secs") ?? DEFAULT_INTERVAL_SECS;
   const [draft, setDraft] = useState(String(interval));
+  const enabled = getSetting("meeting_assistant_enabled") ?? false;
   useEffect(() => setDraft(String(interval)), [interval]);
 
   const providerOptions = [
@@ -51,6 +52,15 @@ export const MeetingAssistantSettings: React.FC = () => {
       title={t("settings.meeting.title")}
       description={t("settings.meeting.description")}
     >
+      <ToggleSwitch
+        checked={enabled}
+        onChange={(v) => updateSetting("meeting_assistant_enabled", v)}
+        isUpdating={isUpdating("meeting_assistant_enabled")}
+        label={t("settings.meeting.enabled.label")}
+        description={t("settings.meeting.enabled.description", { interval })}
+        descriptionMode="inline"
+        grouped={true}
+      />
       <SettingContainer
         title={t("settings.meeting.provider.label")}
         description={t("settings.meeting.provider.description")}
@@ -61,7 +71,7 @@ export const MeetingAssistantSettings: React.FC = () => {
           options={providerOptions}
           selectedValue={getSetting("meeting_provider_id") ?? ""}
           onSelect={(v) => updateSetting("meeting_provider_id", v)}
-          disabled={isUpdating("meeting_provider_id")}
+          disabled={!enabled || isUpdating("meeting_provider_id")}
         />
       </SettingContainer>
       <SettingContainer
@@ -76,7 +86,7 @@ export const MeetingAssistantSettings: React.FC = () => {
           onSelect={(v) =>
             updateSetting("meeting_sensitivity", v as MeetingSensitivity)
           }
-          disabled={isUpdating("meeting_sensitivity")}
+          disabled={!enabled || isUpdating("meeting_sensitivity")}
         />
       </SettingContainer>
       <SettingContainer
@@ -97,13 +107,14 @@ export const MeetingAssistantSettings: React.FC = () => {
           onKeyDown={(e) => {
             if (e.key === "Enter") e.currentTarget.blur();
           }}
-          disabled={isUpdating("meeting_observer_interval_secs")}
+          disabled={!enabled || isUpdating("meeting_observer_interval_secs")}
         />
       </SettingContainer>
       <ToggleSwitch
         checked={getSetting("meeting_beep_enabled") ?? true}
         onChange={(v) => updateSetting("meeting_beep_enabled", v)}
         isUpdating={isUpdating("meeting_beep_enabled")}
+        disabled={!enabled}
         label={t("settings.meeting.beep.label")}
         description={t("settings.meeting.beep.description")}
         descriptionMode="tooltip"
