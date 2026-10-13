@@ -2,6 +2,8 @@
 
 This file provides guidance to AI coding assistants working with code in this repository.
 
+**This is Meet Assist**, a private meeting copilot forked from [Handy](https://github.com/cjpais/Handy). Read [docs/VISION.md](docs/VISION.md) first, then [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). The meeting subsystem is specified in [docs/superpowers/specs/2026-10-13-meeting-assistant-design.md](docs/superpowers/specs/2026-10-13-meeting-assistant-design.md); implementation plans live in `docs/superpowers/plans/`.
+
 ## Development Commands
 
 **Prerequisites:**
@@ -51,7 +53,7 @@ For detailed platform-specific build setup, see [BUILD.md](BUILD.md).
 
 ## Architecture Overview
 
-Handy is a cross-platform desktop speech-to-text application built with Tauri 2.x (Rust backend + React/TypeScript frontend).
+Meet Assist is a cross-platform desktop app built with Tauri 2.x (Rust backend + React/TypeScript frontend). It has two pipelines sharing one transcription engine: the inherited dictation pipeline (shipping) and the meeting pipeline (planned, see `docs/ARCHITECTURE.md`). The module lists below describe the dictation pipeline that exists today.
 
 ### Backend Structure (src-tauri/src/)
 
@@ -97,6 +99,10 @@ Handy is a cross-platform desktop speech-to-text application built with Tauri 2.
 **Pipeline Processing:** Audio → VAD → Whisper/Parakeet → Text output → Clipboard/Paste
 
 **State Flow:** Zustand → Tauri Command → Rust State → Persistence (tauri-plugin-store)
+
+### Meeting Subsystem (planned)
+
+New backend code goes under `src-tauri/src/meeting/` (`mod.rs`, `capture.rs`, `transcriber.rs`, `observer.rs`, `summary.rs`, `store.rs`) plus `audio_toolkit/audio/system_capture/` and `commands/meeting.rs`. New frontend code goes under `src/components/meetings/`, `src/stores/meetingStore.ts`, `src/components/settings/meeting/`, and a separate window entry `src/intervention/`. Reuse `TranscriptionManager`, `CaptureVad`, `llm_client`, `audio_feedback`, and `components/ui`. Do not add a second LLM client, a second VAD, or new UI primitives. Keep the existing design language.
 
 ### Technology Stack
 
@@ -206,12 +212,11 @@ See the [Troubleshooting](README.md#troubleshooting) section in README.md.
 
 ## GitHub workflow for AI coding assistants
 
-**MANDATORY. Before opening any PR, issue, or discussion in this repo: you MUST read the relevant template file and follow it strictly.** That includes sections that look "ceremonial" — checklists, AI Assistance disclosures, "Human Written Description". A generic Summary/Test-plan layout is not acceptable.
+This fork is not under Handy's feature freeze. Meeting-subsystem features are in scope when they follow the design spec. Keep these rules:
 
-- **Opening a PR:** Read [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md). Every section listed there is mandatory. If a section requires a human-written paragraph (e.g. "Human Written Description"), leave a clear TODO placeholder and ask the human contributor to fill it in — do not invent their voice.
-- **Opening an issue:** Read [`.github/ISSUE_TEMPLATE/`](.github/ISSUE_TEMPLATE/). Blank issues are disabled; pick the right template (`bug_report.md` for bugs). Feature requests do not belong in issues — they go to [Discussions](https://github.com/cjpais/Handy/discussions) (see `.github/ISSUE_TEMPLATE/config.yml`).
-- **Proposing a feature:** Handy is under a feature freeze. New features require community support gathered in [Discussions](https://github.com/cjpais/Handy/discussions) before any PR is opened — see the PR template's "Community Feedback" section.
-- **Translations:** Follow [CONTRIBUTING_TRANSLATIONS.md](CONTRIBUTING_TRANSLATIONS.md).
-- **Full contributor workflow:** [CONTRIBUTING.md](CONTRIBUTING.md).
+- **Opening a PR:** Read [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md) and fill every section. The "Community Feedback" section may be answered with a link to the relevant spec or plan instead of a Discussion. Leave "Human Written Description" as a TODO for the human contributor.
+- **Opening an issue:** Use [`.github/ISSUE_TEMPLATE/bug_report.md`](.github/ISSUE_TEMPLATE/bug_report.md) for bugs. Feature ideas for the meeting subsystem go in a spec change under `docs/superpowers/specs/`, not an issue.
+- **Upstream sync:** Dictation fixes from Handy are welcome; cherry-pick with the upstream commit referenced in the message.
+- **Translations:** Follow [CONTRIBUTING_TRANSLATIONS.md](CONTRIBUTING_TRANSLATIONS.md). New `meetings.*` keys land in `en/translation.json` first; other locales fall back to English.
 
 **Commits:** Use conventional commit prefixes (`feat:`, `fix:`, `docs:`, `refactor:`, `chore:`). Focus the message on _why_, not _what_.
