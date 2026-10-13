@@ -651,6 +651,285 @@ pub async fn fetch_models(
     Ok(models)
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct ToolDef {
+    pub name: String,
+    pub description: String,
+    pub input_schema: Value,
+}
+
+#[derive(Debug, Clone)]
+pub struct ToolCall {
+    pub id: String,
+    pub name: String,
+    pub arguments: Value,
+}
+
+#[derive(Debug)]
+pub enum ToolLoopError {
+    /// The endpoint rejected the `tools` field; caller should retry without tools.
+    ToolsRejected(String),
+    Other(String),
+}
+
+impl std::fmt::Display for ToolLoopError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ToolLoopError::ToolsRejected(s) => write!(f, "tools rejected: {s}"),
+            ToolLoopError::Other(s) => write!(f, "{s}"),
+        }
+    }
+}
+
+pub fn is_tools_rejection(status: u16, body: &str) -> bool {
+    (status == 400 || status == 422) && body.to_ascii_lowercase().contains("tool")
+}
+
+pub fn openai_tool_request(
+    model: &str,
+    messages: &[Value],
+    tools: &[ToolDef],
+    final_schema: Option<&Value>,
+) -> Value {
+    let mut req = serde_json::json!({ "model": model, "messages": messages, "stream": false });
+    if !tools.is_empty() {
+        req["tools"] = Value::Array(
+            tools
+                .iter()
+                .map(|t| {
+                    serde_json::json!({
+                        "type": "function",
+                        "function": { "name": t.name, "description": t.description, "parameters": t.input_schema }
+                    })
+                })
+                .collect(),
+        );
+    }
+    if let Some(schema) = final_schema {
+        req["response_format"] = serde_json::json!({
+            "type": "json_schema",
+            "json_schema": { "name": "observer_verdict", "strict": true, "schema": schema }
+        });
+    }
+    req
+}
+
+pub fn parse_openai_tool_calls(resp: &Value) -> (Option<String>, Vec<ToolCall>) {
+    let msg = &resp["choices"][0]["message"];
+    let text = msg["content"]
+        .as_str()
+        .map(|s| s.to_string())
+        .filter(|s| !s.is_empty());
+    let calls = msg["tool_calls"]
+        .as_array()
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|c| {
+                    let id = c["id"].as_str()?.to_string();
+                    let name = c["function"]["name"].as_str()?.to_string();
+                    let raw = c["function"]["arguments"].as_str().unwrap_or("{}");
+                    let arguments =
+                        serde_json::from_str(raw).unwrap_or(Value::Object(Default::default()));
+                    Some(ToolCall {
+                        id,
+                        name,
+                        arguments,
+                    })
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    (text, calls)
+}
+
+pub fn openai_tool_result_message(call: &ToolCall, result: &str) -> Value {
+    serde_json::json!({ "role": "tool", "tool_call_id": call.id, "content": result })
+}
+
+pub fn openai_assistant_tool_call_message(calls: &[ToolCall], text: Option<&str>) -> Value {
+    serde_json::json!({
+        "role": "assistant",
+        "content": text,
+        "tool_calls": calls.iter().map(|c| serde_json::json!({
+            "id": c.id, "type": "function",
+            "function": { "name": c.name, "arguments": c.arguments.to_string() }
+        })).collect::<Vec<_>>()
+    })
+}
+
+pub fn anthropic_tool_request(
+    model: &str,
+    system: &str,
+    messages: &[Value],
+    tools: &[ToolDef],
+) -> Value {
+    let mut req = serde_json::json!({
+        "model": model, "max_tokens": ANTHROPIC_MAX_TOKENS, "system": system, "messages": messages
+    });
+    if !tools.is_empty() {
+        req["tools"] = Value::Array(
+            tools
+                .iter()
+                .map(|t| serde_json::json!({ "name": t.name, "description": t.description, "input_schema": t.input_schema }))
+                .collect(),
+        );
+    }
+    req
+}
+
+pub fn parse_anthropic_tool_calls(resp: &Value) -> (Option<String>, Vec<ToolCall>) {
+    let mut text = String::new();
+    let mut calls = Vec::new();
+    if let Some(blocks) = resp["content"].as_array() {
+        for b in blocks {
+            match b["type"].as_str() {
+                Some("text") => text.push_str(b["text"].as_str().unwrap_or("")),
+                Some("tool_use") => calls.push(ToolCall {
+                    id: b["id"].as_str().unwrap_or("").to_string(),
+                    name: b["name"].as_str().unwrap_or("").to_string(),
+                    arguments: b["input"].clone(),
+                }),
+                _ => {}
+            }
+        }
+    }
+    (if text.is_empty() { None } else { Some(text) }, calls)
+}
+
+pub fn anthropic_assistant_tool_use_message(calls: &[ToolCall], text: Option<&str>) -> Value {
+    let mut content: Vec<Value> = Vec::new();
+    if let Some(t) = text {
+        content.push(serde_json::json!({ "type": "text", "text": t }));
+    }
+    for c in calls {
+        content.push(serde_json::json!({ "type": "tool_use", "id": c.id, "name": c.name, "input": c.arguments }));
+    }
+    serde_json::json!({ "role": "assistant", "content": content })
+}
+
+pub fn anthropic_tool_result_message(results: &[(ToolCall, String)]) -> Value {
+    serde_json::json!({
+        "role": "user",
+        "content": results.iter().map(|(c, r)| serde_json::json!({
+            "type": "tool_result", "tool_use_id": c.id, "content": r
+        })).collect::<Vec<_>>()
+    })
+}
+
+/// Run a tool-calling conversation until the model answers without tool
+/// calls, or `max_tool_calls` is reached (then one final no-tools request
+/// demanding the answer). Returns the final assistant text.
+pub async fn send_with_tools(
+    provider: &PostProcessProvider,
+    api_key: String,
+    model: &str,
+    system_prompt: String,
+    user_content: String,
+    tools: &[ToolDef],
+    final_schema: Value,
+    max_tool_calls: usize,
+    handler: &(dyn Fn(&ToolCall) -> String + Sync),
+) -> Result<String, ToolLoopError> {
+    let client = create_client(provider, &api_key).map_err(ToolLoopError::Other)?;
+    let base = provider.base_url.trim_end_matches('/');
+    let anthropic = provider.api_format == PostProcessApiFormat::Anthropic;
+    let url = if anthropic {
+        format!("{base}/messages")
+    } else {
+        format!("{base}/chat/completions")
+    };
+
+    let mut messages: Vec<Value> = Vec::new();
+    if !anthropic {
+        messages.push(serde_json::json!({ "role": "system", "content": system_prompt }));
+    }
+    messages.push(serde_json::json!({ "role": "user", "content": user_content }));
+
+    let mut calls_made = 0usize;
+    let mut first_request = true;
+    loop {
+        let tools_now: &[ToolDef] = if calls_made >= max_tool_calls {
+            &[]
+        } else {
+            tools
+        };
+        if calls_made >= max_tool_calls {
+            messages.push(serde_json::json!({ "role": "user", "content": "Tool budget exhausted. Answer now with the final JSON only." }));
+        }
+        let body = if anthropic {
+            anthropic_tool_request(model, &system_prompt, &messages, tools_now)
+        } else {
+            openai_tool_request(
+                model,
+                &messages,
+                tools_now,
+                if tools_now.is_empty() {
+                    Some(&final_schema)
+                } else {
+                    None
+                },
+            )
+        };
+        let resp = client
+            .post(&url)
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| ToolLoopError::Other(e.to_string()))?;
+        let status = resp.status().as_u16();
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ToolLoopError::Other(e.to_string()))?;
+        if !(200..300).contains(&status) {
+            if first_request && !tools_now.is_empty() && is_tools_rejection(status, &text) {
+                return Err(ToolLoopError::ToolsRejected(text));
+            }
+            return Err(ToolLoopError::Other(format!("HTTP {status}: {text}")));
+        }
+        first_request = false;
+        let json: Value = serde_json::from_str(&text)
+            .map_err(|e| ToolLoopError::Other(format!("bad json: {e}")))?;
+        let (answer, calls) = if anthropic {
+            parse_anthropic_tool_calls(&json)
+        } else {
+            parse_openai_tool_calls(&json)
+        };
+        if calls.is_empty() {
+            return answer.ok_or_else(|| ToolLoopError::Other("empty answer".into()));
+        }
+        let mut results = Vec::new();
+        for c in &calls {
+            if calls_made >= max_tool_calls {
+                results.push((c.clone(), "Tool budget exhausted; answer now.".to_string()));
+                continue;
+            }
+            calls_made += 1;
+            let mut r = handler(c);
+            if r.len() > 4096 {
+                r.truncate(4096);
+                r.push_str("\n[truncated]");
+            }
+            results.push((c.clone(), r));
+        }
+        if anthropic {
+            messages.push(anthropic_assistant_tool_use_message(
+                &calls,
+                answer.as_deref(),
+            ));
+            messages.push(anthropic_tool_result_message(&results));
+        } else {
+            messages.push(openai_assistant_tool_call_message(
+                &calls,
+                answer.as_deref(),
+            ));
+            for (c, r) in &results {
+                messages.push(openai_tool_result_message(c, r));
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -962,5 +1241,96 @@ mod tests {
         )
         .await;
         assert!(result.unwrap_err().contains("truncated"));
+    }
+}
+
+#[cfg(test)]
+mod tool_tests {
+    use super::*;
+    use serde_json::json;
+
+    fn tool() -> ToolDef {
+        ToolDef {
+            name: "search_context".into(),
+            description: "Search project sources".into(),
+            input_schema: json!({"type":"object","properties":{"query":{"type":"string"}},"required":["query"]}),
+        }
+    }
+
+    #[test]
+    fn openai_request_carries_tools_and_schema() {
+        let msgs = vec![json!({"role":"user","content":"hi"})];
+        let schema = json!({"type":"object"});
+        let req = openai_tool_request("m", &msgs, &[tool()], Some(&schema));
+        assert_eq!(req["tools"][0]["type"], "function");
+        assert_eq!(req["tools"][0]["function"]["name"], "search_context");
+        assert_eq!(
+            req["tools"][0]["function"]["parameters"]["required"][0],
+            "query"
+        );
+        assert_eq!(req["response_format"]["type"], "json_schema");
+        assert_eq!(req["stream"], false);
+        let req2 = openai_tool_request("m", &msgs, &[], None);
+        assert!(req2.get("tools").is_none());
+        assert!(req2.get("response_format").is_none());
+    }
+
+    #[test]
+    fn openai_response_tool_calls_parsed() {
+        let resp = json!({"choices":[{"message":{"role":"assistant","content":null,
+            "tool_calls":[{"id":"c1","type":"function","function":{"name":"search_context","arguments":"{\"query\":\"retry\"}"}}]},
+            "finish_reason":"tool_calls"}]});
+        let (text, calls) = parse_openai_tool_calls(&resp);
+        assert!(text.is_none());
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].id, "c1");
+        assert_eq!(calls[0].arguments["query"], "retry");
+        let resp2 = json!({"choices":[{"message":{"role":"assistant","content":"{\"intervene\":false}"},"finish_reason":"stop"}]});
+        let (text, calls) = parse_openai_tool_calls(&resp2);
+        assert_eq!(text.as_deref(), Some("{\"intervene\":false}"));
+        assert!(calls.is_empty());
+    }
+
+    #[test]
+    fn anthropic_request_and_response_shapes() {
+        let msgs = vec![json!({"role":"user","content":"hi"})];
+        let req = anthropic_tool_request("m", "sys", &msgs, &[tool()]);
+        assert_eq!(req["system"], "sys");
+        assert_eq!(req["tools"][0]["name"], "search_context");
+        assert!(req["tools"][0]["input_schema"].is_object());
+        assert_eq!(req["max_tokens"], 4096);
+        let resp = json!({"content":[{"type":"text","text":"thinking"},{"type":"tool_use","id":"t1","name":"search_context","input":{"query":"x"}}],"stop_reason":"tool_use"});
+        let (text, calls) = parse_anthropic_tool_calls(&resp);
+        assert_eq!(text.as_deref(), Some("thinking"));
+        assert_eq!(calls[0].id, "t1");
+        assert_eq!(calls[0].arguments["query"], "x");
+    }
+
+    #[test]
+    fn tool_result_messages_have_provider_shape() {
+        let call = ToolCall {
+            id: "c1".into(),
+            name: "search_context".into(),
+            arguments: json!({}),
+        };
+        let o = openai_tool_result_message(&call, "RESULT");
+        assert_eq!(o["role"], "tool");
+        assert_eq!(o["tool_call_id"], "c1");
+        assert_eq!(o["content"], "RESULT");
+        let a = anthropic_tool_result_message(&[(call.clone(), "RESULT".to_string())]);
+        assert_eq!(a["role"], "user");
+        assert_eq!(a["content"][0]["type"], "tool_result");
+        assert_eq!(a["content"][0]["tool_use_id"], "c1");
+    }
+
+    #[test]
+    fn tools_rejected_detection() {
+        assert!(is_tools_rejection(
+            400,
+            "Unrecognized request argument supplied: tools"
+        ));
+        assert!(is_tools_rejection(422, "tools is not supported"));
+        assert!(!is_tools_rejection(400, "invalid api key"));
+        assert!(!is_tools_rejection(500, "tools"));
     }
 }
