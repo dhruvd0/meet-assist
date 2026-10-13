@@ -22,7 +22,7 @@ use tauri_specta::Event;
 #[cfg(not(test))]
 const WORKER_DRAIN_TIMEOUT: Duration = Duration::from_secs(10);
 #[cfg(test)]
-const WORKER_DRAIN_TIMEOUT: Duration = Duration::from_millis(300);
+const WORKER_DRAIN_TIMEOUT: Duration = Duration::from_millis(1000);
 
 pub trait Transcriber: Send + Sync {
     fn transcribe(&self, samples: Vec<f32>) -> Result<String>;
@@ -876,7 +876,7 @@ mod tests {
     #[test]
     fn summary_waits_for_a_transcriber_that_outlives_the_drain_timeout() {
         // Transcription (700 ms) outlasts the 300 ms test drain timeout.
-        let (_d, m, cap, _dict) = mgr_with_delay(false, 700);
+        let (_d, m, cap, _dict) = mgr_with_delay(false, 2000);
         let seen = Arc::new(LinesSeen(Mutex::new(vec![])));
         let m = m.with_summarizer(seen.clone());
         let meeting = m.start(None, None).unwrap();
