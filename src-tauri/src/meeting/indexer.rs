@@ -3,7 +3,8 @@
 
 use crate::meeting::chunk::{chunk_text, MAX_CHUNK_CHARS};
 use anyhow::{anyhow, Context, Result};
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 pub const MAX_FILE_BYTES: u64 = 524_288;
 
@@ -126,6 +127,64 @@ pub fn chunks_for_folder(root: &Path) -> Result<Vec<(String, String)>> {
     Ok(out)
 }
 
+pub fn html_to_chunks(html: &str) -> Vec<(String, String)> {
+    let text = html2text::from_read(html.as_bytes(), 100).unwrap_or_default();
+    chunks_for_text(&text)
+}
+
+pub async fn chunks_for_link(url: &str) -> Result<Vec<(String, String)>> {
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(20))
+        .user_agent("MeetAssist/0.1")
+        .build()?;
+    let resp = client
+        .get(url)
+        .send()
+        .await
+        .with_context(|| format!("fetch {}", url))?;
+    let status = resp.status();
+    if !status.is_success() {
+        return Err(anyhow!("{} returned HTTP {}", url, status.as_u16()));
+    }
+    let content_type = resp
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    let body = resp
+        .text()
+        .await
+        .with_context(|| format!("read body of {}", url))?;
+    if content_type.contains("text/html") || content_type.contains("application/xhtml") {
+        Ok(html_to_chunks(&body))
+    } else if content_type.starts_with("text/") || content_type.is_empty() {
+        Ok(chunks_for_text(&body))
+    } else {
+        Err(anyhow!(
+            "{} is {}, only HTML and plain text links are supported",
+            url,
+            content_type
+        ))
+    }
+}
+
+pub fn copy_image_into(source_path: &Path, dest_dir: &Path, source_id: i64) -> Result<PathBuf> {
+    std::fs::create_dir_all(dest_dir)?;
+    let ext = source_path
+        .extension()
+        .map(|e| e.to_string_lossy().to_ascii_lowercase())
+        .unwrap_or_else(|| "img".to_string());
+    let dest = dest_dir.join(format!("{}.{}", source_id, ext));
+    std::fs::copy(source_path, &dest)
+        .with_context(|| format!("copy {} to {}", source_path.display(), dest.display()))?;
+    Ok(dest)
+}
+
+pub fn chunks_for_caption(caption: &str) -> Vec<(String, String)> {
+    chunks_for_text(caption)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -226,5 +285,36 @@ mod tests {
             .map(|c| c.0)
             .collect();
         assert_eq!(paths, vec!["main.rs"]);
+    }
+
+    #[test]
+    fn html_is_stripped_to_text_chunks() {
+        let html = "<html><body><h1>Title</h1><p>Body <b>bold</b> text.</p><script>var x=1;</script></body></html>";
+        let chunks = html_to_chunks(html);
+        let joined = chunks
+            .iter()
+            .map(|c| c.1.as_str())
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(joined.contains("Title"));
+        assert!(joined.contains("bold"));
+        assert!(!joined.contains("var x"));
+    }
+
+    #[tokio::test]
+    async fn link_to_unreachable_host_is_error_not_panic() {
+        let res = chunks_for_link("http://127.0.0.1:9/nothing").await;
+        assert!(res.is_err());
+    }
+
+    #[test]
+    fn image_copy_uses_source_id_and_extension() {
+        let dir = tempfile::tempdir().unwrap();
+        let src = dir.path().join("pic.PNG");
+        fs::write(&src, b"\x89PNG").unwrap();
+        let dest = dir.path().join("images");
+        let out = copy_image_into(&src, &dest, 42).unwrap();
+        assert_eq!(out.file_name().unwrap().to_string_lossy(), "42.png");
+        assert!(out.exists());
     }
 }
