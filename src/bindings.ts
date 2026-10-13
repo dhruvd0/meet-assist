@@ -1231,7 +1231,12 @@ export type PostProcessApiFormat =
 export type PostProcessProvider = { id: string; label: string; base_url: string; allow_base_url_edit?: boolean; models_endpoint?: string | null; supports_structured_output?: boolean; api_format?: PostProcessApiFormat }
 export type Project = { id: number; title: string; brief: string; created_at: number; updated_at: number }
 export type RecordingRetentionPeriod = "never" | "preserve_limit" | "days_3" | "weeks_2" | "months_3"
-export type SearchHit = { source_id: number; source_title: string; path: string; ord: number; snippet: string }
+export type SearchHit = { source_id: number; source_title: string; path: string; ord: number; snippet: string; 
+/**
+ * Raw SQLite FTS5 `bm25(source_chunks)` value. Lower (more negative)
+ * is a better match; hits are returned best first.
+ */
+score: number }
 export type SecretMap = Partial<{ [key in string]: string }>
 export type SecureInputStatus = { 
 /**

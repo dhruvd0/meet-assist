@@ -95,18 +95,19 @@ Meeting gains project_id (nullable; quick meetings without a project remain poss
 
 All new code under `src-tauri/src/meeting/` unless noted.
 
-| Module                | Responsibility                                                                                                                                                                                                                                                                                |
-| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `mod.rs`              | `MeetingManager` (Tauri state). Session state machine `Idle → Live ⇄ Paused → Ended`. Public: `start(meeting_id?)`, `pause`, `resume`, `end`, `update_context`, `dismiss_intervention`.                                                                                                       |
-| `capture.rs`          | `MeetingCapture`. Two sources: mic via handy-recorder (reuse `open_microphone` in `managers/audio.rs`), system audio via `audio_toolkit/audio/system_capture/`. Both resampled to 16 kHz mono. One `CaptureVad` per source. Emits `Utterance { speaker, samples, started_at }` on speech end. |
-| `transcriber.rs`      | Worker thread. Consumes utterances in order, calls `TranscriptionManager::transcribe()`, appends `TranscriptLine`, emits `meeting:transcript-line`. Keeps model loaded for session via existing unload-timeout.                                                                               |
-| `observer.rs`         | Timer loop, default 20 s. Runs only when new lines exist. Builds the base prompt and runs the tool loop (section 3a) via `llm_client::send_with_tools`. Cooldown 60 s, dedupe against recent interventions. On intervene: beep via `audio_feedback`, store, emit `meeting:intervention`.      |
-| `tools.rs`            | MCP-shaped tool definitions and handlers: `list_sources`, `search_context`, `read_source`, `read_transcript`, `list_meetings`. One implementation, reusable by a future MCP server.                                                                                                           |
-| `indexer.rs`          | Background source indexing: folder walk (`ignore` crate), link fetch and HTML-to-text, image copy and digest, chunking, FTS5 writes.                                                                                                                                                          |
-| `summary.rs`          | On session end: session summary, then rolling summary merge.                                                                                                                                                                                                                                  |
-| `store.rs`            | SQLite via rusqlite, same pattern as `managers/history.rs`. Tables `projects`, `sources`, `source_chunks` (FTS5), `meetings`, `sessions`, `transcript_lines`, `interventions`. Schema version column for migrations. Audio not stored unless setting enabled.                                 |
-| `commands/meeting.rs` | Tauri commands with specta bindings: `list_meetings`, `get_meeting`, `start_meeting(project_id?)`, `pause_meeting`, `resume_meeting`, `end_meeting`, `update_meeting_context`, `update_meeting_title`, `delete_meeting`, `dismiss_intervention`.                                              |
-| `commands/project.rs` | `list_projects`, `get_project`, `create_project`, `update_project_brief`, `update_project_title`, `delete_project`, `add_source`, `remove_source`, `reindex_source`, `set_source_caption`.                                                                                                    |
+| Module                | Responsibility                                                                                                                                                                                                                                                                                            |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `mod.rs`              | `MeetingManager` (Tauri state). Session state machine `Idle → Live ⇄ Paused → Ended`. Public: `start(meeting_id?)`, `pause`, `resume`, `end`, `update_context`, `dismiss_intervention`.                                                                                                                   |
+| `capture.rs`          | `MeetingCapture`. Two sources: mic via handy-recorder (reuse `open_microphone` in `managers/audio.rs`), system audio via `audio_toolkit/audio/system_capture/`. Both resampled to 16 kHz mono. One `CaptureVad` per source. Emits `Utterance { speaker, samples, started_at }` on speech end.             |
+| `transcriber.rs`      | Worker thread. Consumes utterances in order, calls `TranscriptionManager::transcribe()`, appends `TranscriptLine`, emits `meeting:transcript-line`. Keeps model loaded for session via existing unload-timeout.                                                                                           |
+| `observer.rs`         | Timer loop, default 20 s. Runs only when new lines exist. Builds the base prompt and runs the tool loop (section 3a) via `llm_client::send_with_tools`. Cooldown 60 s, dedupe against recent interventions. On intervene: beep via `audio_feedback`, store, emit `meeting:intervention`.                  |
+| `tools.rs`            | MCP-shaped tool definitions and handlers: `list_sources`, `search_context`, `read_source`, `read_transcript`, `list_meetings`. One implementation, reusable by a future MCP server.                                                                                                                       |
+| `indexer.rs`          | Background source indexing: folder walk (`ignore` crate), link fetch and HTML-to-text, image copy and digest, chunking, FTS5 writes.                                                                                                                                                                      |
+| `summary.rs`          | On session end: session summary, then rolling summary merge.                                                                                                                                                                                                                                              |
+| `manager.rs`          | `ProjectManager` (Tauri state). Owns the store, runs source indexing on a worker thread, resumes `pending` sources at startup, emits `source-status-payload`.                                                                                                                                             |
+| `store.rs`            | SQLite via rusqlite (WAL journal), same pattern as `managers/history.rs`. Tables `projects`, `sources`, `source_chunks` (FTS5, `porter unicode61` tokenizer), `meetings`, `sessions`, `transcript_lines`, `interventions`. Schema version column for migrations. Audio not stored unless setting enabled. |
+| `commands/meeting.rs` | Tauri commands with specta bindings: `list_meetings`, `get_meeting`, `start_meeting(project_id?)`, `pause_meeting`, `resume_meeting`, `end_meeting`, `update_meeting_context`, `update_meeting_title`, `delete_meeting`, `dismiss_intervention`.                                                          |
+| `commands/project.rs` | `list_projects`, `get_project`, `create_project`, `update_project_brief`, `update_project_title`, `delete_project`, `add_source`, `remove_source`, `reindex_source`, `set_source_caption`.                                                                                                                |
 
 `Judge` trait wraps the LLM call so tests inject a fake.
 
@@ -149,7 +150,7 @@ Loop limits: 5 tool calls per tick, 15 s wall budget, tool results capped at 4 K
 
 ### Events to frontend
 
-`meeting:state`, `meeting:transcript-line`, `meeting:intervention`, `meeting:capture-warning`, `meeting:observer-error`, `project:source-status`.
+`meeting:state`, `meeting:transcript-line`, `meeting:intervention`, `meeting:capture-warning`, `meeting:observer-error`, `source-status-payload` (tauri-specta derives the name from `SourceStatusPayload`; frontend `events.sourceStatusPayload`).
 
 ### Failure handling
 
@@ -161,7 +162,7 @@ Loop limits: 5 tool calls per tick, 15 s wall budget, tool results capped at 4 K
 
 ## 4. Frontend
 
-- `stores/projectStore.ts`: Zustand. Project list, active project, sources with status. Subscribes to `project:source-status`.
+- `stores/projectStore.ts`: Zustand. Project list, active project, sources with status. Subscribes to `source-status-payload` (`events.sourceStatusPayload`).
 - `components/projects/ProjectList.tsx`, `ProjectDetail.tsx` (with `BriefEditor`, `SourceList`, `AddSourceDialog`, `ProjectMeetings`).
 - `stores/meetingStore.ts`: Zustand. Meeting list, active meeting, live transcript buffer, interventions. Subscribes to events above.
 - `components/meetings/MeetingList.tsx`, `MeetingDetail.tsx` (with `ContextEditor`, `TranscriptThread`, `InterventionTimeline`, `SessionSummary`), `MeetingControls.tsx` (shared with tray actions).

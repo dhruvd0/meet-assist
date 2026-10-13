@@ -6,8 +6,9 @@ use tauri_plugin_dialog::DialogExt;
 
 type Pm<'a> = State<'a, Arc<ProjectManager>>;
 
+/// `{:#}` keeps the anyhow cause chain so the UI sees the root cause.
 fn err(e: anyhow::Error) -> String {
-    e.to_string()
+    format!("{e:#}")
 }
 
 #[tauri::command]

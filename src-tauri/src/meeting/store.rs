@@ -37,7 +37,7 @@ static MIGRATIONS: &[M] = &[
             path UNINDEXED,
             ord UNINDEXED,
             content,
-            tokenize = 'unicode61'
+            tokenize = 'porter unicode61'
         );",
     ),
 ];
@@ -55,16 +55,25 @@ pub struct ProjectStore {
     db_path: PathBuf,
 }
 
+fn fts_tokens(input: &str) -> Vec<String> {
+    input
+        .split_whitespace()
+        .map(|tok| format!("\"{}\"", tok.replace('"', "\"\"")))
+        .collect()
+}
+
 /// Turn free text into a safe FTS5 MATCH expression: each whitespace token
 /// becomes a quoted phrase (inner quotes doubled), joined by implicit AND.
 /// Raw FTS operators are deliberately not exposed; queries come from users
 /// and the model, not from code.
 fn fts_query(input: &str) -> String {
-    input
-        .split_whitespace()
-        .map(|tok| format!("\"{}\"", tok.replace('"', "\"\"")))
-        .collect::<Vec<_>>()
-        .join(" ")
+    fts_tokens(input).join(" ")
+}
+
+/// Same sanitization as `fts_query`, but tokens joined with OR. Used as a
+/// fallback when the AND form matches nothing.
+fn fts_query_any(input: &str) -> String {
+    fts_tokens(input).join(" OR ")
 }
 
 fn now() -> i64 {
@@ -82,6 +91,9 @@ impl ProjectStore {
         #[cfg(debug_assertions)]
         migrations.validate().expect("Invalid project migrations");
         migrations.to_latest(&mut conn)?;
+        // WAL lets a long chunk write run without blocking a brief save.
+        // The pragma returns the resulting mode; it is persistent per file.
+        let _mode: String = conn.query_row("PRAGMA journal_mode = WAL", [], |r| r.get(0))?;
         Ok(store)
     }
 
@@ -260,6 +272,9 @@ pub struct SearchHit {
     pub path: String,
     pub ord: i64,
     pub snippet: String,
+    /// Raw SQLite FTS5 `bm25(source_chunks)` value. Lower (more negative)
+    /// is a better match; hits are returned best first.
+    pub score: f64,
 }
 
 const SOURCE_COLS: &str =
@@ -311,6 +326,16 @@ impl ProjectStore {
             error: None,
             digest: None,
         })
+    }
+
+    /// Ids of every source still `pending`, oldest first. Used at startup
+    /// to resume indexing that was interrupted by a quit or crash.
+    pub fn list_pending_source_ids(&self) -> Result<Vec<i64>> {
+        let conn = self.conn()?;
+        let mut stmt =
+            conn.prepare("SELECT id FROM sources WHERE status = 'pending' ORDER BY id ASC")?;
+        let rows = stmt.query_map([], |r| r.get(0))?;
+        Ok(rows.collect::<rusqlite::Result<Vec<i64>>>()?)
     }
 
     pub fn list_sources(&self, project_id: i64) -> Result<Vec<Source>> {
@@ -365,6 +390,19 @@ impl ProjectStore {
     pub fn replace_chunks(&self, source_id: i64, chunks: &[(String, String)]) -> Result<usize> {
         let mut conn = self.conn()?;
         let tx = conn.transaction()?;
+        // The source may have been removed while it was being indexed;
+        // inserting then would leave orphan FTS rows nothing ever deletes.
+        let exists = tx
+            .query_row(
+                "SELECT 1 FROM sources WHERE id = ?1",
+                params![source_id],
+                |_| Ok(()),
+            )
+            .optional()?
+            .is_some();
+        if !exists {
+            return Ok(0);
+        }
         tx.execute(
             "DELETE FROM source_chunks WHERE source_id = ?1",
             params![source_id],
@@ -383,19 +421,36 @@ impl ProjectStore {
 
     /// Full-text search scoped to one project. The query is sanitized via
     /// `fts_query`, so any input is valid FTS5 and real errors propagate.
+    /// All tokens must match first; if that finds nothing and the query has
+    /// more than one token, any-token (OR) matches are returned instead.
+    /// Terms are porter-stemmed by the tokenizer ("retries" matches "retry").
     pub fn search(&self, project_id: i64, query: &str, limit: usize) -> Result<Vec<SearchHit>> {
         let q = fts_query(query);
         if q.is_empty() {
             return Ok(Vec::new());
         }
         let conn = self.conn()?;
+        let hits = Self::run_search(&conn, project_id, &q, limit)?;
+        if hits.is_empty() && query.split_whitespace().nth(1).is_some() {
+            return Self::run_search(&conn, project_id, &fts_query_any(query), limit);
+        }
+        Ok(hits)
+    }
+
+    fn run_search(
+        conn: &Connection,
+        project_id: i64,
+        q: &str,
+        limit: usize,
+    ) -> Result<Vec<SearchHit>> {
         let mut stmt = conn.prepare(
             "SELECT c.source_id, s.title, c.path, c.ord,
-                    snippet(source_chunks, 3, '[', ']', '…', 24) AS snip
+                    snippet(source_chunks, 3, '[', ']', '…', 24) AS snip,
+                    bm25(source_chunks) AS score
              FROM source_chunks c
              JOIN sources s ON s.id = c.source_id
              WHERE s.project_id = ?1 AND source_chunks MATCH ?2
-             ORDER BY bm25(source_chunks)
+             ORDER BY score
              LIMIT ?3",
         )?;
         let rows = stmt.query_map(params![project_id, q, limit as i64], |row| {
@@ -405,6 +460,7 @@ impl ProjectStore {
                 path: row.get(2)?,
                 ord: row.get(3)?,
                 snippet: row.get(4)?,
+                score: row.get(5)?,
             })
         })?;
         Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
@@ -601,6 +657,62 @@ mod tests {
         s.remove_source(src.id).unwrap();
         assert!(s.search(p.id, "needle", 10).unwrap().is_empty());
         assert!(s.read_chunks(src.id, None, 0, 10).unwrap().is_empty());
+    }
+
+    #[test]
+    fn replace_chunks_after_remove_inserts_nothing() {
+        let (_d, s) = store();
+        let p = s.create_project("P").unwrap();
+        let src = s.add_source(p.id, SourceKind::Text, "N", "").unwrap();
+        s.replace_chunks(src.id, &[("a".into(), "needle".into())])
+            .unwrap();
+        s.remove_source(src.id).unwrap();
+        let n = s
+            .replace_chunks(src.id, &[("a".into(), "late needle".into())])
+            .unwrap();
+        assert_eq!(n, 0);
+        assert!(s.read_chunks(src.id, None, 0, 10).unwrap().is_empty());
+    }
+
+    #[test]
+    fn search_matches_stemmed_terms() {
+        let (_d, s) = store();
+        let p = s.create_project("P").unwrap();
+        let src = s.add_source(p.id, SourceKind::Text, "N", "").unwrap();
+        s.replace_chunks(src.id, &[("a".into(), "we retry once then give up".into())])
+            .unwrap();
+        let hits = s.search(p.id, "retries", 10).unwrap();
+        assert_eq!(hits.len(), 1);
+        assert!(hits[0].score.is_finite());
+    }
+
+    #[test]
+    fn search_falls_back_to_or_when_and_misses() {
+        let (_d, s) = store();
+        let p = s.create_project("P").unwrap();
+        let src = s.add_source(p.id, SourceKind::Text, "Spec", "").unwrap();
+        s.replace_chunks(
+            src.id,
+            &[(
+                "spec.md".into(),
+                "The retry budget is five attempts.".into(),
+            )],
+        )
+        .unwrap();
+        let hits = s.search(p.id, "budget elephant", 10).unwrap();
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].source_id, src.id);
+        assert!(s.search(p.id, "elephant", 10).unwrap().is_empty());
+    }
+
+    #[test]
+    fn open_enables_wal() {
+        let (_d, s) = store();
+        let conn = s.conn().unwrap();
+        let mode: String = conn
+            .query_row("PRAGMA journal_mode", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(mode.to_ascii_lowercase(), "wal");
     }
 
     #[test]

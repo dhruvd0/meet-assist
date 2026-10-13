@@ -45,12 +45,15 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
   loadProjects: async () => {
     set({ loading: true });
-    const res = await commands.listProjects();
-    if (res.status === "ok") {
-      set({ projects: res.data, loading: false });
-    } else {
+    try {
+      const res = await commands.listProjects();
+      if (res.status === "ok") {
+        set({ projects: res.data });
+      } else {
+        toast.error(t("projects.errors.load"));
+      }
+    } finally {
       set({ loading: false });
-      toast.error(t("projects.errors.load"));
     }
   },
 
@@ -137,7 +140,10 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
 
   reindexSource: async (id) => {
-    await commands.reindexSource(id);
+    const res = await commands.reindexSource(id);
+    if (res.status !== "ok") {
+      toast.error(t("projects.sources.errors.reindex"));
+    }
   },
 
   setCaption: async (id, caption) => {

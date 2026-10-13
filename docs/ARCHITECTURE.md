@@ -29,25 +29,30 @@ Both pipelines share `TranscriptionManager`, the model store, settings, the LLM 
 
 ### Existing (from Handy)
 
-| Path                          | Role                                                                                     |
-| ----------------------------- | ---------------------------------------------------------------------------------------- |
-| `lib.rs`                      | Tauri setup, manager initialization, tray, shortcuts                                     |
-| `managers/audio.rs`           | Microphone selection and recording via `handy-recorder`                                  |
-| `managers/transcription.rs`   | Model lifecycle, batch `transcribe(Vec<f32>)`, streaming preview                         |
-| `managers/model.rs`           | Model download and discovery                                                             |
-| `managers/history.rs`         | SQLite transcription history (pattern reused by the meeting store)                       |
-| `audio_toolkit/audio/sink.rs` | `CaptureVad`: frames in, speech segments out                                             |
-| `audio_toolkit/vad/`          | Silero VAD                                                                               |
-| `llm_client.rs`               | Chat completion client, OpenAI and Anthropic formats, JSON schema responses              |
-| `audio_feedback.rs`           | Plays feedback sounds via rodio                                                          |
-| `overlay.rs`                  | Always-on-top recording overlay window                                                   |
-| `settings.rs`                 | Persisted settings and migrations                                                        |
-| `commands/`                   | Tauri commands exposed to the frontend via tauri-specta                                  |
-| `meeting/store.rs`            | SQLite tables `projects`, `sources`, FTS5 `source_chunks`.                               |
-| `meeting/chunk.rs`            | Paragraph-aware chunking                                                                 |
-| `meeting/indexer.rs`          | Source indexing: text, file, folder, link, and image caption to FTS5 chunks              |
-| `meeting/manager.rs`          | `ProjectManager`: Tauri state, background indexing thread, `source-status-payload` event |
-| `commands/project.rs`         | Project and source CRUD, `search_sources`, `pick_source_path`                            |
+| Path                          | Role                                                                        |
+| ----------------------------- | --------------------------------------------------------------------------- |
+| `lib.rs`                      | Tauri setup, manager initialization, tray, shortcuts                        |
+| `managers/audio.rs`           | Microphone selection and recording via `handy-recorder`                     |
+| `managers/transcription.rs`   | Model lifecycle, batch `transcribe(Vec<f32>)`, streaming preview            |
+| `managers/model.rs`           | Model download and discovery                                                |
+| `managers/history.rs`         | SQLite transcription history (pattern reused by the meeting store)          |
+| `audio_toolkit/audio/sink.rs` | `CaptureVad`: frames in, speech segments out                                |
+| `audio_toolkit/vad/`          | Silero VAD                                                                  |
+| `llm_client.rs`               | Chat completion client, OpenAI and Anthropic formats, JSON schema responses |
+| `audio_feedback.rs`           | Plays feedback sounds via rodio                                             |
+| `overlay.rs`                  | Always-on-top recording overlay window                                      |
+| `settings.rs`                 | Persisted settings and migrations                                           |
+| `commands/`                   | Tauri commands exposed to the frontend via tauri-specta                     |
+
+### Existing (Meet Assist)
+
+| Path                  | Role                                                                                                                                                                                                                                 |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `meeting/store.rs`    | SQLite (WAL journal) tables `projects`, `sources`, and FTS5 `source_chunks` with the `porter unicode61` tokenizer. Search ANDs tokens, falls back to OR when that finds nothing, and returns the raw `bm25` score (lower is better). |
+| `meeting/chunk.rs`    | Paragraph-aware chunking                                                                                                                                                                                                             |
+| `meeting/indexer.rs`  | Source indexing: text, file, folder, link, and image caption to FTS5 chunks. Folder walks are capped by files, entries, and total bytes.                                                                                             |
+| `meeting/manager.rs`  | `ProjectManager`: Tauri state, background indexing thread (resumes `pending` sources at startup, survives indexer panics), `source-status-payload` event                                                                             |
+| `commands/project.rs` | Project and source CRUD, `search_sources`, `pick_source_path`                                                                                                                                                                        |
 
 ### Planned (meeting subsystem)
 
@@ -62,7 +67,7 @@ Both pipelines share `TranscriptionManager`, the model store, settings, the LLM 
 | `audio_toolkit/audio/system_capture/{macos,windows,linux}.rs` | Trait `SystemCapture { start(cb), stop() }`. macOS CoreAudio process tap (14.2+) with ScreenCaptureKit fallback; Windows WASAPI loopback; Linux PulseAudio/PipeWire monitor via cpal.          |
 | `commands/meeting.rs`                                         | `list_meetings`, `get_meeting`, `start_meeting`, `pause_meeting`, `resume_meeting`, `end_meeting`, `update_meeting_context`, `update_meeting_title`, `delete_meeting`, `dismiss_intervention`. |
 
-## Data model (planned)
+## Data model
 
 ```
 Project        id, title, created_at, updated_at, brief
@@ -73,6 +78,8 @@ Session        id, meeting_id, started_at, ended_at, summary
 TranscriptLine id, session_id, ts, speaker (me|them), text
 Intervention   id, session_id, ts, kind (loop|stuck|info|idea), text, reason, dismissed
 ```
+
+Project, Source, and SourceChunk exist today. Meeting, Session, TranscriptLine, and Intervention are planned.
 
 A project holds sources and meetings. A meeting is a thread of sessions. "Continue" opens a new session under an existing meeting. The observer receives the rolling summary of past sessions plus the live window, never the full raw history.
 
@@ -103,25 +110,33 @@ Response schema:
 
 Sensitivity setting adds one instruction: low restricts to loop and explicit stuck, high permits ideas freely.
 
-## Events backend to frontend (planned)
+## Events backend to frontend
 
-`meeting:state`, `meeting:transcript-line`, `meeting:intervention`, `meeting:capture-warning`, `meeting:observer-error`, `project:source-status`.
+Existing: `source-status-payload` (tauri-specta derives the name from `SourceStatusPayload`; the frontend listens via `events.sourceStatusPayload`).
+
+Planned: `meeting:state`, `meeting:transcript-line`, `meeting:intervention`, `meeting:capture-warning`, `meeting:observer-error`.
 
 ## Frontend (`src/`)
 
-### Existing
+### Existing (from Handy)
 
-| Path                                    | Role                                                                            |
-| --------------------------------------- | ------------------------------------------------------------------------------- |
-| `App.tsx`                               | Shell, onboarding, sidebar routing                                              |
-| `components/settings/`                  | Dictation and provider settings                                                 |
-| `components/ui/`                        | Shared primitives (buttons, inputs, selects). Meeting screens must reuse these. |
-| `stores/settingsStore.ts`               | Zustand settings store                                                          |
-| `stores/projectStore.ts`                | Zustand store for projects and sources, subscribes to `project:source-status`   |
-| `components/projects/ProjectList.tsx`   | Landing screen, first sidebar entry                                             |
-| `components/projects/ProjectDetail.tsx` | Brief editor and sources list                                                   |
-| `overlay/`                              | Separate window entry for the recording overlay                                 |
-| `bindings.ts`                           | Generated by tauri-specta, do not edit by hand                                  |
+| Path                      | Role                                                                            |
+| ------------------------- | ------------------------------------------------------------------------------- |
+| `App.tsx`                 | Shell, onboarding, sidebar routing                                              |
+| `components/settings/`    | Dictation and provider settings                                                 |
+| `components/ui/`          | Shared primitives (buttons, inputs, selects). Meeting screens must reuse these. |
+| `stores/settingsStore.ts` | Zustand settings store                                                          |
+| `overlay/`                | Separate window entry for the recording overlay                                 |
+| `bindings.ts`             | Generated by tauri-specta, do not edit by hand                                  |
+
+### Existing (Meet Assist)
+
+| Path                                      | Role                                                                                                         |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `stores/projectStore.ts`                  | Zustand store for projects and sources, subscribes to `source-status-payload` (`events.sourceStatusPayload`) |
+| `components/projects/ProjectsSection.tsx` | Section root: loads projects, subscribes to status events, reloads open project's sources on mount           |
+| `components/projects/ProjectList.tsx`     | Landing screen, first sidebar entry                                                                          |
+| `components/projects/ProjectDetail.tsx`   | Brief editor and sources list                                                                                |
 
 ### Planned
 

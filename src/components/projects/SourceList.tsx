@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   FileText,
@@ -36,6 +36,7 @@ const CaptionRow: React.FC<{ source: Source }> = ({ source }) => {
   const { t } = useTranslation();
   const setCaption = useProjectStore((s) => s.setCaption);
   const [value, setValue] = useState(source.digest ?? "");
+  useEffect(() => setValue(source.digest ?? ""), [source.digest]);
   return (
     <div className="flex items-center gap-2 mt-2">
       <Input

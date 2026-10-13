@@ -11,6 +11,10 @@ export const ProjectsSection: React.FC = () => {
   useEffect(() => {
     loadProjects();
     const unlisten = subscribe();
+    // Status events fired while another section was shown were missed;
+    // reload the open project's sources to reconcile.
+    const { activeProjectId: openId, loadSources } = useProjectStore.getState();
+    if (openId !== null) loadSources(openId);
     return () => {
       unlisten.then((fn) => fn());
     };

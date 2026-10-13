@@ -7,6 +7,7 @@ use anyhow::{anyhow, Result};
 use log::{error, info, warn};
 use serde::{Deserialize, Serialize};
 use specta::Type;
+use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::path::{Path, PathBuf};
 use std::sync::{mpsc, Arc, Mutex};
 use tauri::AppHandle;
@@ -56,17 +57,45 @@ impl ProjectManager {
                     app: worker_app,
                 };
                 for source_id in rx {
-                    if let Err(e) = worker.index_source_now(source_id) {
-                        warn!("indexing source {} failed: {}", source_id, e);
+                    match catch_unwind(AssertUnwindSafe(|| worker.index_source_now(source_id))) {
+                        Ok(Ok(())) => {}
+                        Ok(Err(e)) => warn!("indexing source {} failed: {:#}", source_id, e),
+                        Err(_) => {
+                            error!("indexer panicked on source {}", source_id);
+                            let marked = catch_unwind(AssertUnwindSafe(|| {
+                                worker.set_status(
+                                    source_id,
+                                    SourceStatus::Failed,
+                                    Some("indexer panicked"),
+                                )
+                            }));
+                            match marked {
+                                Ok(Ok(())) => {}
+                                Ok(Err(e)) => {
+                                    error!("mark source {} failed: {:#}", source_id, e)
+                                }
+                                Err(_) => error!("marking source {} failed panicked", source_id),
+                            }
+                        }
                     }
                 }
             })?;
-        Ok(Self {
+        let manager = Self {
             store,
             images_dir,
             tx: Mutex::new(Some(tx)),
             app,
-        })
+        };
+        // Resume sources left pending by a quit or crash mid-index.
+        match manager.store.list_pending_source_ids() {
+            Ok(ids) => {
+                for id in ids {
+                    manager.enqueue_index(id);
+                }
+            }
+            Err(e) => warn!("list pending sources: {:#}", e),
+        }
+        Ok(manager)
     }
 
     pub fn store(&self) -> &ProjectStore {
@@ -114,7 +143,8 @@ impl ProjectManager {
                 self.set_status(source_id, SourceStatus::Ready, None)
             }
             Err(e) => {
-                let msg = e.to_string();
+                // `{:#}` keeps the anyhow cause chain (e.g. the OS error).
+                let msg = format!("{e:#}");
                 self.set_status(source_id, SourceStatus::Failed, Some(&msg))?;
                 Err(e)
             }
@@ -239,7 +269,44 @@ mod tests {
         let _ = m.index_source_now(s.id);
         let got = m.store().get_source(s.id).unwrap().unwrap();
         assert_eq!(got.status, SourceStatus::Failed);
-        assert!(got.error.is_some());
+        let msg = got.error.expect("error text stored");
+        assert!(
+            msg.contains("No such file") || msg.contains("os error"),
+            "cause chain lost: {msg}"
+        );
+    }
+
+    #[test]
+    fn pending_sources_resume_on_build() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = dir.path().join("meet.db");
+        let images = dir.path().join("images");
+        let src_id;
+        let pid;
+        {
+            let store = ProjectStore::open(db.clone()).unwrap();
+            let p = store.create_project("P").unwrap();
+            pid = p.id;
+            src_id = store
+                .add_source(p.id, SourceKind::Text, "Notes", "resume me")
+                .unwrap()
+                .id;
+        }
+        let m = ProjectManager::new_for_test(db, images).unwrap();
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        loop {
+            let st = m.store().get_source(src_id).unwrap().unwrap().status;
+            if st == SourceStatus::Ready {
+                break;
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "pending source never indexed: {:?}",
+                st
+            );
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+        assert_eq!(m.store().search(pid, "resume", 5).unwrap().len(), 1);
     }
 
     #[test]

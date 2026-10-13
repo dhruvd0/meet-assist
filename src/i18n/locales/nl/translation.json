@@ -78,7 +78,8 @@
       },
       "errors": {
         "add": "Could not add source.",
-        "remove": "Could not remove source."
+        "remove": "Could not remove source.",
+        "reindex": "Could not re-index source."
       }
     },
     "errors": {

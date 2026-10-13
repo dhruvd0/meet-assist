@@ -3,6 +3,7 @@
 
 use crate::meeting::chunk::{chunk_text, MAX_CHUNK_CHARS};
 use anyhow::{anyhow, Context, Result};
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -23,6 +24,14 @@ pub const SKIP_DIRS: &[&str] = &[
 /// Upper bound on files read per folder source. Hit the cap and the walk
 /// stops with a warning; the source still indexes what was read.
 pub const MAX_FOLDER_FILES: usize = 5000;
+/// Upper bound on walk entries (files, dirs, skipped files) visited per
+/// folder source, so a huge tree of unreadable files still terminates fast.
+pub const MAX_FOLDER_ENTRIES: usize = 50_000;
+/// Upper bound on total text bytes accepted per folder source.
+pub const MAX_FOLDER_BYTES: u64 = 50 * 1024 * 1024;
+
+/// Bytes sniffed for NUL before a file is read in full.
+const BINARY_SNIFF_BYTES: u64 = 8192;
 
 pub fn is_probably_binary(bytes: &[u8]) -> bool {
     bytes.iter().take(8192).any(|b| *b == 0)
@@ -45,10 +54,19 @@ fn read_text_file(path: &Path) -> Result<String> {
             MAX_FILE_BYTES
         ));
     }
-    let bytes = std::fs::read(path).with_context(|| format!("read {}", path.display()))?;
+    let mut file = std::fs::File::open(path).with_context(|| format!("open {}", path.display()))?;
+    let mut bytes = Vec::with_capacity(meta.len() as usize);
+    (&mut file)
+        .take(BINARY_SNIFF_BYTES)
+        .read_to_end(&mut bytes)
+        .with_context(|| format!("read {}", path.display()))?;
     if is_probably_binary(&bytes) {
         return Err(anyhow!("{} looks binary", path.display()));
     }
+    // Cap the rest too, in case the file grew after the stat.
+    file.take(MAX_FILE_BYTES.saturating_sub(bytes.len() as u64))
+        .read_to_end(&mut bytes)
+        .with_context(|| format!("read {}", path.display()))?;
     String::from_utf8(bytes).map_err(|_| anyhow!("{} is not UTF-8", path.display()))
 }
 
@@ -84,7 +102,18 @@ pub fn chunks_for_folder(root: &Path) -> Result<Vec<(String, String)>> {
         })
         .build();
     let mut files_read = 0usize;
+    let mut entries_seen = 0usize;
+    let mut bytes_read = 0u64;
     for entry in walker {
+        entries_seen += 1;
+        if entries_seen > MAX_FOLDER_ENTRIES {
+            log::warn!(
+                "folder {} hit the {} entry limit; indexing what was read",
+                root.display(),
+                MAX_FOLDER_ENTRIES
+            );
+            break;
+        }
         let entry = match entry {
             Ok(e) => e,
             Err(e) => {
@@ -104,6 +133,7 @@ pub fn chunks_for_folder(root: &Path) -> Result<Vec<(String, String)>> {
             }
         };
         files_read += 1;
+        bytes_read += text.len() as u64;
         let rel = path
             .strip_prefix(root)
             .unwrap_or(path)
@@ -119,6 +149,14 @@ pub fn chunks_for_folder(root: &Path) -> Result<Vec<(String, String)>> {
                 "folder {} hit the {} file limit; indexing what was read",
                 root.display(),
                 MAX_FOLDER_FILES
+            );
+            break;
+        }
+        if bytes_read >= MAX_FOLDER_BYTES {
+            log::warn!(
+                "folder {} hit the {} byte limit; indexing what was read",
+                root.display(),
+                MAX_FOLDER_BYTES
             );
             break;
         }
@@ -247,6 +285,32 @@ mod tests {
         let chunks = chunks_for_folder(dir.path()).unwrap();
         assert_eq!(chunks.len(), 1);
         assert_eq!(chunks[0].0, "small.txt");
+    }
+
+    #[test]
+    fn folder_with_binary_file_yields_text_files_only() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        fs::write(root.join("a.txt"), "alpha").unwrap();
+        fs::write(root.join("b.txt"), "beta").unwrap();
+        fs::write(root.join("c.txt"), "gamma").unwrap();
+        let mut bin = vec![b'x'; 100];
+        bin.push(0);
+        bin.extend(vec![b'y'; 20_000]);
+        fs::write(root.join("d.bin"), bin).unwrap();
+        let paths: Vec<String> = chunks_for_folder(root)
+            .unwrap()
+            .into_iter()
+            .map(|c| c.0)
+            .collect();
+        assert_eq!(paths, vec!["a.txt", "b.txt", "c.txt"]);
+    }
+
+    #[test]
+    fn folder_caps_are_public_and_sane() {
+        assert_eq!(MAX_FOLDER_ENTRIES, 50_000);
+        assert_eq!(MAX_FOLDER_BYTES, 50 * 1024 * 1024);
+        const { assert!(MAX_FOLDER_FILES <= MAX_FOLDER_ENTRIES) };
     }
 
     #[test]
