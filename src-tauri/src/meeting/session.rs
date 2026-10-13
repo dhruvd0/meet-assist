@@ -230,12 +230,14 @@ impl MeetingManager {
         if guard.is_some() {
             return Err(anyhow!("A meeting is already running"));
         }
+        let mut previous_status = None;
         let meeting = match meeting_id {
             Some(id) => {
                 let m = self
                     .store
                     .get_meeting(id)?
                     .ok_or_else(|| anyhow!("meeting {} not found", id))?;
+                previous_status = Some(m.status);
                 self.store.set_meeting_status(id, MeetingStatus::Live)?;
                 Meeting {
                     status: MeetingStatus::Live,
@@ -248,9 +250,22 @@ impl MeetingManager {
         let capture = match self.start_capture_and_worker(meeting.id, session.id) {
             Ok(c) => c,
             Err(e) => {
-                self.store.end_session(session.id)?;
-                self.store
-                    .set_meeting_status(meeting.id, MeetingStatus::Paused)?;
+                // Undo the partial start; always surface the capture error.
+                match previous_status {
+                    Some(prev) => {
+                        if let Err(ce) = self.store.end_session(session.id) {
+                            warn!("cleanup after failed start (end session): {ce:#}");
+                        }
+                        if let Err(ce) = self.store.set_meeting_status(meeting.id, prev) {
+                            warn!("cleanup after failed start (restore status): {ce:#}");
+                        }
+                    }
+                    None => {
+                        if let Err(ce) = self.store.delete_meeting(meeting.id) {
+                            warn!("cleanup after failed start (delete meeting): {ce:#}");
+                        }
+                    }
+                }
                 return Err(e);
             }
         };
@@ -342,22 +357,32 @@ mod tests {
     }
 
     struct FakeCapture {
-        senders: Mutex<Vec<mpsc::Sender<Utterance>>>,
+        senders: Mutex<Vec<Option<mpsc::Sender<Utterance>>>>,
         stops: AtomicUsize,
+        fail_next: AtomicBool,
     }
-    struct FakeHandle(Arc<FakeCapture>);
+    struct FakeSource(Arc<FakeCapture>);
+    struct FakeHandle {
+        cap: Arc<FakeCapture>,
+        index: usize,
+    }
     impl CaptureHandle for FakeHandle {
         fn stop(self: Box<Self>) {
-            self.0.stops.fetch_add(1, Ordering::SeqCst);
+            self.cap.stops.fetch_add(1, Ordering::SeqCst);
+            self.cap.senders.lock().unwrap()[self.index] = None;
         }
     }
-    impl CaptureSource for FakeCapture {
+    impl CaptureSource for FakeSource {
         fn start(&self, tx: mpsc::Sender<Utterance>) -> anyhow::Result<Box<dyn CaptureHandle>> {
-            self.senders.lock().unwrap().push(tx);
-            Ok(Box::new(FakeHandle(Arc::new(FakeCapture {
-                senders: Mutex::new(vec![]),
-                stops: AtomicUsize::new(0),
-            }))))
+            if self.0.fail_next.swap(false, Ordering::SeqCst) {
+                return Err(anyhow::anyhow!("capture failed"));
+            }
+            let mut senders = self.0.senders.lock().unwrap();
+            senders.push(Some(tx));
+            Ok(Box::new(FakeHandle {
+                cap: Arc::clone(&self.0),
+                index: senders.len() - 1,
+            }))
         }
     }
 
@@ -374,6 +399,7 @@ mod tests {
         let cap = Arc::new(FakeCapture {
             senders: Mutex::new(vec![]),
             stops: AtomicUsize::new(0),
+            fail_next: AtomicBool::new(false),
         });
         let dict = Arc::new(AtomicBool::new(false));
         let m = MeetingManager::new_for_test(
@@ -382,7 +408,7 @@ mod tests {
                 calls: AtomicUsize::new(0),
                 fail_first,
             }),
-            cap.clone(),
+            Arc::new(FakeSource(cap.clone())),
             dict.clone(),
         );
         (dir, m, cap, dict)
@@ -412,7 +438,7 @@ mod tests {
         let st = m.state();
         assert_eq!(st.meeting_id, Some(meeting.id));
         assert!(st.session_id.is_some());
-        let tx = cap.senders.lock().unwrap()[0].clone();
+        let tx = cap.senders.lock().unwrap()[0].clone().unwrap();
         tx.send(Utterance {
             samples: vec![0.1; 4800],
             captured_at: 1,
@@ -450,6 +476,8 @@ mod tests {
         let meeting = m.start(None, None).unwrap();
         let session_id = m.state().session_id.unwrap();
         m.pause().unwrap();
+        assert_eq!(cap.stops.load(Ordering::SeqCst), 1, "pause stops capture");
+        assert!(cap.senders.lock().unwrap()[0].is_none());
         assert_eq!(m.state().status, Some(MeetingStatus::Paused));
         assert_eq!(
             m.store().get_meeting(meeting.id).unwrap().unwrap().status,
@@ -463,6 +491,7 @@ mod tests {
             "capture restarted on resume"
         );
         m.end().unwrap();
+        assert_eq!(cap.stops.load(Ordering::SeqCst), 2, "end stops capture");
         let d = m.store().get_meeting_detail(meeting.id).unwrap().unwrap();
         assert_eq!(d.meeting.status, MeetingStatus::Ended);
         assert!(d.sessions[0].ended_at.is_some());
@@ -485,7 +514,7 @@ mod tests {
     fn transcriber_error_is_retried_once_then_line_stored() {
         let (_d, m, cap, _dict) = mgr(true);
         let meeting = m.start(None, None).unwrap();
-        let tx = cap.senders.lock().unwrap()[0].clone();
+        let tx = cap.senders.lock().unwrap()[0].clone().unwrap();
         tx.send(Utterance {
             samples: vec![0.1; 4800],
             captured_at: 1,
@@ -493,5 +522,25 @@ mod tests {
         .unwrap();
         let lines = wait_lines(&m, meeting.id, 1);
         assert_eq!(lines[0].text, "heard 4800 samples");
+    }
+
+    #[test]
+    fn start_failure_restores_ended_status_and_discards_empty_meeting() {
+        let (_d, m, cap, _dict) = mgr(false);
+        let meeting = m.start(None, None).unwrap();
+        m.end().unwrap();
+        cap.fail_next.store(true, Ordering::SeqCst);
+        assert!(m.start(None, Some(meeting.id)).is_err());
+        let d = m.store().get_meeting_detail(meeting.id).unwrap().unwrap();
+        assert_eq!(d.meeting.status, MeetingStatus::Ended);
+        // No delete_session in the store: the aborted session stays but is closed.
+        assert_eq!(d.sessions.len(), 2);
+        assert!(d.sessions.iter().all(|x| x.ended_at.is_some()));
+        assert_eq!(m.state().meeting_id, None);
+
+        let before = m.store().list_meetings(None).unwrap().len();
+        cap.fail_next.store(true, Ordering::SeqCst);
+        assert!(m.start(None, None).is_err());
+        assert_eq!(m.store().list_meetings(None).unwrap().len(), before);
     }
 }
