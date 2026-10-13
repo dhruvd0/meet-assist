@@ -936,6 +936,113 @@ async isLaptop() : Promise<Result<boolean, string>> {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+async listProjects() : Promise<Result<Project[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("list_projects") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async getProject(id: number) : Promise<Result<Project | null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_project", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async createProject(title: string) : Promise<Result<Project, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("create_project", { title }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async updateProjectTitle(id: number, title: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("update_project_title", { id, title }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async updateProjectBrief(id: number, brief: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("update_project_brief", { id, brief }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async deleteProject(id: number) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("delete_project", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async listSources(projectId: number) : Promise<Result<Source[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("list_sources", { projectId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async addSource(projectId: number, kind: SourceKind, title: string, locator: string) : Promise<Result<Source, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("add_source", { projectId, kind, title, locator }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async removeSource(id: number) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("remove_source", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async reindexSource(id: number) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("reindex_source", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async setSourceCaption(id: number, caption: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_source_caption", { id, caption }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async searchSources(projectId: number, query: string, limit: number | null) : Promise<Result<SearchHit[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("search_sources", { projectId, query, limit }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Native picker. `kind` is `file`, `folder`, or `image`.
+ */
+async pickSourcePath(kind: SourceKind) : Promise<Result<string | null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("pick_source_path", { kind }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 }
 }
 
@@ -944,10 +1051,12 @@ async isLaptop() : Promise<Result<boolean, string>> {
 
 export const events = __makeEvents__<{
 historyUpdatePayload: HistoryUpdatePayload,
+sourceStatusPayload: SourceStatusPayload,
 streamPhaseEvent: StreamPhaseEvent,
 streamTextEvent: StreamTextEvent
 }>({
 historyUpdatePayload: "history-update-payload",
+sourceStatusPayload: "source-status-payload",
 streamPhaseEvent: "stream-phase-event",
 streamTextEvent: "stream-text-event"
 })
@@ -1120,7 +1229,9 @@ export type PostProcessApiFormat =
  */
 "anthropic"
 export type PostProcessProvider = { id: string; label: string; base_url: string; allow_base_url_edit?: boolean; models_endpoint?: string | null; supports_structured_output?: boolean; api_format?: PostProcessApiFormat }
+export type Project = { id: number; title: string; brief: string; created_at: number; updated_at: number }
 export type RecordingRetentionPeriod = "never" | "preserve_limit" | "days_3" | "weeks_2" | "months_3"
+export type SearchHit = { source_id: number; source_title: string; path: string; ord: number; snippet: string }
 export type SecretMap = Partial<{ [key in string]: string }>
 export type SecureInputStatus = { 
 /**
@@ -1174,6 +1285,10 @@ export type ShortcutActivation =
 "hold_or_toggle"
 export type ShortcutBinding = { id: string; name: string; description: string; default_binding: string; current_binding: string }
 export type SoundTheme = "marimba" | "pop" | "custom"
+export type Source = { id: number; project_id: number; kind: SourceKind; title: string; locator: string; added_at: number; indexed_at: number | null; status: SourceStatus; error: string | null; digest: string | null }
+export type SourceKind = "text" | "file" | "folder" | "link" | "image"
+export type SourceStatus = "pending" | "ready" | "failed"
+export type SourceStatusPayload = { source: Source }
 /**
  * Phase of the streaming overlay card, emitted to drive its UI state.
  */
