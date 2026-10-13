@@ -51,6 +51,7 @@ impl ProjectStore {
 
     fn conn(&self) -> Result<Connection> {
         let conn = Connection::open(&self.db_path)?;
+        conn.busy_timeout(std::time::Duration::from_secs(5))?;
         conn.execute_batch("PRAGMA foreign_keys = ON;")?;
         Ok(conn)
     }
@@ -153,12 +154,14 @@ mod tests {
         let a = s.create_project("Alpha").unwrap();
         std::thread::sleep(std::time::Duration::from_millis(5));
         let b = s.create_project("Beta").unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(5));
         s.update_project_brief(a.id, "touched").unwrap();
         let list = s.list_projects().unwrap();
         assert_eq!(list.len(), 2);
         assert_eq!(list[0].id, a.id, "updated project sorts first");
         assert_eq!(list[1].id, b.id);
         assert_eq!(list[0].brief, "touched");
+        assert!(list[0].updated_at > list[1].updated_at);
     }
 
     #[test]
