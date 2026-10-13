@@ -2,9 +2,11 @@ import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ArrowLeft, Pencil } from "lucide-react";
 import { useMeetingStore } from "@/stores/meetingStore";
+import { Alert } from "../ui/Alert";
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
 import { ContextEditor } from "./ContextEditor";
+import { InterventionTimeline } from "./InterventionTimeline";
 import { MeetingControls } from "./MeetingControls";
 import { TranscriptThread } from "./TranscriptThread";
 
@@ -12,6 +14,7 @@ export const MeetingDetail: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const { t } = useTranslation();
   const detail = useMeetingStore((s) => s.detail);
   const live = useMeetingStore((s) => s.live);
+  const observer = useMeetingStore((s) => s.observer);
   const renameMeeting = useMeetingStore((s) => s.renameMeeting);
   const refreshLive = useMeetingStore((s) => s.refreshLive);
   const subscribe = useMeetingStore((s) => s.subscribe);
@@ -78,11 +81,22 @@ export const MeetingDetail: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         </Button>
         <MeetingControls meetingId={m.id} />
       </div>
+      {observer.tools_unavailable && (
+        <Alert variant="info">{t("meetings.observer.toolsUnavailable")}</Alert>
+      )}
+      {observer.consecutive_failures >= 3 && (
+        <Alert variant="warning">
+          {t("meetings.observer.failing", {
+            count: observer.consecutive_failures,
+          })}
+        </Alert>
+      )}
       <ContextEditor meetingId={m.id} context={m.context} />
       <TranscriptThread
         detail={detail}
         autoscroll={live.meeting_id === m.id && live.status === "live"}
       />
+      <InterventionTimeline items={detail.interventions} />
     </div>
   );
 };

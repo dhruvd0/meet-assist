@@ -24,6 +24,7 @@ import { LazyStreamClose } from "../LazyStreamClose";
 import { FillerWordRemoval } from "../FillerWordRemoval";
 import { ChineseScriptSetting } from "../ChineseScript";
 import { VadBackendSelector } from "../VadBackendSelector";
+import { MeetingAssistantSettings } from "../meeting/MeetingAssistantSettings";
 
 export const AdvancedSettings: React.FC = () => {
   const { t } = useTranslation();
@@ -76,6 +77,8 @@ export const AdvancedSettings: React.FC = () => {
           <VadBackendSelector descriptionMode="tooltip" grouped={true} />
         </SettingsGroup>
       )}
+
+      <MeetingAssistantSettings />
     </div>
   );
 };

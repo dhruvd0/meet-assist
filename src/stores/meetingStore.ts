@@ -14,6 +14,7 @@ interface MeetingStore {
   activeMeetingId: number | null;
   detail: MeetingDetail | null;
   live: MeetingStatePayload;
+  observer: { tools_unavailable: boolean; consecutive_failures: number };
   loading: boolean;
 
   loadMeetings: (projectId?: number | null) => Promise<void>;
@@ -30,6 +31,7 @@ interface MeetingStore {
   renameMeeting: (id: number, title: string) => Promise<void>;
   saveContext: (id: number, context: string) => Promise<void>;
   deleteMeeting: (id: number) => Promise<void>;
+  dismiss: (id: number) => Promise<void>;
   subscribe: () => Promise<() => void>;
 }
 
@@ -45,6 +47,7 @@ export const useMeetingStore = create<MeetingStore>((set, get) => ({
   activeMeetingId: null,
   detail: null,
   live: idle,
+  observer: { tools_unavailable: false, consecutive_failures: 0 },
   loading: false,
 
   loadMeetings: async (projectId = null) => {
@@ -155,6 +158,26 @@ export const useMeetingStore = create<MeetingStore>((set, get) => ({
     }));
   },
 
+  dismiss: async (id) => {
+    const res = await commands.dismissIntervention(id);
+    if (res.status !== "ok") {
+      toast.error(t("meetings.errors.save"));
+      return;
+    }
+    set((s) =>
+      s.detail
+        ? {
+            detail: {
+              ...s.detail,
+              interventions: s.detail.interventions.map((iv) =>
+                iv.id === id ? { ...iv, dismissed: true } : iv,
+              ),
+            },
+          }
+        : s,
+    );
+  },
+
   subscribe: async () => {
     const un1 = await events.meetingStatePayload.listen((e) => {
       set({ live: e.payload });
@@ -184,10 +207,32 @@ export const useMeetingStore = create<MeetingStore>((set, get) => ({
     const un3 = await events.meetingCaptureWarningPayload.listen((e) => {
       toast.error(`${t("meetings.errors.capture")} ${e.payload.message}`);
     });
+    const un4 = await events.interventionPayload.listen((e) => {
+      set((s) => {
+        if (s.activeMeetingId !== e.payload.meeting_id || !s.detail) return s;
+        if (
+          s.detail.interventions.some((i) => i.id === e.payload.intervention.id)
+        )
+          return s;
+        return {
+          detail: {
+            ...s.detail,
+            interventions: [...s.detail.interventions, e.payload.intervention],
+          },
+        };
+      });
+    });
+    const un5 = await events.observerStatusPayload.listen((e) => {
+      const { meeting_id, tools_unavailable, consecutive_failures } = e.payload;
+      if (meeting_id === null || meeting_id === get().activeMeetingId)
+        set({ observer: { tools_unavailable, consecutive_failures } });
+    });
     return () => {
       un1();
       un2();
       un3();
+      un4();
+      un5();
     };
   },
 }));
