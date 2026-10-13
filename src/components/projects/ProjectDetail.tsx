@@ -2,10 +2,13 @@ import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ArrowLeft, Pencil } from "lucide-react";
 import { useProjectStore } from "@/stores/projectStore";
+import { useMeetingStore } from "@/stores/meetingStore";
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
 import { BriefEditor } from "./BriefEditor";
 import { SourceList } from "./SourceList";
+import { MeetingDetail } from "../meetings/MeetingDetail";
+import { ProjectMeetings } from "../meetings/ProjectMeetings";
 
 export const ProjectDetail: React.FC = () => {
   const { t } = useTranslation();
@@ -15,10 +18,24 @@ export const ProjectDetail: React.FC = () => {
   );
   const closeProject = useProjectStore((s) => s.closeProject);
   const renameProject = useProjectStore((s) => s.renameProject);
+  const activeMeetingId = useMeetingStore((s) => s.activeMeetingId);
+  const closeMeeting = useMeetingStore((s) => s.closeMeeting);
+  const loadMeetings = useMeetingStore((s) => s.loadMeetings);
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(project?.title ?? "");
 
   if (activeProjectId === null || !project) return null;
+
+  if (activeMeetingId !== null) {
+    return (
+      <MeetingDetail
+        onBack={() => {
+          closeMeeting();
+          loadMeetings(project.id);
+        }}
+      />
+    );
+  }
 
   const commit = () => {
     const next = title.trim();
@@ -69,6 +86,7 @@ export const ProjectDetail: React.FC = () => {
       </div>
       <BriefEditor projectId={project.id} brief={project.brief} />
       <SourceList projectId={project.id} />
+      <ProjectMeetings projectId={project.id} />
     </div>
   );
 };

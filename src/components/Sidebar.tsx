@@ -6,10 +6,12 @@ import {
   FolderKanban,
   History,
   Info,
+  Mic,
   Sparkles,
   Cpu,
 } from "lucide-react";
 import { ProjectsSection } from "./projects/ProjectsSection";
+import { MeetingsSection } from "./meetings/MeetingsSection";
 import HandyTextLogo from "./icons/HandyTextLogo";
 import HandyHand from "./icons/HandyHand";
 import { useSettings } from "../hooks/useSettings";
@@ -45,6 +47,12 @@ export const SECTIONS_CONFIG = {
     labelKey: "sidebar.projects",
     icon: FolderKanban,
     component: ProjectsSection,
+    enabled: () => true,
+  },
+  meetings: {
+    labelKey: "sidebar.meetings",
+    icon: Mic,
+    component: MeetingsSection,
     enabled: () => true,
   },
   general: {
