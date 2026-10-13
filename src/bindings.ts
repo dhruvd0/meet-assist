@@ -232,6 +232,22 @@ async changeMeetingAssistantSetting(enabled: boolean) : Promise<Result<null, str
     else return { status: "error", error: e  as any };
 }
 },
+async changeMeetingSystemAudioSetting(enabled: boolean) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("change_meeting_system_audio_setting", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async changeMeetingVisionSetting(enabled: boolean) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("change_meeting_vision_setting", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async changeMeetingProviderSetting(providerId: string) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("change_meeting_provider_setting", { providerId }) };
@@ -1192,6 +1208,18 @@ async focusMeeting(meetingId: number) : Promise<Result<null, string>> {
 },
 async getObserverReadiness() : Promise<ObserverReadiness> {
     return await TAURI_INVOKE("get_observer_readiness");
+},
+/**
+ * Summarize a session in the background (also the UI's Retry). The result
+ * arrives as a `SessionSummaryPayload` event.
+ */
+async summarizeSession(sessionId: number) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("summarize_session", { sessionId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 }
 }
 
@@ -1205,6 +1233,7 @@ meetingCaptureWarningPayload: MeetingCaptureWarningPayload,
 meetingStatePayload: MeetingStatePayload,
 observerStatusPayload: ObserverStatusPayload,
 openMeetingPayload: OpenMeetingPayload,
+sessionSummaryPayload: SessionSummaryPayload,
 sourceStatusPayload: SourceStatusPayload,
 streamPhaseEvent: StreamPhaseEvent,
 streamTextEvent: StreamTextEvent,
@@ -1216,6 +1245,7 @@ meetingCaptureWarningPayload: "meeting-capture-warning-payload",
 meetingStatePayload: "meeting-state-payload",
 observerStatusPayload: "observer-status-payload",
 openMeetingPayload: "open-meeting-payload",
+sessionSummaryPayload: "session-summary-payload",
 sourceStatusPayload: "source-status-payload",
 streamPhaseEvent: "stream-phase-event",
 streamTextEvent: "stream-text-event",
@@ -1274,6 +1304,10 @@ selected_channel?: number | null; clamshell_microphone?: string | null; selected
  * sends transcript, brief and context to the chosen provider.
  */
 meeting_assistant_enabled?: boolean; 
+/**
+ * Capture system audio (the other participants) during meetings.
+ */
+meeting_system_audio_enabled?: boolean; meeting_vision_enabled?: boolean; 
 /**
  * Provider for the meeting observer; empty means the post-processing provider.
  */
@@ -1350,9 +1384,14 @@ export type LLMPrompt = { id: string; name: string; prompt: string }
 export type LogLevel = "trace" | "debug" | "info" | "warn" | "error"
 export type Meeting = { id: number; project_id: number | null; title: string; created_at: number; updated_at: number; status: MeetingStatus; context: string; rolling_summary: string | null }
 /**
- * Emitted once per capture run when the microphone stops delivering audio.
+ * Emitted once per capture run when a capture source fails: the
+ * microphone stops delivering audio, or system audio cannot start.
  */
-export type MeetingCaptureWarningPayload = { meeting_id: number; message: string }
+export type MeetingCaptureWarningPayload = { meeting_id: number; 
+/**
+ * `"microphone"` or `"system_audio"`.
+ */
+source: string; message: string }
 export type MeetingDetail = { meeting: Meeting; sessions: Session[]; lines: TranscriptLine[]; interventions: Intervention[] }
 /**
  * How readily the meeting observer raises interventions.
@@ -1474,6 +1513,11 @@ uncovered_bindings: string[];
  */
 recorder_blocked: boolean }
 export type Session = { id: number; meeting_id: number; started_at: number; ended_at: number | null; summary: string | null }
+export type SessionSummary = { decisions?: string[]; open_questions?: string[]; action_items?: string[]; recap?: string }
+/**
+ * Emitted when a session summary has been stored.
+ */
+export type SessionSummaryPayload = { meeting_id: number; session_id: number; summary: SessionSummary; rolling_summary: string }
 /**
  * How the transcribe shortcut's key events drive a recording.
  */
