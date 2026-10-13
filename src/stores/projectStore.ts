@@ -121,12 +121,8 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     }
     set((s) => {
       if (s.activeProjectId !== res.data.project_id) return s;
-      const exists = s.sources.some((x) => x.id === res.data.id);
-      return {
-        sources: exists
-          ? s.sources.map((x) => (x.id === res.data.id ? res.data : x))
-          : [...s.sources, res.data],
-      };
+      if (s.sources.some((x) => x.id === res.data.id)) return s;
+      return { sources: [...s.sources, res.data] };
     });
     return res.data;
   },
