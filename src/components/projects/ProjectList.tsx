@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { ask } from "@tauri-apps/plugin-dialog";
 import { FolderKanban, Plus, Trash2 } from "lucide-react";
 import { useProjectStore } from "@/stores/projectStore";
 import { Button } from "../ui/Button";
@@ -75,10 +76,12 @@ export const ProjectList: React.FC = () => {
                 variant="danger-ghost"
                 size="sm"
                 title={t("projects.delete")}
-                onClick={() => {
-                  if (window.confirm(t("projects.deleteConfirm"))) {
-                    deleteProject(p.id);
-                  }
+                onClick={async () => {
+                  const ok = await ask(t("projects.deleteConfirm"), {
+                    title: t("projects.delete"),
+                    kind: "warning",
+                  });
+                  if (ok) deleteProject(p.id);
                 }}
               >
                 <Trash2 className="w-4 h-4" />
