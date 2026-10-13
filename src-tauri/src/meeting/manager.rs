@@ -107,29 +107,8 @@ impl ProjectManager {
             return Err(anyhow!("source {} not found", source_id));
         };
         self.set_status(source_id, SourceStatus::Pending, None)?;
-        let result: Result<Vec<(String, String)>> = match src.kind {
-            SourceKind::Text => Ok(indexer::chunks_for_text(&src.locator)),
-            SourceKind::File => indexer::chunks_for_file(Path::new(&src.locator)),
-            SourceKind::Folder => indexer::chunks_for_folder(Path::new(&src.locator)),
-            SourceKind::Link => {
-                let url = src.locator.clone();
-                match tokio::runtime::Handle::try_current() {
-                    Ok(h) => {
-                        tokio::task::block_in_place(|| h.block_on(indexer::chunks_for_link(&url)))
-                    }
-                    Err(_) => tokio::runtime::Builder::new_current_thread()
-                        .enable_all()
-                        .build()?
-                        .block_on(indexer::chunks_for_link(&url)),
-                }
-            }
-            SourceKind::Image => Ok(indexer::chunks_for_caption(
-                src.digest.as_deref().unwrap_or(""),
-            )),
-        };
-        match result {
-            Ok(chunks) => {
-                let n = self.store.replace_chunks(source_id, &chunks)?;
+        match self.index_inner(&src) {
+            Ok(n) => {
                 info!("indexed source {} ({} chunks)", source_id, n);
                 self.set_status(source_id, SourceStatus::Ready, None)
             }
@@ -141,6 +120,28 @@ impl ProjectManager {
         }
     }
 
+    fn index_inner(&self, src: &Source) -> Result<usize> {
+        let chunks: Vec<(String, String)> = match src.kind {
+            SourceKind::Text => indexer::chunks_for_text(&src.locator),
+            SourceKind::File => indexer::chunks_for_file(Path::new(&src.locator))?,
+            SourceKind::Folder => indexer::chunks_for_folder(Path::new(&src.locator))?,
+            SourceKind::Link => {
+                let url = src.locator.clone();
+                match tokio::runtime::Handle::try_current() {
+                    Ok(h) => {
+                        tokio::task::block_in_place(|| h.block_on(indexer::chunks_for_link(&url)))?
+                    }
+                    Err(_) => tokio::runtime::Builder::new_current_thread()
+                        .enable_all()
+                        .build()?
+                        .block_on(indexer::chunks_for_link(&url))?,
+                }
+            }
+            SourceKind::Image => indexer::chunks_for_caption(src.digest.as_deref().unwrap_or("")),
+        };
+        self.store.replace_chunks(src.id, &chunks)
+    }
+
     pub fn add_and_index(
         &self,
         project_id: i64,
@@ -150,10 +151,23 @@ impl ProjectManager {
     ) -> Result<Source> {
         let mut source = self.store.add_source(project_id, kind, title, locator)?;
         if kind == SourceKind::Image {
-            let copied = indexer::copy_image_into(Path::new(locator), &self.images_dir, source.id)?;
-            let copied_str = copied.to_string_lossy().to_string();
-            self.store.update_source_locator(source.id, &copied_str)?;
-            source.locator = copied_str;
+            let copy_result =
+                indexer::copy_image_into(Path::new(locator), &self.images_dir, source.id).and_then(
+                    |copied| {
+                        let copied_str = copied.to_string_lossy().to_string();
+                        self.store.update_source_locator(source.id, &copied_str)?;
+                        Ok(copied_str)
+                    },
+                );
+            match copy_result {
+                Ok(copied_str) => source.locator = copied_str,
+                Err(e) => {
+                    if let Err(e2) = self.store.remove_source(source.id) {
+                        warn!("remove orphan source {}: {}", source.id, e2);
+                    }
+                    return Err(e);
+                }
+            }
         }
         self.emit_status(&source);
         self.enqueue_index(source.id);
@@ -283,5 +297,31 @@ mod tests {
         m.delete_project(p.id).unwrap();
         assert!(!copied.exists());
         assert!(m.store().get_project(p.id).unwrap().is_none());
+    }
+
+    #[test]
+    fn folder_locator_that_is_a_file_marks_failed() {
+        let (d, m) = mgr();
+        let p = m.store().create_project("P").unwrap();
+        let f = d.path().join("plain.txt");
+        fs::write(&f, b"x").unwrap();
+        let s = m
+            .store()
+            .add_source(p.id, SourceKind::Folder, "F", f.to_str().unwrap())
+            .unwrap();
+        assert!(m.index_source_now(s.id).is_err());
+        let got = m.store().get_source(s.id).unwrap().unwrap();
+        assert_eq!(got.status, SourceStatus::Failed);
+        assert!(got.error.is_some());
+    }
+
+    #[test]
+    fn image_copy_failure_removes_orphan_row() {
+        let (d, m) = mgr();
+        let p = m.store().create_project("P").unwrap();
+        let missing = d.path().join("nope.png");
+        let r = m.add_and_index(p.id, SourceKind::Image, "X", missing.to_str().unwrap());
+        assert!(r.is_err());
+        assert!(m.store().list_sources(p.id).unwrap().is_empty());
     }
 }
