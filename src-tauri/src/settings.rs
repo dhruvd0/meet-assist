@@ -496,6 +496,8 @@ pub struct AppSettings {
     /// Capture system audio (the other participants) during meetings.
     #[serde(default = "default_meeting_system_audio_enabled")]
     pub meeting_system_audio_enabled: bool,
+    #[serde(default = "default_meeting_vision_enabled")]
+    pub meeting_vision_enabled: bool,
     /// Provider for the meeting observer; empty means the post-processing provider.
     #[serde(default = "default_meeting_provider_id")]
     pub meeting_provider_id: String,
@@ -692,6 +694,10 @@ fn default_theme() -> Theme {
 }
 
 fn default_meeting_system_audio_enabled() -> bool {
+    true
+}
+
+fn default_meeting_vision_enabled() -> bool {
     true
 }
 
@@ -1046,6 +1052,7 @@ pub fn get_default_settings() -> AppSettings {
         post_process_models: default_post_process_models(),
         meeting_assistant_enabled: false,
         meeting_system_audio_enabled: default_meeting_system_audio_enabled(),
+        meeting_vision_enabled: default_meeting_vision_enabled(),
         meeting_provider_id: default_meeting_provider_id(),
         meeting_sensitivity: MeetingSensitivity::default(),
         meeting_observer_interval_secs: default_meeting_observer_interval_secs(),
@@ -1391,6 +1398,7 @@ mod tests {
         assert_eq!(s.meeting_provider_id, "");
         assert!(!s.meeting_assistant_enabled, "assistant is opt-in");
         assert!(s.meeting_system_audio_enabled);
+        assert!(s.meeting_vision_enabled);
         assert_eq!(s.meeting_sensitivity, MeetingSensitivity::Medium);
         assert_eq!(s.meeting_observer_interval_secs, 20);
         assert!(s.meeting_beep_enabled);

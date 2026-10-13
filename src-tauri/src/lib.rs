@@ -711,6 +711,7 @@ pub fn run(cli_args: CliArgs) {
             shortcut::change_post_process_enabled_setting,
             shortcut::change_meeting_assistant_setting,
             shortcut::change_meeting_system_audio_setting,
+            shortcut::change_meeting_vision_setting,
             shortcut::change_meeting_provider_setting,
             shortcut::change_meeting_sensitivity_setting,
             shortcut::change_meeting_observer_interval_setting,
