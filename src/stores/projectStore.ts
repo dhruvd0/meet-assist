@@ -119,7 +119,15 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       toast.error(t("projects.sources.errors.add"));
       return null;
     }
-    set((s) => ({ sources: [...s.sources, res.data] }));
+    set((s) => {
+      if (s.activeProjectId !== res.data.project_id) return s;
+      const exists = s.sources.some((x) => x.id === res.data.id);
+      return {
+        sources: exists
+          ? s.sources.map((x) => (x.id === res.data.id ? res.data : x))
+          : [...s.sources, res.data],
+      };
+    });
     return res.data;
   },
 
