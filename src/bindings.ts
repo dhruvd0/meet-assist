@@ -1084,9 +1084,13 @@ async resumeMeeting() : Promise<Result<null, string>> {
     else return { status: "error", error: e  as any };
 }
 },
-async endMeeting() : Promise<Result<null, string>> {
+/**
+ * `None` (or the running meeting's id) ends the running meeting; any other
+ * id ends that idle meeting, e.g. one left paused by a restart.
+ */
+async endMeeting(meetingId: number | null) : Promise<Result<null, string>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("end_meeting") };
+    return { status: "ok", data: await TAURI_INVOKE("end_meeting", { meetingId }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -1126,6 +1130,7 @@ async deleteMeeting(id: number) : Promise<Result<null, string>> {
 
 export const events = __makeEvents__<{
 historyUpdatePayload: HistoryUpdatePayload,
+meetingCaptureWarningPayload: MeetingCaptureWarningPayload,
 meetingStatePayload: MeetingStatePayload,
 sourceStatusPayload: SourceStatusPayload,
 streamPhaseEvent: StreamPhaseEvent,
@@ -1133,6 +1138,7 @@ streamTextEvent: StreamTextEvent,
 transcriptLinePayload: TranscriptLinePayload
 }>({
 historyUpdatePayload: "history-update-payload",
+meetingCaptureWarningPayload: "meeting-capture-warning-payload",
 meetingStatePayload: "meeting-state-payload",
 sourceStatusPayload: "source-status-payload",
 streamPhaseEvent: "stream-phase-event",
@@ -1256,6 +1262,10 @@ export type KeyboardImplementation = "tauri" | "handy_keys"
 export type LLMPrompt = { id: string; name: string; prompt: string }
 export type LogLevel = "trace" | "debug" | "info" | "warn" | "error"
 export type Meeting = { id: number; project_id: number | null; title: string; created_at: number; updated_at: number; status: MeetingStatus; context: string; rolling_summary: string | null }
+/**
+ * Emitted once per capture run when the microphone stops delivering audio.
+ */
+export type MeetingCaptureWarningPayload = { meeting_id: number; message: string }
 export type MeetingDetail = { meeting: Meeting; sessions: Session[]; lines: TranscriptLine[] }
 export type MeetingStatePayload = { meeting_id: number | null; session_id: number | null; status: MeetingStatus | null }
 export type MeetingStatus = "live" | "paused" | "ended"

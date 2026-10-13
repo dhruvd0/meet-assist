@@ -36,6 +36,12 @@ export const MeetingControls: React.FC<{ meetingId: number }> = ({
           <Play className="w-4 h-4 inline mr-1" />
           {t("meetings.continue")}
         </Button>
+        {status === "paused" && (
+          <Button size="sm" variant="danger" onClick={() => end(meetingId)}>
+            <Square className="w-4 h-4 inline mr-1" />
+            {t("meetings.controls.end")}
+          </Button>
+        )}
       </div>
     );
   }
@@ -58,7 +64,7 @@ export const MeetingControls: React.FC<{ meetingId: number }> = ({
           {t("meetings.controls.resume")}
         </Button>
       )}
-      <Button size="sm" variant="danger" onClick={end}>
+      <Button size="sm" variant="danger" onClick={() => end(null)}>
         <Square className="w-4 h-4 inline mr-1" />
         {t("meetings.controls.end")}
       </Button>

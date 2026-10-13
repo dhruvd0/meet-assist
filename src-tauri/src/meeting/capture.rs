@@ -12,29 +12,48 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc};
 
 pub struct Utterance {
+    /// Who spoke. The microphone path is always the user ("me").
+    pub speaker: String,
     pub samples: Vec<f32>,
-    /// Capture time in ms; consumed by the system-audio path in a later plan.
-    #[allow(dead_code)]
-    pub captured_at: i64,
+    /// Wall-clock ms when the utterance's first sample was captured.
+    pub started_at: i64,
 }
+
+const SAMPLE_RATE: usize = 16_000;
 
 pub struct MeetingSink {
     vad: CaptureVad,
     segmenter: Segmenter,
     tx: mpsc::Sender<Utterance>,
+    started_at: Option<i64>,
 }
 
 impl MeetingSink {
     pub fn new(mut vad: CaptureVad, tx: mpsc::Sender<Utterance>) -> Self {
         vad.prepare_offline();
-        let segmenter = Segmenter::new(SegmenterConfig::defaults(vad.frame_samples()));
-        Self { vad, segmenter, tx }
+        let frame = vad.frame_samples();
+        let mut cfg = SegmenterConfig::defaults(frame);
+        // The detector already labels `hangover` frames after real speech as
+        // speech; count them toward the end silence instead of waiting the
+        // full silence again after them.
+        let hangover_ms = (vad.offline_hangover_frames() * frame * 1000 / SAMPLE_RATE) as u64;
+        cfg.end_silence_ms = cfg.end_silence_ms.saturating_sub(hangover_ms).max(200);
+        let segmenter = Segmenter::new(cfg);
+        Self {
+            vad,
+            segmenter,
+            tx,
+            started_at: None,
+        }
     }
 
-    fn emit(&self, samples: Vec<f32>) {
+    fn emit(&mut self, samples: Vec<f32>) {
+        let now = chrono::Utc::now().timestamp_millis();
+        let started_at = self.started_at.take().unwrap_or(now);
         let utt = Utterance {
+            speaker: "me".into(),
             samples,
-            captured_at: chrono::Utc::now().timestamp_millis(),
+            started_at,
         };
         if self.tx.send(utt).is_err() {
             warn!("meeting capture: utterance receiver is gone");
@@ -66,6 +85,15 @@ impl Sink for MeetingSink {
                 None
             }
         };
+        if let Some(samples) = speech.as_deref() {
+            if self.segmenter.is_empty() {
+                // First speech of a new utterance. Anything beyond this frame
+                // is detector prefill, captured before now.
+                let prefill = samples.len().saturating_sub(frame_len);
+                let prefill_ms = (prefill * 1000 / SAMPLE_RATE) as i64;
+                self.started_at = Some(chrono::Utc::now().timestamp_millis() - prefill_ms);
+            }
+        }
         if let Some(samples) = self.segmenter.push(speech.as_deref()) {
             self.emit(samples);
         }
@@ -75,7 +103,6 @@ impl Sink for MeetingSink {
 pub struct MeetingCapture {
     recorder: Recorder<MeetingSink>,
     /// Set by the recorder error callback; read via `has_failed`.
-    #[allow(dead_code)]
     failed: Arc<AtomicBool>,
 }
 
@@ -108,8 +135,7 @@ impl MeetingCapture {
         Ok(Self { recorder, failed })
     }
 
-    /// Whether the recorder reported a failure; polled by a later plan.
-    #[allow(dead_code)]
+    /// Whether the recorder reported a failure (device lost, stream error).
     pub fn has_failed(&self) -> bool {
         self.failed.load(Ordering::Acquire)
     }
@@ -176,7 +202,8 @@ mod tests {
         }
         let utt = rx.try_recv().expect("one utterance");
         assert_eq!(utt.samples.len(), 25 * 320);
-        assert!(utt.captured_at > 0);
+        assert!(utt.started_at > 0);
+        assert_eq!(utt.speaker, "me");
         assert!(rx.try_recv().is_err());
     }
 
@@ -222,6 +249,88 @@ mod tests {
         sink.finish();
         let utt = rx.try_recv().expect("flushed utterance");
         assert_eq!(utt.samples.len(), 25 * 320);
+        assert!(rx.try_recv().is_err());
+    }
+
+    /// Like `LoudVad`, but the first speech frame comes with 10 frames
+    /// (200 ms) of prefill, as Silero's smoothing wrapper delivers it.
+    struct PrefillVad {
+        out: Vec<f32>,
+        in_speech: bool,
+    }
+    impl VoiceActivityDetector for PrefillVad {
+        fn push_frame<'a>(&'a mut self, frame: &'a [f32]) -> anyhow::Result<VadFrame<'a>> {
+            let mean = frame.iter().map(|s| s.abs()).sum::<f32>() / frame.len().max(1) as f32;
+            if mean <= 0.05 {
+                self.in_speech = false;
+                return Ok(VadFrame::Noise);
+            }
+            if self.in_speech {
+                return Ok(VadFrame::Speech(frame));
+            }
+            self.in_speech = true;
+            self.out = vec![0.0; 320 * 10];
+            self.out.extend_from_slice(frame);
+            Ok(VadFrame::Speech(&self.out))
+        }
+        fn frame_samples(&self) -> usize {
+            320
+        }
+        fn set_hangover_frames(&mut self, _frames: usize) {}
+        fn reset(&mut self) {}
+    }
+
+    #[test]
+    fn utterance_started_at_precedes_emit_by_prefill() {
+        let vad = CaptureVad::new(
+            Box::new(PrefillVad {
+                out: vec![],
+                in_speech: false,
+            }),
+            0,
+            0,
+        );
+        let (tx, rx) = mpsc::channel();
+        let mut sink = MeetingSink::new(vad, tx);
+        let loud = vec![0.2f32; 320];
+        let quiet = vec![0.0f32; 320];
+        let before = chrono::Utc::now().timestamp_millis();
+        for _ in 0..25 {
+            sink.process_chunk(chunk(&loud));
+        }
+        for _ in 0..40 {
+            sink.process_chunk(chunk(&quiet));
+        }
+        let emitted_at = chrono::Utc::now().timestamp_millis();
+        let utt = rx.try_recv().expect("one utterance");
+        assert_eq!(utt.samples.len(), 35 * 320, "prefill plus 25 frames");
+        assert!(utt.started_at <= emitted_at);
+        // First push happened in [before, emitted_at]; prefill is 200 ms.
+        assert!(utt.started_at <= emitted_at - 200, "{}", utt.started_at);
+        assert!(utt.started_at >= before - 200, "{}", utt.started_at);
+    }
+
+    #[test]
+    fn end_silence_is_shortened_by_detector_hangover() {
+        // 10 frames of hangover = 200 ms: the segmenter waits 500 ms, not 700.
+        let vad = CaptureVad::new(Box::new(LoudVad), 10, 0);
+        let (tx, rx) = mpsc::channel();
+        let mut sink = MeetingSink::new(vad, tx);
+        let loud = vec![0.2f32; 320];
+        let quiet = vec![0.0f32; 320];
+        for _ in 0..25 {
+            sink.process_chunk(chunk(&loud));
+        }
+        for _ in 0..30 {
+            sink.process_chunk(chunk(&quiet));
+        }
+        let utt = rx
+            .try_recv()
+            .expect("utterance ends within 30 quiet frames once hangover is counted");
+        assert_eq!(utt.samples.len(), 25 * 320);
+        for _ in 0..10 {
+            sink.process_chunk(chunk(&quiet));
+        }
         assert!(rx.try_recv().is_err());
     }
 }

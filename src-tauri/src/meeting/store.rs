@@ -2,7 +2,7 @@
 //! Pure rusqlite; no Tauri types, so it is unit-testable with a temp dir.
 
 use anyhow::{anyhow, Result};
-use rusqlite::{params, Connection, OptionalExtension};
+use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 use rusqlite_migration::{Migrations, M};
 use serde::{Deserialize, Serialize};
 use specta::Type;
@@ -69,6 +69,7 @@ static MIGRATIONS: &[M] = &[
         );
         CREATE INDEX transcript_lines_session_idx ON transcript_lines(session_id);",
     ),
+    M::up("CREATE INDEX transcript_lines_session_ts_idx ON transcript_lines(session_id, ts);"),
 ];
 
 #[derive(Clone, Debug, Serialize, Deserialize, Type)]
@@ -210,7 +211,7 @@ impl ProjectStore {
 
     pub fn delete_project(&self, id: i64) -> Result<()> {
         let mut conn = self.conn()?;
-        let tx = conn.transaction()?;
+        let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
         tx.execute(
             "DELETE FROM source_chunks WHERE source_id IN (SELECT id FROM sources WHERE project_id = ?1)",
             params![id],
@@ -428,7 +429,7 @@ impl ProjectStore {
 
     pub fn replace_chunks(&self, source_id: i64, chunks: &[(String, String)]) -> Result<usize> {
         let mut conn = self.conn()?;
-        let tx = conn.transaction()?;
+        let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
         // The source may have been removed while it was being indexed;
         // inserting then would leave orphan FTS rows nothing ever deletes.
         let exists = tx
@@ -538,7 +539,7 @@ impl ProjectStore {
 
     pub fn remove_source(&self, id: i64) -> Result<()> {
         let mut conn = self.conn()?;
-        let tx = conn.transaction()?;
+        let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
         tx.execute(
             "DELETE FROM source_chunks WHERE source_id = ?1",
             params![id],
@@ -768,7 +769,7 @@ impl ProjectStore {
 
     pub fn delete_meeting(&self, id: i64) -> Result<()> {
         let mut conn = self.conn()?;
-        let tx = conn.transaction()?;
+        let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
         tx.execute(
             "DELETE FROM transcript_lines WHERE session_id IN (SELECT id FROM sessions WHERE meeting_id = ?1)",
             params![id],
@@ -806,14 +807,16 @@ impl ProjectStore {
         Ok(())
     }
 
+    /// Store one line. `ts` is when the utterance started (ms), not when its
+    /// text came back from the model.
     pub fn append_line(
         &self,
         session_id: i64,
         speaker: &str,
         text: &str,
+        ts: i64,
     ) -> Result<TranscriptLine> {
         let conn = self.conn()?;
-        let ts = now();
         conn.execute(
             "INSERT INTO transcript_lines (session_id, ts, speaker, text) VALUES (?1, ?2, ?3, ?4)",
             params![session_id, ts, speaker, text],
@@ -834,14 +837,24 @@ impl ProjectStore {
         })
     }
 
+    /// Close every open session of a meeting; returns how many were closed.
+    pub fn end_open_sessions(&self, meeting_id: i64) -> Result<usize> {
+        let conn = self.conn()?;
+        Ok(conn.execute(
+            "UPDATE sessions SET ended_at = ?1 WHERE meeting_id = ?2 AND ended_at IS NULL",
+            params![now(), meeting_id],
+        )?)
+    }
+
     pub fn mark_live_sessions_paused(&self) -> Result<usize> {
         let mut conn = self.conn()?;
-        let tx = conn.transaction()?;
+        let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let ts = now();
-        // A crash or quit leaves open sessions behind; close them so they do
-        // not stay open forever.
+        // A crash or quit leaves open sessions behind (on live meetings, and
+        // on paused ones whose session was never ended); nothing is capturing
+        // at startup, so close every one of them.
         tx.execute(
-            "UPDATE sessions SET ended_at = ?1 WHERE ended_at IS NULL AND meeting_id IN (SELECT id FROM meetings WHERE status = 'live')",
+            "UPDATE sessions SET ended_at = ?1 WHERE ended_at IS NULL",
             params![ts],
         )?;
         let flipped = tx.execute(
@@ -856,6 +869,8 @@ impl ProjectStore {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const TS: i64 = 1_700_000_000_000;
 
     fn store() -> (tempfile::TempDir, ProjectStore) {
         let dir = tempfile::tempdir().unwrap();
@@ -1100,8 +1115,8 @@ mod tests {
         let (_d, s) = store();
         let m = s.create_meeting(None, "M").unwrap();
         let sess = s.create_session(m.id).unwrap();
-        let a = s.append_line(sess.id, "me", "first").unwrap();
-        let b = s.append_line(sess.id, "me", "second").unwrap();
+        let a = s.append_line(sess.id, "me", "first", TS).unwrap();
+        let b = s.append_line(sess.id, "me", "second", TS).unwrap();
         let d = s.get_meeting_detail(m.id).unwrap().unwrap();
         assert_eq!(d.sessions.len(), 1);
         assert_eq!(
@@ -1128,7 +1143,7 @@ mod tests {
     }
 
     #[test]
-    fn mark_live_sessions_paused_only_touches_live() {
+    fn startup_recovery_closes_open_sessions_and_pauses_live() {
         let (_d, s) = store();
         let live = s.create_meeting(None, "L").unwrap();
         let ended = s.create_meeting(None, "E").unwrap();
@@ -1151,8 +1166,8 @@ mod tests {
             .find(|x| x.id == ended_session.id)
             .unwrap();
         assert!(
-            es.ended_at.is_none(),
-            "session of non-live meeting untouched"
+            es.ended_at.is_some(),
+            "open session of non-live meeting closed too"
         );
         assert_eq!(
             s.get_meeting(live.id).unwrap().unwrap().status,
@@ -1165,15 +1180,45 @@ mod tests {
     }
 
     #[test]
+    fn end_open_sessions_closes_only_that_meeting() {
+        let (_d, s) = store();
+        let a = s.create_meeting(None, "A").unwrap();
+        let b = s.create_meeting(None, "B").unwrap();
+        s.create_session(a.id).unwrap();
+        s.create_session(b.id).unwrap();
+        assert_eq!(s.end_open_sessions(a.id).unwrap(), 1);
+        assert_eq!(s.end_open_sessions(a.id).unwrap(), 0);
+        let da = s.get_meeting_detail(a.id).unwrap().unwrap();
+        assert!(da.sessions[0].ended_at.is_some());
+        let db = s.get_meeting_detail(b.id).unwrap().unwrap();
+        assert!(db.sessions[0].ended_at.is_none());
+    }
+
+    #[test]
+    fn append_line_keeps_given_ts_and_orders_by_it() {
+        let (_d, s) = store();
+        let m = s.create_meeting(None, "M").unwrap();
+        let sess = s.create_session(m.id).unwrap();
+        let late = s.append_line(sess.id, "me", "late", 2_000).unwrap();
+        let early = s.append_line(sess.id, "me", "early", 1_000).unwrap();
+        assert_eq!(late.ts, 2_000);
+        let d = s.get_meeting_detail(m.id).unwrap().unwrap();
+        assert_eq!(
+            d.lines.iter().map(|l| l.id).collect::<Vec<_>>(),
+            vec![early.id, late.id]
+        );
+    }
+
+    #[test]
     fn delete_meeting_and_delete_project_cascade_lines() {
         let (_d, s) = store();
         let p = s.create_project("P").unwrap();
         let m1 = s.create_meeting(Some(p.id), "A").unwrap();
         let s1 = s.create_session(m1.id).unwrap();
-        s.append_line(s1.id, "me", "x").unwrap();
+        s.append_line(s1.id, "me", "x", TS).unwrap();
         let m2 = s.create_meeting(Some(p.id), "B").unwrap();
         let s2 = s.create_session(m2.id).unwrap();
-        s.append_line(s2.id, "me", "y").unwrap();
+        s.append_line(s2.id, "me", "y", TS).unwrap();
         s.delete_meeting(m1.id).unwrap();
         assert!(s.get_meeting_detail(m1.id).unwrap().is_none());
         s.delete_project(p.id).unwrap();

@@ -10,6 +10,8 @@ export const MeetingsSection: React.FC = () => {
   const subscribe = useMeetingStore((s) => s.subscribe);
   const closeMeeting = useMeetingStore((s) => s.closeMeeting);
   const openMeeting = useMeetingStore((s) => s.openMeeting);
+  const liveMeetingId = useMeetingStore((s) => s.live.meeting_id);
+  const liveStatus = useMeetingStore((s) => s.live.status);
 
   useEffect(() => {
     loadMeetings(null);
@@ -21,6 +23,11 @@ export const MeetingsSection: React.FC = () => {
       unlisten.then((fn) => fn());
     };
   }, [loadMeetings, refreshLive, subscribe, openMeeting]);
+
+  // Reload when the live meeting changes (start/end) so the list stays current.
+  useEffect(() => {
+    loadMeetings(null);
+  }, [loadMeetings, liveMeetingId, liveStatus]);
 
   return activeMeetingId === null ? (
     <MeetingList />

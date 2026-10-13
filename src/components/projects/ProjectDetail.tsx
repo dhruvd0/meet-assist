@@ -19,6 +19,9 @@ export const ProjectDetail: React.FC = () => {
   const closeProject = useProjectStore((s) => s.closeProject);
   const renameProject = useProjectStore((s) => s.renameProject);
   const activeMeetingId = useMeetingStore((s) => s.activeMeetingId);
+  const detailProjectId = useMeetingStore(
+    (s) => s.detail?.meeting.project_id ?? null,
+  );
   const closeMeeting = useMeetingStore((s) => s.closeMeeting);
   const loadMeetings = useMeetingStore((s) => s.loadMeetings);
   const [editing, setEditing] = useState(false);
@@ -26,7 +29,9 @@ export const ProjectDetail: React.FC = () => {
 
   if (activeProjectId === null || !project) return null;
 
-  if (activeMeetingId !== null) {
+  // Only a meeting of this project takes over the page; one opened from the
+  // Meetings tab stays there.
+  if (activeMeetingId !== null && detailProjectId === project.id) {
     return (
       <MeetingDetail
         onBack={() => {

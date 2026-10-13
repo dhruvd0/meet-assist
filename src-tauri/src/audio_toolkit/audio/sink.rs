@@ -51,6 +51,12 @@ impl CaptureVad {
         self.detector.frame_samples()
     }
 
+    /// Offline hangover tail in detector frames: speech-labelled frames the
+    /// detector keeps emitting after real speech stops.
+    pub fn offline_hangover_frames(&self) -> usize {
+        self.offline_hangover_frames
+    }
+
     /// Configure the detector for offline-style hangover and clear state.
     /// Used by meeting capture, which drives the detector frame by frame.
     pub fn prepare_offline(&mut self) {

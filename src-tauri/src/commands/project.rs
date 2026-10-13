@@ -1,4 +1,5 @@
 use crate::meeting::manager::ProjectManager;
+use crate::meeting::session::MeetingManager;
 use crate::meeting::store::{Project, SearchHit, Source, SourceKind};
 use std::sync::Arc;
 use tauri::{AppHandle, State};
@@ -45,7 +46,14 @@ pub fn update_project_brief(pm: Pm<'_>, id: i64, brief: String) -> Result<(), St
 
 #[tauri::command]
 #[specta::specta]
-pub fn delete_project(pm: Pm<'_>, id: i64) -> Result<(), String> {
+pub fn delete_project(
+    pm: Pm<'_>,
+    mm: State<'_, Arc<MeetingManager>>,
+    id: i64,
+) -> Result<(), String> {
+    if mm.active_project_id() == Some(id) {
+        return Err("End the meeting before deleting its project".into());
+    }
     pm.delete_project(id).map_err(err)
 }
 

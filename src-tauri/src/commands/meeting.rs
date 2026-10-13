@@ -45,8 +45,13 @@ pub async fn resume_meeting(mm: Mm<'_>) -> Result<(), String> {
 
 #[tauri::command]
 #[specta::specta]
-pub async fn end_meeting(mm: Mm<'_>) -> Result<(), String> {
-    mm.end().map_err(err)
+/// `None` (or the running meeting's id) ends the running meeting; any other
+/// id ends that idle meeting, e.g. one left paused by a restart.
+pub async fn end_meeting(mm: Mm<'_>, meeting_id: Option<i64>) -> Result<(), String> {
+    match meeting_id {
+        Some(id) if mm.state().meeting_id != Some(id) => mm.end_idle(id).map_err(err),
+        _ => mm.end().map_err(err),
+    }
 }
 
 #[tauri::command]

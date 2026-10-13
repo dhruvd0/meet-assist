@@ -820,6 +820,7 @@ pub fn run(cli_args: CliArgs) {
             meeting::manager::SourceStatusPayload,
             meeting::session::MeetingStatePayload,
             meeting::session::TranscriptLinePayload,
+            meeting::session::MeetingCaptureWarningPayload,
         ]);
 
     #[cfg(debug_assertions)] // <- Only export on non-release builds

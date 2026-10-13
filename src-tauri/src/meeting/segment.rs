@@ -76,6 +76,11 @@ impl Segmenter {
         }
     }
 
+    /// True when no utterance is in progress.
+    pub fn is_empty(&self) -> bool {
+        self.buffer.is_empty()
+    }
+
     pub fn flush(&mut self) -> Option<Vec<f32>> {
         self.take()
     }

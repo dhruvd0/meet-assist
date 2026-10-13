@@ -25,7 +25,7 @@ interface MeetingStore {
   ) => Promise<Meeting | null>;
   pause: () => Promise<void>;
   resume: () => Promise<void>;
-  end: () => Promise<void>;
+  end: (meetingId: number | null) => Promise<void>;
   refreshLive: () => Promise<void>;
   renameMeeting: (id: number, title: string) => Promise<void>;
   saveContext: (id: number, context: string) => Promise<void>;
@@ -61,8 +61,11 @@ export const useMeetingStore = create<MeetingStore>((set, get) => ({
   openMeeting: async (id) => {
     set({ activeMeetingId: id, detail: null });
     const res = await commands.getMeetingDetail(id);
-    if (res.status === "ok" && get().activeMeetingId === id)
-      set({ detail: res.data });
+    if (res.status !== "ok") {
+      toast.error(`${t("meetings.errors.load")} ${res.error}`);
+      return;
+    }
+    if (get().activeMeetingId === id) set({ detail: res.data });
   },
 
   closeMeeting: () => set({ activeMeetingId: null, detail: null }),
@@ -80,7 +83,8 @@ export const useMeetingStore = create<MeetingStore>((set, get) => ({
 
   pause: async () => {
     const res = await commands.pauseMeeting();
-    if (res.status !== "ok") toast.error(t("meetings.errors.control"));
+    if (res.status !== "ok")
+      toast.error(`${t("meetings.errors.control")} ${res.error}`);
     await get().refreshLive();
   },
 
@@ -91,9 +95,10 @@ export const useMeetingStore = create<MeetingStore>((set, get) => ({
     await get().refreshLive();
   },
 
-  end: async () => {
-    const res = await commands.endMeeting();
-    if (res.status !== "ok") toast.error(t("meetings.errors.control"));
+  end: async (meetingId) => {
+    const res = await commands.endMeeting(meetingId);
+    if (res.status !== "ok")
+      toast.error(`${t("meetings.errors.control")} ${res.error}`);
     await get().refreshLive();
     const id = get().activeMeetingId;
     if (id !== null) await get().openMeeting(id);
@@ -176,9 +181,13 @@ export const useMeetingStore = create<MeetingStore>((set, get) => ({
         };
       });
     });
+    const un3 = await events.meetingCaptureWarningPayload.listen((e) => {
+      toast.error(`${t("meetings.errors.capture")} ${e.payload.message}`);
+    });
     return () => {
       un1();
       un2();
+      un3();
     };
   },
 }));

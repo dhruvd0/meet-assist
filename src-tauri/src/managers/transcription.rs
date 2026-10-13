@@ -275,6 +275,13 @@ pub struct TranscriptionManager {
     active_stream_worker: Arc<AtomicU64>,
 }
 
+/// Whether a meeting is capturing; the model must stay warm while it is.
+fn meeting_is_live(app: &AppHandle) -> bool {
+    app.try_state::<Arc<crate::meeting::session::MeetingManager>>()
+        .map(|m| m.is_live())
+        .unwrap_or(false)
+}
+
 impl TranscriptionManager {
     pub fn new(app_handle: &AppHandle, model_manager: Arc<ModelManager>) -> Result<Self> {
         let manager = Self {
@@ -325,7 +332,7 @@ impl TranscriptionManager {
                     let is_recording = app_handle_cloned
                         .try_state::<Arc<AudioRecordingManager>>()
                         .is_some_and(|a| a.is_recording());
-                    if is_recording {
+                    if is_recording || meeting_is_live(&app_handle_cloned) {
                         manager_cloned.touch_activity();
                         continue;
                     }
@@ -506,6 +513,11 @@ impl TranscriptionManager {
     /// is loaded. Never waits for the worker to exit, so it is safe on any
     /// thread, including the event loop.
     pub fn maybe_unload_immediately(&self, context: &str) {
+        // A live meeting transcribes an utterance every few seconds; unloading
+        // between them would reload the model for each one.
+        if meeting_is_live(&self.app_handle) {
+            return;
+        }
         let settings = get_settings(&self.app_handle);
         if settings.model_unload_timeout == ModelUnloadTimeout::Immediately
             && self.is_model_loaded()

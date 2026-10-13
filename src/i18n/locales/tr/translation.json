@@ -129,7 +129,8 @@
       "start": "Could not start the meeting.",
       "control": "Could not change the meeting state.",
       "save": "Could not save.",
-      "delete": "Could not delete the meeting."
+      "delete": "Could not delete the meeting.",
+      "capture": "Microphone stopped delivering audio."
     }
   },
   "onboarding": {

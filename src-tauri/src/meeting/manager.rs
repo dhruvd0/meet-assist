@@ -356,6 +356,28 @@ mod tests {
         assert!(!copied.exists());
     }
 
+    /// add_and_index starts a background index whose read-then-write
+    /// transaction raced remove_source; a deferred transaction there could
+    /// fail with SQLITE_BUSY instead of waiting on the busy timeout.
+    #[test]
+    fn remove_source_while_indexing_never_reports_busy() {
+        for i in 0..30 {
+            let (d, m) = mgr();
+            let p = m.store().create_project("P").unwrap();
+            let pic = d.path().join("shot.png");
+            fs::write(&pic, b"\x89PNG").unwrap();
+            let s = m
+                .add_and_index(p.id, SourceKind::Image, "Shot", pic.to_str().unwrap())
+                .unwrap();
+            let copied = std::path::PathBuf::from(&s.locator);
+            assert!(copied.exists());
+            if let Err(e) = m.remove_source(s.id) {
+                panic!("iteration {i}: remove_source failed: {e:#}");
+            }
+            assert!(!copied.exists());
+        }
+    }
+
     #[test]
     fn delete_project_removes_image_files() {
         let (d, m) = mgr();
