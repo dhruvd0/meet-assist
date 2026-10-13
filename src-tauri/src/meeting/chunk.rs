@@ -5,6 +5,7 @@ pub const MAX_CHUNK_CHARS: usize = 1500;
 
 pub fn chunk_text(text: &str, max_chars: usize) -> Vec<String> {
     let max_chars = max_chars.max(1);
+    let text = text.replace("\r\n", "\n");
     let mut out: Vec<String> = Vec::new();
     let mut current = String::new();
 
@@ -47,31 +48,63 @@ fn flush(out: &mut Vec<String>, current: &mut String) {
     current.clear();
 }
 
+/// Splits an over-long paragraph: pack whole lines first, and only
+/// char-split a single line that is itself longer than `max_chars`.
 fn hard_split(text: &str, max_chars: usize) -> Vec<String> {
-    let mut pieces = Vec::new();
+    let mut pieces: Vec<String> = Vec::new();
     let mut buf = String::new();
+    let mut buf_len = 0usize;
+
     for line in text.split('\n') {
-        for ch in line.chars() {
-            if buf.chars().count() >= max_chars {
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        let line_len = line.chars().count();
+        if line_len > max_chars {
+            if !buf.is_empty() {
                 pieces.push(std::mem::take(&mut buf));
+                buf_len = 0;
             }
-            buf.push(ch);
+            split_chars(line, max_chars, &mut pieces);
+            continue;
         }
-        if buf.chars().count() >= max_chars {
+        if !buf.is_empty() && buf_len + 1 + line_len > max_chars {
             pieces.push(std::mem::take(&mut buf));
-        } else if !buf.is_empty() {
-            buf.push('\n');
+            buf_len = 0;
         }
+        if !buf.is_empty() {
+            buf.push('\n');
+            buf_len += 1;
+        }
+        buf.push_str(line);
+        buf_len += line_len;
     }
-    let tail = buf.trim().to_string();
-    if !tail.is_empty() {
-        pieces.push(tail);
+    if !buf.is_empty() {
+        pieces.push(buf);
     }
     pieces
         .into_iter()
         .map(|p| p.trim().to_string())
         .filter(|p| !p.is_empty())
         .collect()
+}
+
+/// Char-boundary split of a single line into pieces of at most `max_chars`.
+fn split_chars(line: &str, max_chars: usize, pieces: &mut Vec<String>) {
+    let mut buf = String::new();
+    let mut count = 0usize;
+    for ch in line.chars() {
+        buf.push(ch);
+        count += 1;
+        if count >= max_chars {
+            pieces.push(std::mem::take(&mut buf));
+            count = 0;
+        }
+    }
+    if !buf.is_empty() {
+        pieces.push(buf);
+    }
 }
 
 #[cfg(test)]
@@ -108,5 +141,15 @@ mod tests {
     #[test]
     fn drops_empty_chunks() {
         assert!(chunk_text("\n\n   \n\n", 10).is_empty());
+    }
+
+    #[test]
+    fn hard_split_packs_lines_before_splitting_chars() {
+        assert_eq!(
+            chunk_text("abcdefghij\nklm", 4),
+            vec!["abcd", "efgh", "ij", "klm"]
+        );
+        assert_eq!(chunk_text("ab\ncd\nef", 5), vec!["ab\ncd", "ef"]);
+        assert_eq!(chunk_text("one\r\n\r\ntwo", 5), vec!["one", "two"]);
     }
 }
