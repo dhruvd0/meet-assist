@@ -70,6 +70,18 @@ static MIGRATIONS: &[M] = &[
         CREATE INDEX transcript_lines_session_idx ON transcript_lines(session_id);",
     ),
     M::up("CREATE INDEX transcript_lines_session_ts_idx ON transcript_lines(session_id, ts);"),
+    M::up(
+        "CREATE TABLE interventions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id INTEGER NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+            ts INTEGER NOT NULL,
+            kind TEXT NOT NULL,
+            text TEXT NOT NULL,
+            reason TEXT NOT NULL DEFAULT '',
+            dismissed INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE INDEX interventions_session_idx ON interventions(session_id);",
+    ),
 ];
 
 #[derive(Clone, Debug, Serialize, Deserialize, Type)]
@@ -214,6 +226,11 @@ impl ProjectStore {
         let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
         tx.execute(
             "DELETE FROM source_chunks WHERE source_id IN (SELECT id FROM sources WHERE project_id = ?1)",
+            params![id],
+        )?;
+        tx.execute(
+            "DELETE FROM interventions WHERE session_id IN
+               (SELECT s.id FROM sessions s JOIN meetings m ON m.id = s.meeting_id WHERE m.project_id = ?1)",
             params![id],
         )?;
         tx.execute(
@@ -611,7 +628,21 @@ pub struct MeetingDetail {
     pub meeting: Meeting,
     pub sessions: Vec<Session>,
     pub lines: Vec<TranscriptLine>,
+    pub interventions: Vec<Intervention>,
 }
+
+#[derive(Clone, Debug, Serialize, Deserialize, Type)]
+pub struct Intervention {
+    pub id: i64,
+    pub session_id: i64,
+    pub ts: i64,
+    pub kind: String,
+    pub text: String,
+    pub reason: String,
+    pub dismissed: bool,
+}
+
+const INTERVENTION_COLS: &str = "i.id, i.session_id, i.ts, i.kind, i.text, i.reason, i.dismissed";
 
 const MEETING_COLS: &str =
     "id, project_id, title, created_at, updated_at, status, context, rolling_summary";
@@ -730,10 +761,13 @@ impl ProjectStore {
             let rows = stmt.query_map(params![id], Self::map_line)?;
             rows.collect::<rusqlite::Result<Vec<_>>>()?
         };
+        drop(conn);
+        let interventions = self.list_interventions(id)?;
         Ok(Some(MeetingDetail {
             meeting,
             sessions,
             lines,
+            interventions,
         }))
     }
 
@@ -770,6 +804,10 @@ impl ProjectStore {
     pub fn delete_meeting(&self, id: i64) -> Result<()> {
         let mut conn = self.conn()?;
         let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        tx.execute(
+            "DELETE FROM interventions WHERE session_id IN (SELECT id FROM sessions WHERE meeting_id = ?1)",
+            params![id],
+        )?;
         tx.execute(
             "DELETE FROM transcript_lines WHERE session_id IN (SELECT id FROM sessions WHERE meeting_id = ?1)",
             params![id],
@@ -863,6 +901,125 @@ impl ProjectStore {
         )?;
         tx.commit()?;
         Ok(flipped)
+    }
+}
+
+impl ProjectStore {
+    fn map_intervention(row: &rusqlite::Row<'_>) -> rusqlite::Result<Intervention> {
+        Ok(Intervention {
+            id: row.get(0)?,
+            session_id: row.get(1)?,
+            ts: row.get(2)?,
+            kind: row.get(3)?,
+            text: row.get(4)?,
+            reason: row.get(5)?,
+            dismissed: row.get::<_, i64>(6)? != 0,
+        })
+    }
+
+    pub fn add_intervention(
+        &self,
+        session_id: i64,
+        kind: &str,
+        text: &str,
+        reason: &str,
+    ) -> Result<Intervention> {
+        let conn = self.conn()?;
+        let ts = now();
+        conn.execute(
+            "INSERT INTO interventions (session_id, ts, kind, text, reason) VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![session_id, ts, kind, text, reason],
+        )?;
+        Ok(Intervention {
+            id: conn.last_insert_rowid(),
+            session_id,
+            ts,
+            kind: kind.into(),
+            text: text.into(),
+            reason: reason.into(),
+            dismissed: false,
+        })
+    }
+
+    pub fn list_interventions(&self, meeting_id: i64) -> Result<Vec<Intervention>> {
+        let conn = self.conn()?;
+        let mut stmt = conn.prepare(&format!(
+            "SELECT {INTERVENTION_COLS} FROM interventions i JOIN sessions s ON s.id = i.session_id
+             WHERE s.meeting_id = ?1 ORDER BY i.ts ASC, i.id ASC"
+        ))?;
+        let rows = stmt.query_map(params![meeting_id], Self::map_intervention)?;
+        Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+    }
+
+    /// Newest first.
+    pub fn recent_interventions(&self, meeting_id: i64, limit: usize) -> Result<Vec<Intervention>> {
+        let conn = self.conn()?;
+        let mut stmt = conn.prepare(&format!(
+            "SELECT {INTERVENTION_COLS} FROM interventions i JOIN sessions s ON s.id = i.session_id
+             WHERE s.meeting_id = ?1 ORDER BY i.ts DESC, i.id DESC LIMIT ?2"
+        ))?;
+        let rows = stmt.query_map(params![meeting_id, limit as i64], Self::map_intervention)?;
+        Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+    }
+
+    pub fn dismiss_intervention(&self, id: i64) -> Result<()> {
+        let conn = self.conn()?;
+        conn.execute(
+            "UPDATE interventions SET dismissed = 1 WHERE id = ?1",
+            params![id],
+        )?;
+        Ok(())
+    }
+
+    pub fn lines_since(&self, meeting_id: i64, since_ts: i64) -> Result<Vec<TranscriptLine>> {
+        self.lines_in_range(meeting_id, Some(since_ts), None, 10_000)
+    }
+
+    pub fn lines_in_range(
+        &self,
+        meeting_id: i64,
+        from_ts: Option<i64>,
+        to_ts: Option<i64>,
+        limit: usize,
+    ) -> Result<Vec<TranscriptLine>> {
+        let conn = self.conn()?;
+        let mut stmt = conn.prepare(
+            "SELECT l.id, l.session_id, l.ts, l.speaker, l.text FROM transcript_lines l
+             JOIN sessions s ON s.id = l.session_id
+             WHERE s.meeting_id = ?1 AND (?2 IS NULL OR l.ts >= ?2) AND (?3 IS NULL OR l.ts <= ?3)
+             ORDER BY l.ts ASC, l.id ASC LIMIT ?4",
+        )?;
+        let rows = stmt.query_map(
+            params![meeting_id, from_ts, to_ts, limit as i64],
+            Self::map_line,
+        )?;
+        Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+    }
+
+    pub fn latest_line_ts(&self, meeting_id: i64) -> Result<Option<i64>> {
+        let conn = self.conn()?;
+        Ok(conn.query_row(
+            "SELECT MAX(l.ts) FROM transcript_lines l JOIN sessions s ON s.id = l.session_id WHERE s.meeting_id = ?1",
+            params![meeting_id],
+            |r| r.get::<_, Option<i64>>(0),
+        )?)
+    }
+
+    /// `(title, rolling_summary)` of the most recently updated other meeting in the project.
+    pub fn previous_meeting_summary(
+        &self,
+        project_id: i64,
+        exclude_meeting_id: i64,
+    ) -> Result<Option<(String, Option<String>)>> {
+        let conn = self.conn()?;
+        Ok(conn
+            .query_row(
+                "SELECT title, rolling_summary FROM meetings WHERE project_id = ?1 AND id != ?2
+                 ORDER BY updated_at DESC, id DESC LIMIT 1",
+                params![project_id, exclude_meeting_id],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .optional()?)
     }
 }
 
@@ -1228,5 +1385,76 @@ mod tests {
             .query_row("SELECT COUNT(*) FROM transcript_lines", [], |r| r.get(0))
             .unwrap();
         assert_eq!(n, 0);
+    }
+
+    #[test]
+    fn interventions_crud_and_cascade() {
+        let (_d, s) = store();
+        let p = s.create_project("P").unwrap();
+        let m = s.create_meeting(Some(p.id), "M").unwrap();
+        let sess = s.create_session(m.id).unwrap();
+        let a = s
+            .add_intervention(sess.id, "loop", "You said that twice", "repeat")
+            .unwrap();
+        let b = s
+            .add_intervention(sess.id, "idea", "Try X", "untried")
+            .unwrap();
+        assert!(!a.dismissed);
+        let d = s.get_meeting_detail(m.id).unwrap().unwrap();
+        assert_eq!(
+            d.interventions.iter().map(|i| i.id).collect::<Vec<_>>(),
+            vec![a.id, b.id]
+        );
+        s.dismiss_intervention(a.id).unwrap();
+        assert!(s.list_interventions(m.id).unwrap()[0].dismissed);
+        let recent = s.recent_interventions(m.id, 1).unwrap();
+        assert_eq!(recent[0].id, b.id);
+        s.delete_meeting(m.id).unwrap();
+        let conn = rusqlite::Connection::open(_d.path().join("meet.db")).unwrap();
+        let n: i64 = conn
+            .query_row("SELECT COUNT(*) FROM interventions", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(n, 0);
+    }
+
+    #[test]
+    fn line_window_queries() {
+        let (_d, s) = store();
+        let m = s.create_meeting(None, "M").unwrap();
+        let s1 = s.create_session(m.id).unwrap();
+        s.append_line(s1.id, "me", "one", 1000).unwrap();
+        s.append_line(s1.id, "me", "two", 2000).unwrap();
+        let s2 = s.create_session(m.id).unwrap();
+        s.append_line(s2.id, "me", "three", 3000).unwrap();
+        assert_eq!(s.latest_line_ts(m.id).unwrap(), Some(3000));
+        let since = s.lines_since(m.id, 2000).unwrap();
+        assert_eq!(
+            since.iter().map(|l| l.text.as_str()).collect::<Vec<_>>(),
+            vec!["two", "three"]
+        );
+        let range = s.lines_in_range(m.id, Some(1500), Some(2500), 10).unwrap();
+        assert_eq!(range.len(), 1);
+        assert_eq!(s.lines_in_range(m.id, None, None, 2).unwrap().len(), 2);
+    }
+
+    #[test]
+    fn previous_meeting_summary_picks_other_meeting_in_project() {
+        let (_d, s) = store();
+        let p = s.create_project("P").unwrap();
+        let older = s.create_meeting(Some(p.id), "Older").unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(5));
+        let current = s.create_meeting(Some(p.id), "Current").unwrap();
+        assert_eq!(
+            s.previous_meeting_summary(p.id, current.id)
+                .unwrap()
+                .map(|x| x.0),
+            Some("Older".to_string())
+        );
+        assert!(
+            s.previous_meeting_summary(p.id, older.id)
+                .unwrap()
+                .map(|x| x.0)
+                == Some("Current".to_string())
+        );
     }
 }
