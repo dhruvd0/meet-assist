@@ -393,6 +393,9 @@ fn initialize_core_logic(app_handle: &AppHandle) {
 
     // Create the recording overlay window (hidden by default)
     utils::create_recording_overlay(app_handle);
+
+    // Create the meeting intervention card window (hidden by default)
+    intervention::create_intervention_window(app_handle);
 }
 
 #[tauri::command]
@@ -825,6 +828,9 @@ pub fn run(cli_args: CliArgs) {
             commands::meeting::update_meeting_title,
             commands::meeting::update_meeting_context,
             commands::meeting::delete_meeting,
+            commands::meeting::list_interventions,
+            commands::meeting::dismiss_intervention,
+            commands::meeting::hide_intervention_window,
         ])
         .events(collect_events![
             managers::history::HistoryUpdatePayload,

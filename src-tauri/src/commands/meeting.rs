@@ -1,5 +1,5 @@
 use crate::meeting::session::{MeetingManager, MeetingStatePayload};
-use crate::meeting::store::{Meeting, MeetingDetail};
+use crate::meeting::store::{Intervention, Meeting, MeetingDetail};
 use std::sync::Arc;
 use tauri::State;
 
@@ -83,4 +83,22 @@ pub fn delete_meeting(mm: Mm<'_>, id: i64) -> Result<(), String> {
         return Err("End the meeting before deleting it".into());
     }
     mm.store().delete_meeting(id).map_err(err)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn list_interventions(mm: Mm<'_>, meeting_id: i64) -> Result<Vec<Intervention>, String> {
+    mm.store().list_interventions(meeting_id).map_err(err)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn dismiss_intervention(mm: Mm<'_>, id: i64) -> Result<(), String> {
+    mm.store().dismiss_intervention(id).map_err(err)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn hide_intervention_window(app: tauri::AppHandle) {
+    crate::intervention::hide(&app);
 }
