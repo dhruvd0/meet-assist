@@ -17,6 +17,7 @@ Meeting bots that join the call as a participant are intrusive, record everyone,
 - **Watches** the recent conversation on a short timer and asks a language model one question: is there a reason to speak up right now?
 - **Beeps and shows a card**, only to you, when the answer is yes. Four kinds of nudge: the conversation is looping, someone is stuck, a quick fact is needed, or an idea is worth raising.
 - **Remembers** meetings as threads. End a meeting today, continue it tomorrow, and the assistant carries a rolling summary forward.
+- **Knows your project.** Meetings live in projects. A project holds a short brief plus sources: pasted notes, local files and folders (checked-out repos included), links, images. The assistant starts each check with only the brief and the last meeting's summary, then searches and reads sources on its own when the conversation calls for it.
 
 ## Principles
 
@@ -33,6 +34,7 @@ Meeting bots that join the call as a participant are intrusive, record everyone,
 - Diarization beyond me/them.
 - Calendar or chat integrations.
 - User-editable observer prompt.
+- Folder watching, embeddings or vector search, remote GitHub API access, a standalone MCP server process, cloud sync.
 
 ## Platform status
 
@@ -47,9 +49,10 @@ Where system audio is unavailable, a meeting runs microphone-only and the UI say
 ## Roadmap
 
 1. Docs and vision (this document).
-2. Meetings as persisted threads: list, detail, start, pause, resume, end. Microphone-only capture, local transcript.
-3. Observer loop, intervention card, beep.
-4. System audio capture, macOS first, then Windows and Linux.
-5. Session and rolling summaries, continue-meeting polish, onboarding step for permissions and provider.
+2. Projects and sources: brief, local files and folders, links, images, full-text search.
+3. Meetings as persisted threads under projects: list, detail, start, pause, resume, end. Microphone-only capture, local transcript.
+4. Observer loop with context tools, intervention card, beep.
+5. System audio capture, macOS first, then Windows and Linux.
+6. Session and rolling summaries, image digests, continue-meeting polish, onboarding step for permissions and provider.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for how the pieces fit, and [superpowers/specs/2026-10-13-meeting-assistant-design.md](superpowers/specs/2026-10-13-meeting-assistant-design.md) for the full design.

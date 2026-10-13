@@ -102,7 +102,7 @@ Meet Assist is a cross-platform desktop app built with Tauri 2.x (Rust backend +
 
 ### Meeting Subsystem (planned)
 
-New backend code goes under `src-tauri/src/meeting/` (`mod.rs`, `capture.rs`, `transcriber.rs`, `observer.rs`, `summary.rs`, `store.rs`) plus `audio_toolkit/audio/system_capture/` and `commands/meeting.rs`. New frontend code goes under `src/components/meetings/`, `src/stores/meetingStore.ts`, `src/components/settings/meeting/`, and a separate window entry `src/intervention/`. Reuse `TranscriptionManager`, `CaptureVad`, `llm_client`, `audio_feedback`, and `components/ui`. Do not add a second LLM client, a second VAD, or new UI primitives. Keep the existing design language.
+New backend code goes under `src-tauri/src/meeting/` (`mod.rs`, `capture.rs`, `transcriber.rs`, `observer.rs`, `tools.rs`, `indexer.rs`, `summary.rs`, `store.rs`) plus `audio_toolkit/audio/system_capture/`, `commands/project.rs`, and `commands/meeting.rs`. New frontend code goes under `src/components/projects/`, `src/components/meetings/`, `src/stores/projectStore.ts`, `src/stores/meetingStore.ts`, `src/components/settings/meeting/`, and a separate window entry `src/intervention/`. Reuse `TranscriptionManager`, `CaptureVad`, `llm_client`, `audio_feedback`, and `components/ui`. Do not add a second LLM client, a second VAD, or new UI primitives. Keep the existing design language.
 
 ### Technology Stack
 

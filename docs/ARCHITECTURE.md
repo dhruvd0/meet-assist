@@ -11,6 +11,8 @@ Dictation (existing)
   shortcut -> mic capture -> VAD -> transcribe -> paste into active app
 
 Meeting (planned)
+  project sources -> indexer -> FTS5 chunks  <-- tools <-- observer
+
   start -> mic capture  ----\
                              +-> VAD per source -> utterances -> transcribe -> transcript lines
            system capture --/                                                      |
@@ -58,17 +60,30 @@ Both pipelines share `TranscriptionManager`, the model store, settings, the LLM 
 ## Data model (planned)
 
 ```
-Meeting        id, title, created_at, updated_at, status (live|paused|ended), context, rolling_summary
+Project        id, title, created_at, updated_at, brief
+Source         id, project_id, kind (text|file|folder|link|image), title, locator, added_at, indexed_at, status, error, digest
+SourceChunk    source_id, path, ord, content            (FTS5 virtual table)
+Meeting        id, project_id?, title, created_at, updated_at, status (live|paused|ended), context, rolling_summary
 Session        id, meeting_id, started_at, ended_at, summary
 TranscriptLine id, session_id, ts, speaker (me|them), text
 Intervention   id, session_id, ts, kind (loop|stuck|info|idea), text, reason, dismissed
 ```
 
-A meeting is a thread of sessions. "Continue" opens a new session under an existing meeting. The observer receives the rolling summary of past sessions plus the live window, never the full raw history.
+A project holds sources and meetings. A meeting is a thread of sessions. "Continue" opens a new session under an existing meeting. The observer receives the rolling summary of past sessions plus the live window, never the full raw history.
 
 ## Observer contract (planned)
 
-Request, in order: rolling summary, user context, recent interventions, last ~3 minutes of transcript.
+Base prompt, in order: project brief, rolling summary of the most recent other meeting in the project, meeting context, recent interventions, last ~3 minutes of transcript. Anything else the model fetches through tools:
+
+| Tool              | Input                                     | Output                                           |
+| ----------------- | ----------------------------------------- | ------------------------------------------------ |
+| `list_sources`    | none                                      | id, kind, title, digest                          |
+| `search_context`  | `query`, `limit`                          | snippets with source id, path, score             |
+| `read_source`     | `source_id`, `path?`, `offset?`, `limit?` | raw chunk text                                   |
+| `read_transcript` | `meeting_id?`, `from_ts?`, `to_ts?`       | transcript lines from any session in the project |
+| `list_meetings`   | none                                      | id, title, dates, rolling summary                |
+
+Limits: 5 tool calls per tick, 15 s wall budget, 4 KB per tool result. Providers without tool support fall back to the base prompt alone with a banner.
 
 Response schema:
 
@@ -85,7 +100,7 @@ Sensitivity setting adds one instruction: low restricts to loop and explicit stu
 
 ## Events backend to frontend (planned)
 
-`meeting:state`, `meeting:transcript-line`, `meeting:intervention`, `meeting:capture-warning`, `meeting:observer-error`.
+`meeting:state`, `meeting:transcript-line`, `meeting:intervention`, `meeting:capture-warning`, `meeting:observer-error`, `project:source-status`.
 
 ## Frontend (`src/`)
 
@@ -122,7 +137,8 @@ Sensitivity setting adds one instruction: low restricts to loop and explicit stu
 ## Delivery order
 
 1. Docs and vision.
-2. Store, commands, list and detail UI, mic-only capture and transcript.
-3. Observer, intervention window, beep.
-4. System audio capture, macOS first.
-5. Summaries, continue polish, onboarding step.
+2. Projects and sources: store, indexer, FTS5, project UI.
+3. Meetings under projects: store, commands, list and detail UI, mic-only capture and transcript.
+4. Tool calling in `llm_client`, observer loop, intervention window, beep.
+5. System audio capture, macOS first.
+6. Summaries, image digests, continue polish, onboarding step.

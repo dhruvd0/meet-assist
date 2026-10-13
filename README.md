@@ -11,20 +11,22 @@ It is a fork of [Handy](https://github.com/cjpais/Handy), the open source offlin
 Early. The meeting subsystem is specified and being built in order:
 
 1. Docs and vision (done)
-2. Meetings as persisted threads with microphone-only transcript
-3. Observer, intervention card, beep
-4. System audio capture (macOS first)
-5. Summaries, continue flow, onboarding
+2. Projects and sources: brief, local files and folders, links, images, full-text search
+3. Meetings as persisted threads under projects, microphone-only transcript
+4. Observer with context tools, intervention card, beep
+5. System audio capture (macOS first)
+6. Summaries, image digests, continue flow, onboarding
 
-Until step 2 lands, this app behaves like Handy with a new name.
+Until step 3 lands, this app behaves like Handy with a new name.
 
 ## How it works
 
-1. **Start a meeting.** Button or global shortcut. A meeting is a thread; you can pause, resume, end, and continue it on another day.
-2. **It listens.** Your microphone and, where supported, system audio for the remote side (macOS first; Windows/Linux not yet verified). Each utterance is transcribed locally and tagged as you or them.
-3. **It watches.** Every ~20 seconds the recent transcript, your pasted context (agenda, notes), and a rolling summary go to the language model you chose with one question: should I speak up?
-4. **It nudges.** If yes, you hear a beep and see a floating card: looping, stuck, quick fact, or idea. Dismiss it or open the meeting.
-5. **It remembers.** Ending a session writes a summary. Continuing a meeting carries the summary forward.
+1. **Make a project.** Write a short brief and add sources: notes, local files and folders (a checked-out repo works), links, images. Everything is indexed locally for search.
+2. **Start a meeting** in that project. Button or global shortcut. A meeting is a thread; you can pause, resume, end, and continue it on another day.
+3. **It listens.** Your microphone and, where supported, system audio for the remote side (macOS first; Windows/Linux not yet verified). Each utterance is transcribed locally and tagged as you or them.
+4. **It watches.** Every ~20 seconds the model you chose gets the project brief, the last meeting's summary, and the recent transcript, with one question: should I speak up? It can search and read your sources on its own before answering.
+5. **It nudges.** If yes, you hear a beep and see a floating card: looping, stuck, quick fact, or idea. Dismiss it or open the meeting.
+6. **It remembers.** Ending a session writes a summary. Continuing a meeting carries the summary forward.
 
 Everything local stays local. The language model is your choice: Anthropic, OpenAI, OpenRouter, or a local Ollama / LM Studio endpoint through the same provider settings Handy uses for post-processing.
 
