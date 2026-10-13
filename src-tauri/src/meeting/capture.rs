@@ -54,7 +54,9 @@ impl Sink for MeetingSink {
             // Final zero-padded chunk; never feed padding to the detector.
             return;
         }
-        let frame = &chunk.samples[..frame_len];
+        let Some(frame) = chunk.samples.get(..frame_len) else {
+            return;
+        };
         let speech = match self.vad.push_frame(frame) {
             Ok(s) => s,
             Err(e) => {
@@ -177,9 +179,14 @@ mod tests {
         let vad = CaptureVad::new(Box::new(LoudVad), 0, 0);
         let (tx, rx) = mpsc::channel();
         let mut sink = MeetingSink::new(vad, tx);
+        let loud = vec![0.2f32; 320];
+        let quiet = vec![0.0f32; 320];
         let mut partial = vec![0.2f32; 320];
         for s in partial.iter_mut().skip(100) {
             *s = 0.0;
+        }
+        for _ in 0..25 {
+            sink.process_chunk(chunk(&loud));
         }
         // Only 100 valid frames: must not be pushed as a full frame.
         sink.process_chunk(AudioChunk {
@@ -188,6 +195,27 @@ mod tests {
             channels: 1,
             valid_frames: 100,
         });
+        for _ in 0..40 {
+            sink.process_chunk(chunk(&quiet));
+        }
+        let utt = rx.try_recv().expect("one utterance");
+        assert_eq!(utt.samples.len(), 25 * 320);
+        assert!(rx.try_recv().is_err());
+    }
+
+    #[test]
+    fn sink_finish_flushes_trailing_utterance() {
+        let vad = CaptureVad::new(Box::new(LoudVad), 0, 0);
+        let (tx, rx) = mpsc::channel();
+        let mut sink = MeetingSink::new(vad, tx);
+        let loud = vec![0.2f32; 320];
+        for _ in 0..25 {
+            sink.process_chunk(chunk(&loud));
+        }
+        assert!(rx.try_recv().is_err());
+        sink.finish();
+        let utt = rx.try_recv().expect("flushed utterance");
+        assert_eq!(utt.samples.len(), 25 * 320);
         assert!(rx.try_recv().is_err());
     }
 }
