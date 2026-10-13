@@ -162,6 +162,16 @@ const settingUpdaters: {
   history_limit: (value) => commands.updateHistoryLimit(value as number),
   post_process_enabled: (value) =>
     commands.changePostProcessEnabledSetting(value as boolean),
+  meeting_provider_id: (value) =>
+    commands.changeMeetingProviderSetting(value as string),
+  meeting_sensitivity: (value) =>
+    commands.changeMeetingSensitivitySetting(
+      value as "low" | "medium" | "high",
+    ),
+  meeting_observer_interval_secs: (value) =>
+    commands.changeMeetingObserverIntervalSetting(value as number),
+  meeting_beep_enabled: (value) =>
+    commands.changeMeetingBeepSetting(value as boolean),
   post_process_selected_prompt_id: (value) =>
     commands.setPostProcessSelectedPrompt(value as string),
   mute_while_recording: (value) =>

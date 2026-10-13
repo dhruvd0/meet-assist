@@ -94,6 +94,16 @@ pub struct LLMPrompt {
     pub prompt: String,
 }
 
+/// How readily the meeting observer raises interventions.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Type, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum MeetingSensitivity {
+    Low,
+    #[default]
+    Medium,
+    High,
+}
+
 /// Request format a post-processing endpoint speaks. Built-in providers have a
 /// fixed format; only the custom provider lets the user change it.
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, Default, PartialEq, Eq, Type)]
@@ -479,6 +489,15 @@ pub struct AppSettings {
     pub post_process_api_keys: SecretMap,
     #[serde(default = "default_post_process_models")]
     pub post_process_models: HashMap<String, String>,
+    /// Provider for the meeting observer; empty means the post-processing provider.
+    #[serde(default = "default_meeting_provider_id")]
+    pub meeting_provider_id: String,
+    #[serde(default)]
+    pub meeting_sensitivity: MeetingSensitivity,
+    #[serde(default = "default_meeting_observer_interval_secs")]
+    pub meeting_observer_interval_secs: u32,
+    #[serde(default = "default_meeting_beep_enabled")]
+    pub meeting_beep_enabled: bool,
     #[serde(default = "default_post_process_prompts")]
     pub post_process_prompts: Vec<LLMPrompt>,
     #[serde(default)]
@@ -663,6 +682,18 @@ fn default_sound_theme() -> SoundTheme {
 
 fn default_theme() -> Theme {
     Theme::System
+}
+
+fn default_meeting_provider_id() -> String {
+    String::new()
+}
+
+fn default_meeting_observer_interval_secs() -> u32 {
+    20
+}
+
+fn default_meeting_beep_enabled() -> bool {
+    true
 }
 
 fn default_post_process_enabled() -> bool {
@@ -1002,6 +1033,10 @@ pub fn get_default_settings() -> AppSettings {
         post_process_providers: default_post_process_providers(),
         post_process_api_keys: default_post_process_api_keys(),
         post_process_models: default_post_process_models(),
+        meeting_provider_id: default_meeting_provider_id(),
+        meeting_sensitivity: MeetingSensitivity::default(),
+        meeting_observer_interval_secs: default_meeting_observer_interval_secs(),
+        meeting_beep_enabled: default_meeting_beep_enabled(),
         post_process_prompts: default_post_process_prompts(),
         post_process_selected_prompt_id: None,
         mute_while_recording: false,
@@ -1041,6 +1076,27 @@ impl AppSettings {
         self.post_process_providers
             .iter()
             .find(|provider| provider.id == self.post_process_provider_id)
+    }
+
+    /// Provider used by the meeting observer: the explicit meeting provider,
+    /// else the active post-processing provider.
+    pub fn meeting_provider(&self) -> Option<&PostProcessProvider> {
+        if self.meeting_provider_id.is_empty() {
+            self.active_post_process_provider()
+        } else {
+            self.post_process_provider(&self.meeting_provider_id)
+        }
+    }
+
+    pub fn meeting_model(&self) -> Option<String> {
+        let provider = self.meeting_provider()?;
+        self.post_process_models.get(&provider.id).cloned()
+    }
+
+    pub fn meeting_api_key(&self) -> String {
+        self.meeting_provider()
+            .and_then(|p| self.post_process_api_keys.get(&p.id).cloned())
+            .unwrap_or_default()
     }
 
     pub fn post_process_provider(&self, provider_id: &str) -> Option<&PostProcessProvider> {
@@ -1314,6 +1370,17 @@ pub fn get_recording_retention_period(app: &AppHandle) -> RecordingRetentionPeri
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn meeting_settings_defaults_and_provider_fallback() {
+        let s = get_default_settings();
+        assert_eq!(s.meeting_provider_id, "");
+        assert_eq!(s.meeting_sensitivity, MeetingSensitivity::Medium);
+        assert_eq!(s.meeting_observer_interval_secs, 20);
+        assert!(s.meeting_beep_enabled);
+        let active = s.active_post_process_provider().map(|p| p.id.clone());
+        assert_eq!(s.meeting_provider().map(|p| p.id.clone()), active);
+    }
 
     #[test]
     fn stored_binding_returns_the_requested_binding() {

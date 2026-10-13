@@ -1050,6 +1050,45 @@ pub fn change_auto_submit_key_setting(app: AppHandle, key: String) -> Result<(),
 
 #[tauri::command]
 #[specta::specta]
+pub fn change_meeting_provider_setting(app: AppHandle, provider_id: String) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.meeting_provider_id = provider_id;
+    settings::write_settings(&app, settings);
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn change_meeting_sensitivity_setting(
+    app: AppHandle,
+    sensitivity: settings::MeetingSensitivity,
+) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.meeting_sensitivity = sensitivity;
+    settings::write_settings(&app, settings);
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn change_meeting_observer_interval_setting(app: AppHandle, secs: u32) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.meeting_observer_interval_secs = secs.clamp(10, 120);
+    settings::write_settings(&app, settings);
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn change_meeting_beep_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.meeting_beep_enabled = enabled;
+    settings::write_settings(&app, settings);
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
 pub fn change_post_process_enabled_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
     let mut settings = settings::get_settings(&app);
     settings.post_process_enabled = enabled;
