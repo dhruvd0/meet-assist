@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ArrowLeft, Pencil } from "lucide-react";
 import { useMeetingStore } from "@/stores/meetingStore";
@@ -13,8 +13,18 @@ export const MeetingDetail: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const detail = useMeetingStore((s) => s.detail);
   const live = useMeetingStore((s) => s.live);
   const renameMeeting = useMeetingStore((s) => s.renameMeeting);
+  const refreshLive = useMeetingStore((s) => s.refreshLive);
+  const subscribe = useMeetingStore((s) => s.subscribe);
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState("");
+
+  useEffect(() => {
+    refreshLive();
+    const unlisten = subscribe();
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, [refreshLive, subscribe]);
 
   if (!detail)
     return <p className="p-4 text-sm text-mid-gray">{t("common.loading")}</p>;

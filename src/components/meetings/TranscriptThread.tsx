@@ -9,10 +9,11 @@ export const TranscriptThread: React.FC<{
   autoscroll: boolean;
 }> = ({ detail, autoscroll }) => {
   const { t, i18n } = useTranslation();
-  const endRef = useRef<HTMLDivElement>(null);
+  const boxRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (autoscroll) endRef.current?.scrollIntoView({ block: "end" });
+    if (autoscroll && boxRef.current)
+      boxRef.current.scrollTop = boxRef.current.scrollHeight;
   }, [detail.lines.length, autoscroll]);
 
   const sessionIndex = new Map(detail.sessions.map((s, i) => [s.id, i + 1]));
@@ -24,7 +25,10 @@ export const TranscriptThread: React.FC<{
           {t("meetings.transcript.empty")}
         </p>
       ) : (
-        <div className="p-4 space-y-3 max-h-[50vh] overflow-y-auto">
+        <div
+          ref={boxRef}
+          className="p-4 space-y-3 max-h-[50vh] overflow-y-auto"
+        >
           {detail.sessions.map((s) => {
             const lines = detail.lines.filter((l) => l.session_id === s.id);
             if (lines.length === 0) return null;
@@ -51,7 +55,6 @@ export const TranscriptThread: React.FC<{
               </div>
             );
           })}
-          <div ref={endRef} />
         </div>
       )}
     </SettingsGroup>
