@@ -1085,6 +1085,7 @@ impl AppSettings {
             self.active_post_process_provider()
         } else {
             self.post_process_provider(&self.meeting_provider_id)
+                .or_else(|| self.active_post_process_provider())
         }
     }
 
@@ -1379,6 +1380,10 @@ mod tests {
         assert_eq!(s.meeting_observer_interval_secs, 20);
         assert!(s.meeting_beep_enabled);
         let active = s.active_post_process_provider().map(|p| p.id.clone());
+        assert_eq!(s.meeting_provider().map(|p| p.id.clone()), active);
+
+        let mut s = s;
+        s.meeting_provider_id = "does-not-exist".into();
         assert_eq!(s.meeting_provider().map(|p| p.id.clone()), active);
     }
 
