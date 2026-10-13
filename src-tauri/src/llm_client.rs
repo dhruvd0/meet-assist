@@ -1046,6 +1046,141 @@ async fn post_json(
     Ok((status, text))
 }
 
+/// Strip markdown fences or surrounding prose from a model's JSON answer.
+pub fn strip_json_fences(text: &str) -> &str {
+    let t = text.trim();
+    let t = t
+        .strip_prefix("```json")
+        .or_else(|| t.strip_prefix("```"))
+        .unwrap_or(t);
+    let t = t.strip_suffix("```").unwrap_or(t).trim();
+    // Fall back to the outermost braces if the model wrapped the JSON in prose.
+    match (t.find('{'), t.rfind('}')) {
+        (Some(s), Some(e)) if e > s => &t[s..=e],
+        _ => t,
+    }
+}
+
+/// Single-shot JSON completion that works across provider formats. The
+/// schema is passed through `send_with_tools` (which gates it on provider
+/// support); fences/prose are stripped from the answer before parsing.
+#[allow(dead_code)] // consumed by the summary/digest lanes
+pub async fn complete_json(
+    provider: &PostProcessProvider,
+    api_key: String,
+    model: &str,
+    system_prompt: String,
+    user_content: String,
+    schema: Value,
+) -> Result<Value, String> {
+    let handler = |_c: &ToolCall| String::new();
+    let text = send_with_tools(
+        provider,
+        api_key,
+        model,
+        system_prompt,
+        user_content,
+        &[],
+        schema,
+        0,
+        &handler,
+    )
+    .await
+    .map_err(|e| format!("{e}"))?;
+    serde_json::from_str::<Value>(strip_json_fences(&text)).map_err(|e| format!("json parse: {e}"))
+}
+
+/// MIME type for a supported image file extension.
+#[allow(dead_code)]
+pub fn mime_for_extension(ext: &str) -> Option<&'static str> {
+    match ext.to_ascii_lowercase().as_str() {
+        "png" => Some("image/png"),
+        "jpg" | "jpeg" => Some("image/jpeg"),
+        "webp" => Some("image/webp"),
+        "gif" => Some("image/gif"),
+        _ => None,
+    }
+}
+
+/// True when an HTTP error looks like the model refusing image input.
+pub fn is_vision_rejection(status: u16, body: &str) -> bool {
+    let b = body.to_ascii_lowercase();
+    (status == 400 || status == 422)
+        && (b.contains("image") || b.contains("vision") || b.contains("content"))
+}
+
+pub fn openai_image_message(prompt: &str, mime: &str, b64: &str) -> Value {
+    serde_json::json!({ "role": "user", "content": [
+        { "type": "text", "text": prompt },
+        { "type": "image_url", "image_url": { "url": format!("data:{mime};base64,{b64}") } }
+    ]})
+}
+
+pub fn anthropic_image_message(prompt: &str, mime: &str, b64: &str) -> Value {
+    serde_json::json!({ "role": "user", "content": [
+        { "type": "image", "source": { "type": "base64", "media_type": mime, "data": b64 } },
+        { "type": "text", "text": prompt }
+    ]})
+}
+
+/// Ask the model to describe an image. Returns `Err("vision_unsupported")`
+/// when the provider/model rejects image input so callers can fall back.
+#[allow(dead_code)] // consumed by the attachment indexing lane
+pub async fn describe_image(
+    provider: &PostProcessProvider,
+    api_key: String,
+    model: &str,
+    prompt: String,
+    mime: &str,
+    bytes: &[u8],
+) -> Result<String, String> {
+    use base64::Engine as _;
+    let b64 = base64::engine::general_purpose::STANDARD.encode(bytes);
+    let client = create_client(provider, &api_key)?;
+    let base = provider.base_url.trim_end_matches('/');
+    let anthropic = provider.api_format == PostProcessApiFormat::Anthropic;
+    let (url, body) = if anthropic {
+        (
+            format!("{base}/messages"),
+            serde_json::json!({
+                "model": model, "max_tokens": 1024,
+                "messages": [anthropic_image_message(&prompt, mime, &b64)]
+            }),
+        )
+    } else {
+        (
+            format!("{base}/chat/completions"),
+            serde_json::json!({
+                "model": model, "stream": false,
+                "messages": [openai_image_message(&prompt, mime, &b64)]
+            }),
+        )
+    };
+    let resp = client
+        .post(&url)
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    let status = resp.status().as_u16();
+    let text = resp.text().await.map_err(|e| e.to_string())?;
+    if !(200..300).contains(&status) {
+        if is_vision_rejection(status, &text) {
+            return Err("vision_unsupported".into());
+        }
+        return Err(format!("HTTP {status}: {text}"));
+    }
+    let json: Value = serde_json::from_str(&text).map_err(|e| format!("bad json: {e}"))?;
+    let (answer, _) = if anthropic {
+        parse_anthropic_tool_calls(&json)
+    } else {
+        parse_openai_tool_calls(&json)
+    };
+    answer
+        .map(|s| s.trim().to_string())
+        .ok_or_else(|| "empty answer".into())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1619,5 +1754,58 @@ mod tool_tests {
             .iter()
             .any(|m| m["tool_call_id"] == "c2"
                 && m["content"] == "Tool budget exhausted; answer now."));
+    }
+}
+
+#[cfg(test)]
+mod json_and_vision_tests {
+    use super::*;
+
+    #[test]
+    fn image_messages_have_provider_shapes() {
+        let o = openai_image_message("Describe", "image/png", "AAAA");
+        assert_eq!(o["role"], "user");
+        assert_eq!(o["content"][0]["type"], "text");
+        assert_eq!(o["content"][1]["type"], "image_url");
+        assert_eq!(
+            o["content"][1]["image_url"]["url"],
+            "data:image/png;base64,AAAA"
+        );
+        let a = anthropic_image_message("Describe", "image/png", "AAAA");
+        assert_eq!(a["content"][0]["type"], "image");
+        assert_eq!(a["content"][0]["source"]["media_type"], "image/png");
+        assert_eq!(a["content"][0]["source"]["data"], "AAAA");
+        assert_eq!(a["content"][1]["type"], "text");
+    }
+
+    #[test]
+    fn fences_are_stripped() {
+        assert_eq!(strip_json_fences("```json\n{\"a\":1}\n```"), "{\"a\":1}");
+        assert_eq!(strip_json_fences("  {\"a\":1}  "), "{\"a\":1}");
+        assert_eq!(
+            strip_json_fences("prefix text {\"a\":1} suffix"),
+            "{\"a\":1}"
+        );
+    }
+
+    #[test]
+    fn vision_rejection_detection() {
+        assert!(is_vision_rejection(
+            400,
+            "This model does not support image input"
+        ));
+        assert!(is_vision_rejection(422, "invalid content type: image_url"));
+        assert!(!is_vision_rejection(401, "image"));
+        assert!(!is_vision_rejection(400, "rate limit"));
+    }
+
+    #[test]
+    fn mime_from_extension_covers_common_images() {
+        assert_eq!(mime_for_extension("PNG"), Some("image/png"));
+        assert_eq!(mime_for_extension("jpg"), Some("image/jpeg"));
+        assert_eq!(mime_for_extension("jpeg"), Some("image/jpeg"));
+        assert_eq!(mime_for_extension("webp"), Some("image/webp"));
+        assert_eq!(mime_for_extension("gif"), Some("image/gif"));
+        assert_eq!(mime_for_extension("bmp"), None);
     }
 }
