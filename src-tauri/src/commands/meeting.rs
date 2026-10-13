@@ -23,7 +23,7 @@ pub fn get_meeting_detail(mm: Mm<'_>, id: i64) -> Result<Option<MeetingDetail>, 
 
 #[tauri::command]
 #[specta::specta]
-pub fn start_meeting(
+pub async fn start_meeting(
     mm: Mm<'_>,
     project_id: Option<i64>,
     meeting_id: Option<i64>,
@@ -33,19 +33,19 @@ pub fn start_meeting(
 
 #[tauri::command]
 #[specta::specta]
-pub fn pause_meeting(mm: Mm<'_>) -> Result<(), String> {
+pub async fn pause_meeting(mm: Mm<'_>) -> Result<(), String> {
     mm.pause().map_err(err)
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn resume_meeting(mm: Mm<'_>) -> Result<(), String> {
+pub async fn resume_meeting(mm: Mm<'_>) -> Result<(), String> {
     mm.resume().map_err(err)
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn end_meeting(mm: Mm<'_>) -> Result<(), String> {
+pub async fn end_meeting(mm: Mm<'_>) -> Result<(), String> {
     mm.end().map_err(err)
 }
 
