@@ -8,27 +8,27 @@ It is a fork of [Handy](https://github.com/cjpais/Handy), the open source offlin
 
 ## Status
 
-Early. The meeting subsystem is specified and being built in order:
+Early. The meeting subsystem is built in this order (all six steps are in):
 
 1. Docs and vision (done)
 2. Projects and sources: brief, local files and folders, links, images, full-text search
 3. Meetings as persisted threads under projects, microphone-only transcript
 4. Observer with context tools, intervention card, beep
-5. System audio capture (macOS first)
+5. System audio capture (macOS verified; Windows and Linux built, unverified)
 6. Summaries, image digests, continue flow, onboarding
-
-Until step 3 lands, this app behaves like Handy with a new name.
 
 ## How it works
 
 1. **Make a project.** Write a short brief and add sources: notes, local files and folders (a checked-out repo works), links, images. Everything is indexed locally for search.
 2. **Start a meeting** in that project. Button or global shortcut. A meeting is a thread; you can pause, resume, end, and continue it on another day.
-3. **It listens.** Your microphone and, where supported, system audio for the remote side (macOS first; Windows/Linux not yet verified). Each utterance is transcribed locally and tagged as you or them.
+3. **It listens.** Your microphone and, where supported, system audio for the remote side (macOS first; Windows/Linux not yet verified). It can be turned off in Advanced settings. On macOS the first meeting asks for the "Audio capture" permission; if it is denied, or the default output is also an input (a headset in call mode), a banner says system audio is unavailable and the meeting continues with your microphone only.. Each utterance is transcribed locally and tagged as you or them.
 4. **It watches.** Every ~20 seconds the model you chose gets the project brief, the last meeting's summary, and the recent transcript, with one question: should I speak up? It can search and read your sources on its own before answering.
 5. **It nudges.** If yes, you hear a beep and see a floating card: looping, stuck, quick fact, or idea. Dismiss it or open the meeting.
-6. **It remembers.** Ending a session writes a summary. Continuing a meeting carries the summary forward.
+6. **It remembers.** Within seconds of pressing End, the meeting shows a session summary and an updated rolling summary. Continuing a meeting carries the summary forward. Image sources get a text description from a vision-capable model when one is configured.
 
 Everything local stays local. The language model is your choice: Anthropic, OpenAI, OpenRouter, or a local Ollama / LM Studio endpoint through the same provider settings Handy uses for post-processing.
+
+First run includes an optional "assistant" onboarding step (after the model step) to enter and test an LLM provider, base URL, API key, and model. Skip it and set it up later in settings.
 
 ## Quick start
 
