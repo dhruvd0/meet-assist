@@ -802,6 +802,16 @@ pub fn run(cli_args: CliArgs) {
             commands::project::set_source_caption,
             commands::project::search_sources,
             commands::project::pick_source_path,
+            commands::meeting::list_meetings,
+            commands::meeting::get_meeting_detail,
+            commands::meeting::start_meeting,
+            commands::meeting::pause_meeting,
+            commands::meeting::resume_meeting,
+            commands::meeting::end_meeting,
+            commands::meeting::meeting_state,
+            commands::meeting::update_meeting_title,
+            commands::meeting::update_meeting_context,
+            commands::meeting::delete_meeting,
         ])
         .events(collect_events![
             managers::history::HistoryUpdatePayload,
