@@ -81,9 +81,17 @@ fn handle_inner(ctx: &ToolContext, call: &ToolCall) -> Result<Value, String> {
         }
         "read_source" => {
             let sid = a["source_id"].as_i64().ok_or("source_id is required")?;
+            let source = ctx
+                .store
+                .get_source(sid)
+                .map_err(|e| e.to_string())?
+                .ok_or("source not found")?;
+            if ctx.project_id.is_none() || Some(source.project_id) != ctx.project_id {
+                return Err("source is not in this project".into());
+            }
             let path = a["path"].as_str();
             let offset = a["offset"].as_u64().unwrap_or(0) as usize;
-            let limit = a["limit"].as_u64().unwrap_or(5).clamp(1, 20) as usize;
+            let limit = a["limit"].as_u64().unwrap_or(3).clamp(1, 20) as usize;
             let chunks = ctx
                 .store
                 .read_chunks(sid, path, offset, limit)
@@ -257,5 +265,56 @@ mod tests {
         ))
         .unwrap();
         assert_eq!(out["hits"].as_array().unwrap().len(), 0);
+    }
+
+    #[test]
+    fn read_source_rejects_other_project_and_quick_meeting() {
+        let (_d, c) = ctx();
+        let p2 = c.store.create_project("Other").unwrap();
+        let s2 = c
+            .store
+            .add_source(p2.id, SourceKind::Text, "Secret", "")
+            .unwrap();
+        c.store
+            .replace_chunks(s2.id, &[("".into(), "hidden".into())])
+            .unwrap();
+        let out: Value = serde_json::from_str(&handle_tool(
+            &c,
+            &call("read_source", json!({"source_id": s2.id})),
+        ))
+        .unwrap();
+        assert!(out["error"].is_string());
+        let q = ToolContext {
+            store: c.store.clone(),
+            project_id: None,
+            meeting_id: c.meeting_id,
+        };
+        let out: Value = serde_json::from_str(&handle_tool(
+            &q,
+            &call("read_source", json!({"source_id": s2.id})),
+        ))
+        .unwrap();
+        assert!(out["error"].is_string());
+    }
+
+    #[test]
+    fn read_transcript_rejects_meeting_from_other_project() {
+        let (_d, c) = ctx();
+        let p2 = c.store.create_project("Other").unwrap();
+        let m2 = c.store.create_meeting(Some(p2.id), "Elsewhere").unwrap();
+        let out: Value = serde_json::from_str(&handle_tool(
+            &c,
+            &call("read_transcript", json!({"meeting_id": m2.id})),
+        ))
+        .unwrap();
+        assert!(out["error"].is_string());
+        let m3 = c.store.create_meeting(c.project_id, "Same").unwrap();
+        let out: Value = serde_json::from_str(&handle_tool(
+            &c,
+            &call("read_transcript", json!({"meeting_id": m3.id})),
+        ))
+        .unwrap();
+        assert!(out["error"].is_null());
+        assert!(out["lines"].is_array());
     }
 }
