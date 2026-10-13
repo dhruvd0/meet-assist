@@ -1,6 +1,15 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
-import { Cog, FlaskConical, History, Info, Sparkles, Cpu } from "lucide-react";
+import {
+  Cog,
+  FlaskConical,
+  FolderKanban,
+  History,
+  Info,
+  Sparkles,
+  Cpu,
+} from "lucide-react";
+import { ProjectsSection } from "./projects/ProjectsSection";
 import HandyTextLogo from "./icons/HandyTextLogo";
 import HandyHand from "./icons/HandyHand";
 import { useSettings } from "../hooks/useSettings";
@@ -32,6 +41,12 @@ interface SectionConfig {
 }
 
 export const SECTIONS_CONFIG = {
+  projects: {
+    labelKey: "sidebar.projects",
+    icon: FolderKanban,
+    component: ProjectsSection,
+    enabled: () => true,
+  },
   general: {
     labelKey: "sidebar.general",
     icon: HandyHand,
