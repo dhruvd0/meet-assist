@@ -14,24 +14,25 @@ use anyhow::{Context, Result};
 #[allow(unused_imports)]
 use log::{info, warn};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{mpsc, Arc, Mutex, TryLockError};
+use std::sync::{mpsc, Arc};
 
 /// Model input rate.
 #[cfg_attr(not(any(target_os = "macos", target_os = "windows")), allow(dead_code))]
 const TARGET_RATE: u32 = 16_000;
 
-/// The sink shared between the real-time callback and `stop`. `None` once
-/// `stop` has flushed it.
-pub(crate) type SharedSink = Arc<Mutex<Option<MeetingSink>>>;
+/// Frames buffered between the real-time callback and the VAD worker.
+#[cfg_attr(not(any(target_os = "macos", target_os = "windows")), allow(dead_code))]
+const FRAME_QUEUE: usize = 64;
 
 /// Real-time half of loopback capture: downmix + resample, slice into VAD
-/// frames, hand each frame to the sink without ever blocking. Owned by the
-/// device callback.
+/// frames, and `try_send` each frame to the worker. Never blocks, never
+/// logs, never runs inference. Owned by the device callback; dropping it
+/// flushes the resampler tail and closes the channel.
 #[cfg_attr(not(any(target_os = "macos", target_os = "windows")), allow(dead_code))]
 pub(crate) struct LoopbackPipeline {
     resampler: MonoResampler,
     slicer: FrameSlicer,
-    sink: SharedSink,
+    tx: mpsc::SyncSender<Vec<f32>>,
     dropped: Arc<AtomicU64>,
 }
 
@@ -40,13 +41,13 @@ impl LoopbackPipeline {
     pub(crate) fn new(
         resampler: MonoResampler,
         frame_len: usize,
-        sink: SharedSink,
+        tx: mpsc::SyncSender<Vec<f32>>,
         dropped: Arc<AtomicU64>,
     ) -> Self {
         Self {
             resampler,
             slicer: FrameSlicer::new(frame_len),
-            sink,
+            tx,
             dropped,
         }
     }
@@ -54,34 +55,54 @@ impl LoopbackPipeline {
     /// Feed one device buffer of interleaved samples.
     pub(crate) fn push(&mut self, interleaved: &[f32]) {
         let mono = self.resampler.push(interleaved);
-        for frame in self.slicer.push(&mono) {
-            match self.sink.try_lock() {
-                Ok(mut guard) => {
-                    if let Some(sink) = guard.as_mut() {
-                        sink.push_frame(&frame);
-                    }
-                }
-                Err(TryLockError::Poisoned(p)) => {
-                    if let Some(sink) = p.into_inner().as_mut() {
-                        sink.push_frame(&frame);
-                    }
-                }
-                Err(TryLockError::WouldBlock) => {
-                    self.dropped.fetch_add(1, Ordering::Relaxed);
-                }
+        self.send_frames(&mono);
+    }
+
+    fn send_frames(&mut self, mono: &[f32]) {
+        for frame in self.slicer.push(mono) {
+            if self.tx.try_send(frame).is_err() {
+                self.dropped.fetch_add(1, Ordering::Relaxed);
             }
         }
     }
 }
 
-/// Take the sink out of the shared slot and flush its trailing utterance.
-/// Later calls are no-ops.
-#[cfg_attr(not(any(target_os = "macos", target_os = "windows")), allow(dead_code))]
-pub(crate) fn finish_sink(sink: &SharedSink) {
-    let taken = sink.lock().unwrap_or_else(|p| p.into_inner()).take();
-    if let Some(sink) = taken {
-        sink.finish();
+impl Drop for LoopbackPipeline {
+    /// Runs when the stream (and its callback) is torn down: push the
+    /// resampler tail through the slicer. The sender drops right after,
+    /// which tells the worker to finish.
+    fn drop(&mut self) {
+        let tail = self.resampler.flush();
+        self.send_frames(&tail);
     }
+}
+
+/// Spawn the `meet-sysaudio` worker: owns the sink, runs VAD on each frame,
+/// and flushes the trailing utterance when the channel closes.
+#[cfg_attr(not(any(target_os = "macos", target_os = "windows")), allow(dead_code))]
+pub(crate) fn spawn_worker(
+    mut sink: MeetingSink,
+    rx: mpsc::Receiver<Vec<f32>>,
+) -> std::io::Result<std::thread::JoinHandle<()>> {
+    std::thread::Builder::new()
+        .name("meet-sysaudio".into())
+        .spawn(move || {
+            while let Ok(frame) = rx.recv() {
+                sink.push_frame(&frame);
+            }
+            sink.finish();
+        })
+}
+
+/// macOS 14.2 introduced process taps, which handy-cpal's loopback needs.
+#[cfg(target_os = "macos")]
+fn check_macos_version() -> Result<()> {
+    use objc2_foundation::NSProcessInfo;
+    let v = NSProcessInfo::processInfo().operatingSystemVersion();
+    if (v.majorVersion, v.minorVersion) < (14, 2) {
+        anyhow::bail!("system audio capture needs macOS 14.2 or newer");
+    }
+    Ok(())
 }
 
 /// Choose the PulseAudio monitor of the default output: the first monitor
@@ -104,7 +125,7 @@ pub struct SystemCapture {
     #[cfg(any(target_os = "macos", target_os = "windows"))]
     stream: handy_cpal::Stream,
     #[cfg(any(target_os = "macos", target_os = "windows"))]
-    sink: SharedSink,
+    worker: std::thread::JoinHandle<()>,
     #[cfg(any(target_os = "macos", target_os = "windows"))]
     dropped: Arc<AtomicU64>,
     #[cfg(target_os = "linux")]
@@ -124,12 +145,26 @@ impl SystemCapture {
     ) -> Result<Self> {
         use handy_cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 
+        #[cfg(target_os = "macos")]
+        check_macos_version()?;
         let host = handy_cpal::default_host();
         let device = host
             .default_output_device()
             .context("no default output device")?;
         // Output config: loopback streams take the output's format. Never
         // ask an output device for its input config (errors on WASAPI).
+        // handy-cpal only uses loopback on macOS when the device has no
+        // input; otherwise it would capture the microphone as "them".
+        #[cfg(target_os = "macos")]
+        if device
+            .supported_input_configs()
+            .map(|mut c| c.next().is_some())
+            .unwrap_or(false)
+        {
+            anyhow::bail!(
+                "system audio needs an output-only device; current output also has an input"
+            );
+        }
         let cfg = device
             .default_output_config()
             .context("query output device config")?;
@@ -143,18 +178,22 @@ impl SystemCapture {
         let frame = vad.frame_samples();
         let resampler = MonoResampler::new(cfg.sample_rate(), TARGET_RATE, cfg.channels())
             .context("create resampler")?;
-        let sink: SharedSink =
-            Arc::new(Mutex::new(Some(MeetingSink::with_speaker(vad, tx, "them"))));
+        let sink = MeetingSink::with_speaker(vad, tx, "them");
+        let (frame_tx, frame_rx) = mpsc::sync_channel(FRAME_QUEUE);
         let dropped = Arc::new(AtomicU64::new(0));
         let failed = Arc::new(AtomicBool::new(false));
-        let mut pipeline =
-            LoopbackPipeline::new(resampler, frame, Arc::clone(&sink), Arc::clone(&dropped));
+        let mut pipeline = LoopbackPipeline::new(resampler, frame, frame_tx, Arc::clone(&dropped));
+        let worker = spawn_worker(sink, frame_rx).context("spawn system audio worker")?;
         let flag = Arc::clone(&failed);
         let stream = device
             .build_input_stream(
                 cfg.config(),
                 move |data: &[f32], _: &handy_cpal::InputCallbackInfo| pipeline.push(data),
-                move |e| {
+                move |e: handy_cpal::Error| {
+                    // A glitch is not a dead stream.
+                    if e.kind() == handy_cpal::ErrorKind::Xrun {
+                        return;
+                    }
                     if !flag.swap(true, Ordering::AcqRel) {
                         warn!("system audio: stream error: {e}");
                     }
@@ -171,7 +210,7 @@ impl SystemCapture {
         );
         Ok(Self {
             stream,
-            sink,
+            worker,
             dropped,
             failed,
         })
@@ -242,17 +281,20 @@ impl SystemCapture {
         {
             let Self {
                 stream,
-                sink,
+                worker,
                 dropped,
                 ..
             } = self;
-            // Dropping the stream joins the callback and destroys the tap and
-            // aggregate device; afterwards nothing contends for the sink.
+            // Dropping the stream tears down the tap and the callback; the
+            // pipeline's Drop flushes the resampler tail and closes the
+            // channel, so the worker drains, finishes the sink, and exits.
             drop(stream);
-            finish_sink(&sink);
+            if worker.join().is_err() {
+                warn!("system audio: worker panicked");
+            }
             let n = dropped.load(Ordering::Relaxed);
             if n > 0 {
-                warn!("system audio: dropped {n} frames on sink contention");
+                warn!("system audio: dropped {n} frames (worker queue full)");
             }
         }
         #[cfg(target_os = "linux")]
@@ -277,7 +319,7 @@ mod tests {
     use crate::meeting::capture::MeetingSink;
     use crate::meeting::resample::MonoResampler;
     use std::sync::atomic::{AtomicU64, Ordering};
-    use std::sync::{mpsc, Arc, Mutex};
+    use std::sync::{mpsc, Arc};
 
     /// Copied from `capture.rs` tests: speech when mean |x| > 0.05.
     struct LoudVad;
@@ -308,35 +350,40 @@ mod tests {
         out
     }
 
+    type Worker = std::thread::JoinHandle<()>;
+
     fn pipeline() -> (
         LoopbackPipeline,
-        SharedSink,
+        Worker,
         Arc<AtomicU64>,
         mpsc::Receiver<crate::meeting::capture::Utterance>,
     ) {
         let vad = CaptureVad::new(Box::new(LoudVad), 0, 0);
         let (tx, rx) = mpsc::channel();
-        let sink: SharedSink =
-            Arc::new(Mutex::new(Some(MeetingSink::with_speaker(vad, tx, "them"))));
+        let sink = MeetingSink::with_speaker(vad, tx, "them");
+        let (ftx, frx) = mpsc::sync_channel(FRAME_QUEUE);
+        let worker = spawn_worker(sink, frx).unwrap();
         let dropped = Arc::new(AtomicU64::new(0));
         let p = LoopbackPipeline::new(
             MonoResampler::new(48_000, 16_000, 2).unwrap(),
             320,
-            Arc::clone(&sink),
+            ftx,
             Arc::clone(&dropped),
         );
-        (p, sink, dropped, rx)
+        (p, worker, dropped, rx)
     }
 
     #[test]
     fn stereo_48k_tone_burst_then_silence_yields_one_them_utterance() {
-        let (mut p, _sink, dropped, rx) = pipeline();
+        let (mut p, worker, dropped, rx) = pipeline();
         let mut audio = stereo_48k(1.0, 0.3);
         audio.extend(stereo_48k(1.5, 0.0));
         // 10 ms device callbacks: 480 stereo frames each.
         for block in audio.chunks(960) {
             p.push(block);
         }
+        drop(p);
+        worker.join().unwrap();
         let utt = rx.try_recv().expect("one utterance");
         assert_eq!(utt.speaker, "them");
         // About one second at 16 kHz, give or take resampler edges.
@@ -347,26 +394,29 @@ mod tests {
     }
 
     #[test]
-    fn contended_sink_drops_frames_instead_of_blocking() {
-        let (mut p, sink, dropped, rx) = pipeline();
-        let guard = sink.lock().unwrap();
+    fn full_channel_counts_drops_instead_of_blocking() {
+        let (ftx, _frx) = mpsc::sync_channel(2);
+        let dropped = Arc::new(AtomicU64::new(0));
+        let mut p = LoopbackPipeline::new(
+            MonoResampler::new(48_000, 16_000, 2).unwrap(),
+            320,
+            ftx,
+            Arc::clone(&dropped),
+        );
+        // 0.5 s is ~25 frames into a 2-slot channel nobody drains.
         p.push(&stereo_48k(0.5, 0.3));
-        assert!(dropped.load(Ordering::Relaxed) > 0);
-        drop(guard);
-        assert!(rx.try_recv().is_err());
+        assert!(dropped.load(Ordering::Relaxed) > 10);
     }
 
     #[test]
-    fn finish_sink_flushes_trailing_utterance_once() {
-        let (mut p, sink, _dropped, rx) = pipeline();
+    fn closing_the_channel_flushes_trailing_utterance() {
+        let (mut p, worker, _dropped, rx) = pipeline();
         p.push(&stereo_48k(1.0, 0.3));
-        finish_sink(&sink);
+        drop(p);
+        worker.join().unwrap();
         let utt = rx.try_recv().expect("flushed utterance");
         assert_eq!(utt.speaker, "them");
-        finish_sink(&sink);
-        assert!(rx.try_recv().is_err(), "second finish is a no-op");
-        // Frames after finish go nowhere and do not panic.
-        p.push(&stereo_48k(0.1, 0.3));
+        assert!(rx.try_recv().is_err());
     }
 
     #[test]
