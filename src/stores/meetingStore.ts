@@ -31,6 +31,11 @@ interface MeetingStore {
   live: MeetingStatePayload;
   observer: ObserverView;
   loading: boolean;
+  captureWarning: {
+    meeting_id: number;
+    source: string;
+    message: string;
+  } | null;
 
   loadMeetings: (projectId?: number | null) => Promise<void>;
   openMeeting: (id: number) => Promise<void>;
@@ -47,6 +52,7 @@ interface MeetingStore {
   saveContext: (id: number, context: string) => Promise<void>;
   deleteMeeting: (id: number) => Promise<void>;
   dismiss: (id: number) => Promise<void>;
+  summarize: (sessionId: number) => Promise<void>;
   subscribe: () => Promise<() => void>;
 }
 
@@ -70,6 +76,7 @@ export const useMeetingStore = create<MeetingStore>((set, get) => ({
   live: idle,
   observer: idleObserver,
   loading: false,
+  captureWarning: null,
 
   loadMeetings: async (projectId = null) => {
     set({ loading: true });
@@ -86,6 +93,8 @@ export const useMeetingStore = create<MeetingStore>((set, get) => ({
     set((s) => ({
       activeMeetingId: id,
       detail: null,
+      captureWarning:
+        s.captureWarning?.meeting_id === id ? s.captureWarning : null,
       observer: { ...s.observer, ...idleCounters },
     }));
     const res = await commands.getMeetingDetail(id);
@@ -100,10 +109,12 @@ export const useMeetingStore = create<MeetingStore>((set, get) => ({
     set((s) => ({
       activeMeetingId: null,
       detail: null,
+      captureWarning: null,
       observer: { ...s.observer, ...idleCounters },
     })),
 
   startMeeting: async (projectId, meetingId) => {
+    set({ captureWarning: null });
     const res = await commands.startMeeting(projectId, meetingId);
     if (res.status !== "ok") {
       toast.error(`${t("meetings.errors.start")} ${res.error}`);
@@ -218,6 +229,12 @@ export const useMeetingStore = create<MeetingStore>((set, get) => ({
     );
   },
 
+  summarize: async (sessionId) => {
+    const res = await commands.summarizeSession(sessionId);
+    if (res.status !== "ok")
+      toast.error(`${t("meetings.summary.failed")} ${res.error}`);
+  },
+
   subscribe: async () => {
     const un1 = await events.meetingStatePayload.listen((e) => {
       set({ live: e.payload });
@@ -245,7 +262,13 @@ export const useMeetingStore = create<MeetingStore>((set, get) => ({
       });
     });
     const un3 = await events.meetingCaptureWarningPayload.listen((e) => {
-      toast.error(`${t("meetings.errors.capture")} ${e.payload.message}`);
+      const { source, message, meeting_id } = e.payload;
+      if (source === "system_audio") {
+        // Shown as a banner in the open meeting instead of a toast.
+        set({ captureWarning: { meeting_id, source, message } });
+        return;
+      }
+      toast.error(`${t("meetings.errors.capture")} ${message}`);
     });
     const un4 = await events.interventionPayload.listen((e) => {
       set((s) => {
@@ -287,7 +310,28 @@ export const useMeetingStore = create<MeetingStore>((set, get) => ({
     const un6 = await events.openMeetingPayload.listen((e) => {
       get().openMeeting(e.payload.meeting_id);
     });
+    const un7 = await events.sessionSummaryPayload.listen((e) => {
+      const { meeting_id, session_id, summary, rolling_summary } = e.payload;
+      set((s) => ({
+        meetings: s.meetings.map((m) =>
+          m.id === meeting_id ? { ...m, rolling_summary } : m,
+        ),
+        detail:
+          s.detail && s.detail.meeting.id === meeting_id
+            ? {
+                ...s.detail,
+                meeting: { ...s.detail.meeting, rolling_summary },
+                sessions: s.detail.sessions.map((x) =>
+                  x.id === session_id
+                    ? { ...x, summary: JSON.stringify(summary) }
+                    : x,
+                ),
+              }
+            : s.detail,
+      }));
+    });
     return () => {
+      un7();
       un1();
       un2();
       un3();

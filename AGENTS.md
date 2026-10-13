@@ -53,7 +53,7 @@ For detailed platform-specific build setup, see [BUILD.md](BUILD.md).
 
 ## Architecture Overview
 
-Meet Assist is a cross-platform desktop app built with Tauri 2.x (Rust backend + React/TypeScript frontend). It has two pipelines sharing one transcription engine: the inherited dictation pipeline (shipping) and the meeting pipeline (planned, see `docs/ARCHITECTURE.md`). The module lists below describe the dictation pipeline that exists today.
+Meet Assist is a cross-platform desktop app built with Tauri 2.x (Rust backend + React/TypeScript frontend). It has two pipelines sharing one transcription engine: the inherited dictation pipeline (shipping) and the meeting pipeline (shipping, see `docs/ARCHITECTURE.md`). The module lists below describe the dictation pipeline; the meeting modules are listed in the Meeting Subsystem section.
 
 ### Backend Structure (src-tauri/src/)
 
@@ -100,9 +100,9 @@ Meet Assist is a cross-platform desktop app built with Tauri 2.x (Rust backend +
 
 **State Flow:** Zustand → Tauri Command → Rust State → Persistence (tauri-plugin-store)
 
-### Meeting Subsystem (planned)
+### Meeting Subsystem
 
-New backend code goes under `src-tauri/src/meeting/` (`mod.rs`, `capture.rs`, `transcriber.rs`, `observer.rs`, `tools.rs`, `indexer.rs`, `summary.rs`, `store.rs`) plus `audio_toolkit/audio/system_capture/`, `commands/project.rs`, and `commands/meeting.rs`. New frontend code goes under `src/components/projects/`, `src/components/meetings/`, `src/stores/projectStore.ts`, `src/stores/meetingStore.ts`, `src/components/settings/meeting/`, and a separate window entry `src/intervention/`. Reuse `TranscriptionManager`, `CaptureVad`, `llm_client`, `audio_feedback`, and `components/ui`. Do not add a second LLM client, a second VAD, or new UI primitives. Keep the existing design language.
+Built; see `docs/ARCHITECTURE.md` for the full table. Backend code lives under `src-tauri/src/meeting/`: `mod.rs`, `store.rs`, `chunk.rs`, `indexer.rs`, `manager.rs` (projects, sources, vision digests via `Describer`), `capture.rs` (mic capture, `MeetingSink`), `system_capture.rs` and `resample.rs` (system audio loopback tagged `them`), `segment.rs`, `session.rs` (`MeetingManager`, `CombinedCapture`), `observer.rs`, `tools.rs`, and `summary.rs` (session and rolling summaries). Commands are in `commands/project.rs` and `commands/meeting.rs`; the floating card is `intervention.rs`. Frontend code lives under `src/components/projects/`, `src/components/meetings/`, `src/components/settings/meeting/`, `src/components/onboarding/AssistantOnboarding.tsx`, `src/stores/projectStore.ts`, `src/stores/meetingStore.ts`, and the separate window entry `src/intervention/`. Reuse `TranscriptionManager`, `CaptureVad`, `llm_client`, `audio_feedback`, and `components/ui`. Do not add a second LLM client, a second VAD, or new UI primitives. Keep the existing design language.
 
 ### Technology Stack
 

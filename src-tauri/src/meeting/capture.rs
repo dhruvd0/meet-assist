@@ -26,10 +26,16 @@ pub struct MeetingSink {
     segmenter: Segmenter,
     tx: mpsc::Sender<Utterance>,
     started_at: Option<i64>,
+    speaker: String,
 }
 
 impl MeetingSink {
-    pub fn new(mut vad: CaptureVad, tx: mpsc::Sender<Utterance>) -> Self {
+    pub fn new(vad: CaptureVad, tx: mpsc::Sender<Utterance>) -> Self {
+        Self::with_speaker(vad, tx, "me")
+    }
+
+    /// Like `new`, tagging every emitted utterance with `speaker`.
+    pub fn with_speaker(mut vad: CaptureVad, tx: mpsc::Sender<Utterance>, speaker: &str) -> Self {
         vad.prepare_offline();
         let frame = vad.frame_samples();
         let mut cfg = SegmenterConfig::defaults(frame);
@@ -44,6 +50,7 @@ impl MeetingSink {
             segmenter,
             tx,
             started_at: None,
+            speaker: speaker.to_string(),
         }
     }
 
@@ -51,7 +58,7 @@ impl MeetingSink {
         let now = chrono::Utc::now().timestamp_millis();
         let started_at = self.started_at.take().unwrap_or(now);
         let utt = Utterance {
-            speaker: "me".into(),
+            speaker: self.speaker.clone(),
             samples,
             started_at,
         };
@@ -60,22 +67,11 @@ impl MeetingSink {
         }
     }
 
-    /// Flush a trailing utterance when capture stops.
-    pub fn finish(mut self) {
-        if let Some(samples) = self.segmenter.flush() {
-            self.emit(samples);
-        }
-    }
-}
-
-impl Sink for MeetingSink {
-    fn process_chunk(&mut self, chunk: AudioChunk<'_>) {
+    /// Run one VAD frame through the detector and segmenter, emitting an
+    /// utterance when one ends. `frame` must be `frame_samples()` long.
+    pub fn push_frame(&mut self, frame: &[f32]) {
         let frame_len = self.vad.frame_samples();
-        if chunk.valid_frames < frame_len {
-            // Final zero-padded chunk; never feed padding to the detector.
-            return;
-        }
-        let Some(frame) = chunk.samples.get(..frame_len) else {
+        let Some(frame) = frame.get(..frame_len) else {
             return;
         };
         let speech = match self.vad.push_frame(frame) {
@@ -97,6 +93,24 @@ impl Sink for MeetingSink {
         if let Some(samples) = self.segmenter.push(speech.as_deref()) {
             self.emit(samples);
         }
+    }
+
+    /// Flush a trailing utterance when capture stops.
+    pub fn finish(mut self) {
+        if let Some(samples) = self.segmenter.flush() {
+            self.emit(samples);
+        }
+    }
+}
+
+impl Sink for MeetingSink {
+    fn process_chunk(&mut self, chunk: AudioChunk<'_>) {
+        let frame_len = self.vad.frame_samples();
+        if chunk.valid_frames < frame_len {
+            // Final zero-padded chunk; never feed padding to the detector.
+            return;
+        }
+        self.push_frame(chunk.samples);
     }
 }
 
@@ -330,6 +344,59 @@ mod tests {
         assert_eq!(utt.samples.len(), 25 * 320);
         for _ in 0..10 {
             sink.process_chunk(chunk(&quiet));
+        }
+        assert!(rx.try_recv().is_err());
+    }
+
+    #[test]
+    fn with_speaker_tags_utterances() {
+        let vad = CaptureVad::new(Box::new(LoudVad), 0, 0);
+        let (tx, rx) = mpsc::channel();
+        let mut sink = MeetingSink::with_speaker(vad, tx, "them");
+        let loud = vec![0.2f32; 320];
+        let quiet = vec![0.0f32; 320];
+        for _ in 0..25 {
+            sink.process_chunk(chunk(&loud));
+        }
+        for _ in 0..40 {
+            sink.process_chunk(chunk(&quiet));
+        }
+        let utt = rx.try_recv().expect("one utterance");
+        assert_eq!(utt.speaker, "them");
+        assert!(rx.try_recv().is_err());
+    }
+
+    #[test]
+    fn push_frame_emits_an_utterance_without_audio_chunks() {
+        let vad = CaptureVad::new(Box::new(LoudVad), 0, 0);
+        let (tx, rx) = mpsc::channel();
+        let mut sink = MeetingSink::with_speaker(vad, tx, "them");
+        let loud = vec![0.2f32; 320];
+        let quiet = vec![0.0f32; 320];
+        for _ in 0..25 {
+            sink.push_frame(&loud);
+        }
+        for _ in 0..40 {
+            sink.push_frame(&quiet);
+        }
+        let utt = rx.try_recv().expect("one utterance");
+        assert_eq!(utt.samples.len(), 25 * 320);
+        assert_eq!(utt.speaker, "them");
+        assert!(rx.try_recv().is_err());
+    }
+
+    #[test]
+    fn push_frame_ignores_short_frames() {
+        let vad = CaptureVad::new(Box::new(LoudVad), 0, 0);
+        let (tx, rx) = mpsc::channel();
+        let mut sink = MeetingSink::with_speaker(vad, tx, "them");
+        let short = vec![0.2f32; 100];
+        let quiet = vec![0.0f32; 320];
+        for _ in 0..30 {
+            sink.push_frame(&short);
+        }
+        for _ in 0..40 {
+            sink.push_frame(&quiet);
         }
         assert!(rx.try_recv().is_err());
     }

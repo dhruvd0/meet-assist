@@ -5,8 +5,10 @@ import { useMeetingStore } from "@/stores/meetingStore";
 import { Alert } from "../ui/Alert";
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
+import { SettingsGroup } from "../ui/SettingsGroup";
 import { ContextEditor } from "./ContextEditor";
 import { InterventionTimeline } from "./InterventionTimeline";
+import { SessionSummary } from "./SessionSummary";
 import { MeetingControls } from "./MeetingControls";
 import { TranscriptThread } from "./TranscriptThread";
 
@@ -15,6 +17,8 @@ export const MeetingDetail: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const detail = useMeetingStore((s) => s.detail);
   const live = useMeetingStore((s) => s.live);
   const observer = useMeetingStore((s) => s.observer);
+  const captureWarning = useMeetingStore((s) => s.captureWarning);
+  const summarize = useMeetingStore((s) => s.summarize);
   const renameMeeting = useMeetingStore((s) => s.renameMeeting);
   const refreshLive = useMeetingStore((s) => s.refreshLive);
   const subscribe = useMeetingStore((s) => s.subscribe);
@@ -41,6 +45,15 @@ export const MeetingDetail: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
   return (
     <div className="space-y-6">
+      {captureWarning?.source === "system_audio" &&
+        captureWarning.meeting_id === detail.meeting.id && (
+          <Alert variant="warning">
+            {t("meetings.capture.systemAudioUnavailable", {
+              message: captureWarning.message,
+            })}{" "}
+            {t("meetings.capture.systemAudioHint")}
+          </Alert>
+        )}
       <div className="flex items-center gap-2">
         <Button
           variant="ghost"
@@ -98,11 +111,31 @@ export const MeetingDetail: React.FC<{ onBack: () => void }> = ({ onBack }) => {
           })}
         </Alert>
       )}
+      {m.rolling_summary && (
+        <div className="space-y-1">
+          <h2 className="text-xs font-medium text-mid-gray uppercase tracking-wide">
+            {t("meetings.summary.rolling")}
+          </h2>
+          <p className="text-sm text-text/70 whitespace-pre-wrap">
+            {m.rolling_summary}
+          </p>
+        </div>
+      )}
       <ContextEditor meetingId={m.id} context={m.context} />
       <TranscriptThread
         detail={detail}
         autoscroll={live.meeting_id === m.id && live.status === "live"}
       />
+      <SettingsGroup title={t("meetings.summary.title")}>
+        {detail.sessions.map((s) => (
+          <SessionSummary
+            key={s.id}
+            session={s}
+            meetingEnded={m.status === "ended"}
+            onRetry={() => summarize(s.id)}
+          />
+        ))}
+      </SettingsGroup>
       <InterventionTimeline items={detail.interventions} />
     </div>
   );

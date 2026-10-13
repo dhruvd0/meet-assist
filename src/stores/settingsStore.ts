@@ -164,6 +164,10 @@ const settingUpdaters: {
     commands.changePostProcessEnabledSetting(value as boolean),
   meeting_assistant_enabled: (value) =>
     commands.changeMeetingAssistantSetting(value as boolean),
+  meeting_system_audio_enabled: (value) =>
+    commands.changeMeetingSystemAudioSetting(value as boolean),
+  meeting_vision_enabled: (value) =>
+    commands.changeMeetingVisionSetting(value as boolean),
   meeting_provider_id: (value) =>
     commands.changeMeetingProviderSetting(value as string),
   meeting_sensitivity: (value) =>

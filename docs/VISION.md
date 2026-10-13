@@ -16,7 +16,7 @@ Meeting bots that join the call as a participant are intrusive, record everyone,
 - **Transcribes** locally with the same models Handy uses. Each line is tagged as you or them.
 - **Watches** the recent conversation on a short timer and asks a language model one question: is there a reason to speak up right now?
 - **Beeps and shows a card**, only to you, when the answer is yes. Four kinds of nudge: the conversation is looping, someone is stuck, a quick fact is needed, or an idea is worth raising.
-- **Remembers** meetings as threads. End a meeting today, continue it tomorrow, and the assistant carries a rolling summary forward.
+- **Remembers** meetings as threads. End a meeting today, continue it tomorrow, and the assistant carries a rolling summary forward. Ending a session writes a session summary, then merges it into the meeting's rolling summary.
 - **Knows your project.** Meetings live in projects. A project holds a short brief plus sources: pasted notes, local files and folders (checked-out repos included), links, images. The assistant starts each check with only the brief and the last meeting's summary, then searches and reads sources on its own when the conversation calls for it.
 
 ## Principles
@@ -38,13 +38,13 @@ Meeting bots that join the call as a participant are intrusive, record everyone,
 
 ## Platform status
 
-| Platform | Microphone capture | System audio capture                                                                    |
-| -------- | ------------------ | --------------------------------------------------------------------------------------- |
-| macOS    | Working (Handy)    | Planned, first target. CoreAudio process tap on 14.2+, ScreenCaptureKit fallback on 13. |
-| Windows  | Working (Handy)    | Planned, WASAPI loopback. Not yet verified.                                             |
-| Linux    | Working (Handy)    | Planned, PulseAudio/PipeWire monitor source. Not yet verified.                          |
+| Platform | Microphone capture | System audio capture                                                                                        |
+| -------- | ------------------ | ----------------------------------------------------------------------------------------------------------- |
+| macOS    | Working (Handy)    | Working. CoreAudio process tap on the default output (14.2+); asks for the "Audio capture" permission once. |
+| Windows  | Working (Handy)    | Built, WASAPI loopback. Not yet verified.                                                                   |
+| Linux    | Working (Handy)    | Built, PulseAudio monitor source. Not yet verified.                                                         |
 
-Where system audio is unavailable, a meeting runs microphone-only and the UI says so.
+Where system audio is unavailable (older macOS, permission denied, or a default output that is also an input, such as a headset in call mode, which is refused to avoid capturing your own voice as "them"), a meeting runs microphone-only and a banner says so. System audio can also be switched off in settings.
 
 ## Roadmap
 
@@ -52,7 +52,7 @@ Where system audio is unavailable, a meeting runs microphone-only and the UI say
 2. Projects and sources: brief, local files and folders, links, images, full-text search.
 3. Meetings as persisted threads under projects: list, detail, start, pause, resume, end. Microphone-only capture, local transcript.
 4. Observer loop with context tools, intervention card, beep.
-5. System audio capture, macOS first, then Windows and Linux.
-6. Session and rolling summaries, image digests, continue-meeting polish, onboarding step for permissions and provider.
+5. System audio capture, macOS first, then Windows and Linux. (macOS verified; Windows and Linux built, unverified.)
+6. Session and rolling summaries, image digests, continue-meeting polish, onboarding step for permissions and provider (the "assistant" step, skippable). Steps 1 to 6 are done.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for how the pieces fit, and [superpowers/specs/2026-10-13-meeting-assistant-design.md](superpowers/specs/2026-10-13-meeting-assistant-design.md) for the full design.

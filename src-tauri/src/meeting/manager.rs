@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use specta::Type;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
 use tauri::AppHandle;
 use tauri_specta::Event;
@@ -18,11 +19,64 @@ pub struct SourceStatusPayload {
     pub source: Source,
 }
 
+/// Turns an image into a short text digest using a vision-capable model.
+pub trait Describer: Send + Sync {
+    fn describe(&self, mime: &str, bytes: &[u8]) -> Result<String, String>;
+}
+
+const DESCRIBE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60);
+
+/// Production describer backed by the configured meeting provider.
+pub struct LlmDescriber {
+    app: AppHandle,
+}
+
+impl Describer for LlmDescriber {
+    fn describe(&self, mime: &str, bytes: &[u8]) -> Result<String, String> {
+        let settings = crate::settings::get_settings(&self.app);
+        let provider = settings
+            .meeting_provider()
+            .ok_or_else(|| "no provider".to_string())?
+            .clone();
+        let model = settings
+            .meeting_model()
+            .ok_or_else(|| "no provider".to_string())?;
+        let key = settings.meeting_api_key();
+        let fut = async {
+            tokio::time::timeout(
+                DESCRIBE_TIMEOUT,
+                crate::llm_client::describe_image(
+                    &provider,
+                    key,
+                    &model,
+                    indexer::image_digest_prompt(),
+                    mime,
+                    bytes,
+                ),
+            )
+            .await
+            .unwrap_or_else(|_| Err("image description timed out".to_string()))
+        };
+        match tokio::runtime::Handle::try_current() {
+            Ok(h) => tokio::task::block_in_place(|| h.block_on(fut)),
+            Err(_) => tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .map_err(|e| e.to_string())?
+                .block_on(fut),
+        }
+    }
+}
+
+const MAX_DIGEST_CHARS: usize = 1200;
+
 pub struct ProjectManager {
     store: Arc<ProjectStore>,
     images_dir: PathBuf,
     tx: Mutex<Option<mpsc::Sender<i64>>>,
     app: Option<AppHandle>,
+    describer: Option<Arc<dyn Describer>>,
+    vision_unsupported_logged: AtomicBool,
 }
 
 impl ProjectManager {
@@ -36,21 +90,32 @@ impl ProjectManager {
             data_dir.join("meet.db"),
             data_dir.join("sources").join("images"),
             Some(app.clone()),
+            Some(Arc::new(LlmDescriber { app: app.clone() })),
         )
     }
 
     #[cfg(test)]
-    pub fn new_for_test(db_path: PathBuf, images_dir: PathBuf) -> Result<Self> {
-        Self::build(db_path, images_dir, None)
+    pub fn new_for_test(
+        db_path: PathBuf,
+        images_dir: PathBuf,
+        describer: Option<Arc<dyn Describer>>,
+    ) -> Result<Self> {
+        Self::build(db_path, images_dir, None, describer)
     }
 
-    fn build(db_path: PathBuf, images_dir: PathBuf, app: Option<AppHandle>) -> Result<Self> {
+    fn build(
+        db_path: PathBuf,
+        images_dir: PathBuf,
+        app: Option<AppHandle>,
+        describer: Option<Arc<dyn Describer>>,
+    ) -> Result<Self> {
         let store = Arc::new(ProjectStore::open(db_path)?);
         std::fs::create_dir_all(&images_dir)?;
         let (tx, rx) = mpsc::channel::<i64>();
         let worker_store = Arc::clone(&store);
         let worker_images = images_dir.clone();
         let worker_app = app.clone();
+        let worker_describer = describer.clone();
         std::thread::Builder::new()
             .name("meet-indexer".into())
             .spawn(move || {
@@ -59,6 +124,8 @@ impl ProjectManager {
                     images_dir: worker_images,
                     tx: Mutex::new(None),
                     app: worker_app,
+                    describer: worker_describer,
+                    vision_unsupported_logged: AtomicBool::new(false),
                 };
                 for source_id in rx {
                     match catch_unwind(AssertUnwindSafe(|| worker.index_source_now(source_id))) {
@@ -89,6 +156,8 @@ impl ProjectManager {
             images_dir,
             tx: Mutex::new(Some(tx)),
             app,
+            describer,
+            vision_unsupported_logged: AtomicBool::new(false),
         };
         // Resume sources left pending by a quit or crash mid-index.
         match manager.store.list_pending_source_ids() {
@@ -155,6 +224,48 @@ impl ProjectManager {
         }
     }
 
+    /// Ask the vision model for a digest and persist it. None means fall back
+    /// to the (empty) caption path.
+    fn describe_image_source(&self, src: &Source) -> Option<String> {
+        let describer = self.describer.as_ref()?;
+        // Images leave the machine, so both the assistant opt-in and the
+        // vision toggle must be on.
+        let settings = self.app.as_ref().map(crate::settings::get_settings);
+        let vision_on = settings.as_ref().is_none_or(|s| s.meeting_vision_enabled);
+        if !vision_on || !crate::meeting::session::cloud_allowed(settings.as_ref()) {
+            return None;
+        }
+        let (mime, bytes) = match indexer::read_image_for_vision(Path::new(&src.locator)) {
+            Ok(v) => v,
+            Err(e) => {
+                warn!("image {} not sent for digest: {:#}", src.id, e);
+                return None;
+            }
+        };
+        match describer.describe(mime, &bytes) {
+            Ok(text) => {
+                let text: String = text.trim().chars().take(MAX_DIGEST_CHARS).collect();
+                if text.is_empty() {
+                    return None;
+                }
+                if let Err(e) = self.store.set_source_digest(src.id, &text) {
+                    warn!("store digest for image {}: {:#}", src.id, e);
+                }
+                Some(text)
+            }
+            Err(e) if e == "vision_unsupported" => {
+                if !self.vision_unsupported_logged.swap(true, Ordering::Relaxed) {
+                    info!("meeting model does not support images; skipping digests");
+                }
+                None
+            }
+            Err(e) => {
+                warn!("image digest failed for {}: {}", src.id, e);
+                None
+            }
+        }
+    }
+
     fn index_inner(&self, src: &Source) -> Result<usize> {
         let chunks: Vec<(String, String)> = match src.kind {
             SourceKind::Text => indexer::chunks_for_text(&src.locator),
@@ -172,7 +283,15 @@ impl ProjectManager {
                         .block_on(indexer::chunks_for_link(&url))?,
                 }
             }
-            SourceKind::Image => indexer::chunks_for_caption(src.digest.as_deref().unwrap_or("")),
+            SourceKind::Image => {
+                let mut digest = src.digest.clone().unwrap_or_default();
+                if digest.trim().is_empty() {
+                    if let Some(text) = self.describe_image_source(src) {
+                        digest = text;
+                    }
+                }
+                indexer::chunks_for_caption(&digest)
+            }
         };
         self.store.replace_chunks(src.id, &chunks)
     }
@@ -237,14 +356,27 @@ impl ProjectManager {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn image_digests_need_the_assistant_opt_in() {
+        let mut s = crate::settings::get_default_settings();
+        s.meeting_vision_enabled = true;
+        assert!(!crate::meeting::session::cloud_allowed(Some(&s)));
+        s.meeting_assistant_enabled = true;
+        assert!(crate::meeting::session::cloud_allowed(Some(&s)));
+    }
+
     use super::*;
     use crate::meeting::store::{SourceKind, SourceStatus};
     use std::fs;
 
     fn mgr() -> (tempfile::TempDir, ProjectManager) {
         let dir = tempfile::tempdir().unwrap();
-        let m = ProjectManager::new_for_test(dir.path().join("meet.db"), dir.path().join("images"))
-            .unwrap();
+        let m = ProjectManager::new_for_test(
+            dir.path().join("meet.db"),
+            dir.path().join("images"),
+            None,
+        )
+        .unwrap();
         (dir, m)
     }
 
@@ -296,7 +428,7 @@ mod tests {
                 .unwrap()
                 .id;
         }
-        let m = ProjectManager::new_for_test(db, images).unwrap();
+        let m = ProjectManager::new_for_test(db, images, None).unwrap();
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
         loop {
             let st = m.store().get_source(src_id).unwrap().unwrap().status;
@@ -417,5 +549,72 @@ mod tests {
         let r = m.add_and_index(p.id, SourceKind::Image, "X", missing.to_str().unwrap());
         assert!(r.is_err());
         assert!(m.store().list_sources(p.id).unwrap().is_empty());
+    }
+
+    struct Fake(Result<String, String>);
+    impl Describer for Fake {
+        fn describe(&self, _mime: &str, _bytes: &[u8]) -> Result<String, String> {
+            self.0.clone()
+        }
+    }
+
+    fn mgr_with(r: Result<String, String>) -> (tempfile::TempDir, ProjectManager) {
+        let dir = tempfile::tempdir().unwrap();
+        let m = ProjectManager::new_for_test(
+            dir.path().join("meet.db"),
+            dir.path().join("images"),
+            Some(Arc::new(Fake(r))),
+        )
+        .unwrap();
+        (dir, m)
+    }
+
+    #[test]
+    fn image_digest_is_written_and_searchable() {
+        let (d, m) = mgr_with(Ok("A whiteboard with three boxes".into()));
+        let p = m.store().create_project("P").unwrap();
+        let pic = d.path().join("shot.png");
+        fs::write(&pic, b"\x89PNG").unwrap();
+        let s = m
+            .add_and_index(p.id, SourceKind::Image, "Shot", pic.to_str().unwrap())
+            .unwrap();
+        m.index_source_now(s.id).unwrap();
+        let got = m.store().get_source(s.id).unwrap().unwrap();
+        assert_eq!(got.digest.as_deref(), Some("A whiteboard with three boxes"));
+        assert_eq!(got.status, SourceStatus::Ready);
+        assert!(!m.store().search(p.id, "whiteboard", 5).unwrap().is_empty());
+    }
+
+    #[test]
+    fn vision_unsupported_leaves_digest_empty_and_ready() {
+        let (d, m) = mgr_with(Err("vision_unsupported".into()));
+        let p = m.store().create_project("P").unwrap();
+        let pic = d.path().join("shot.png");
+        fs::write(&pic, b"\x89PNG").unwrap();
+        let s = m
+            .add_and_index(p.id, SourceKind::Image, "Shot", pic.to_str().unwrap())
+            .unwrap();
+        m.index_source_now(s.id).unwrap();
+        let got = m.store().get_source(s.id).unwrap().unwrap();
+        assert_eq!(got.digest, None);
+        assert_eq!(got.status, SourceStatus::Ready);
+    }
+
+    #[test]
+    fn user_caption_wins_over_model_digest() {
+        let (d, m) = mgr_with(Ok("A whiteboard with three boxes".into()));
+        let p = m.store().create_project("P").unwrap();
+        let pic = d.path().join("shot.png");
+        fs::write(&pic, b"\x89PNG").unwrap();
+        let s = m
+            .add_and_index(p.id, SourceKind::Image, "Shot", pic.to_str().unwrap())
+            .unwrap();
+        m.index_source_now(s.id).unwrap();
+        m.store().set_source_digest(s.id, "Roadmap sketch").unwrap();
+        m.index_source_now(s.id).unwrap();
+        let got = m.store().get_source(s.id).unwrap().unwrap();
+        assert_eq!(got.digest.as_deref(), Some("Roadmap sketch"));
+        assert!(!m.store().search(p.id, "roadmap", 5).unwrap().is_empty());
+        assert!(m.store().search(p.id, "whiteboard", 5).unwrap().is_empty());
     }
 }

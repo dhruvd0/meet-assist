@@ -5,6 +5,8 @@ use crate::managers::audio::AudioRecordingManager;
 use crate::managers::transcription::TranscriptionManager;
 use crate::meeting::capture::{MeetingCapture, Utterance};
 use crate::meeting::store::{Meeting, MeetingStatus, ProjectStore, TranscriptLine};
+use crate::meeting::summary::{run_summary_job, SessionSummaryPayload, Summarizer};
+use crate::meeting::system_capture::SystemCapture;
 use anyhow::{anyhow, Result};
 use log::{error, info, warn};
 use serde::{Deserialize, Serialize};
@@ -17,7 +19,10 @@ use tauri::AppHandle;
 use tauri_specta::Event;
 
 /// How long pause/end wait for the transcriber to finish queued utterances.
+#[cfg(not(test))]
 const WORKER_DRAIN_TIMEOUT: Duration = Duration::from_secs(10);
+#[cfg(test)]
+const WORKER_DRAIN_TIMEOUT: Duration = Duration::from_millis(1000);
 
 pub trait Transcriber: Send + Sync {
     fn transcribe(&self, samples: Vec<f32>) -> Result<String>;
@@ -42,10 +47,14 @@ pub trait CaptureHandle: Send {
 }
 
 pub trait CaptureSource: Send + Sync {
-    fn start(&self, tx: mpsc::Sender<Utterance>) -> Result<Box<dyn CaptureHandle>>;
+    /// Start capturing for `meeting_id`, sending utterances to `tx`.
+    fn start(&self, meeting_id: i64, tx: mpsc::Sender<Utterance>)
+        -> Result<Box<dyn CaptureHandle>>;
 }
 
-struct MicCapture {
+/// The production source: the microphone ("me") always, plus system audio
+/// ("them") when enabled, both on one utterance channel.
+struct CombinedCapture {
     app: AppHandle,
 }
 
@@ -58,10 +67,64 @@ impl CaptureHandle for MeetingCapture {
     }
 }
 
-impl CaptureSource for MicCapture {
-    fn start(&self, tx: mpsc::Sender<Utterance>) -> Result<Box<dyn CaptureHandle>> {
+impl CaptureHandle for SystemCapture {
+    fn stop(self: Box<Self>) {
+        SystemCapture::stop(*self);
+    }
+    fn has_failed(&self) -> bool {
+        SystemCapture::has_failed(self)
+    }
+}
+
+/// Both capture streams of one run. Stopping stops both; failure reflects
+/// the microphone only, since a system-audio failure is warned at start.
+struct CombinedHandle {
+    mic: Box<dyn CaptureHandle>,
+    system: Option<Box<dyn CaptureHandle>>,
+}
+
+impl CaptureHandle for CombinedHandle {
+    fn stop(self: Box<Self>) {
+        let CombinedHandle { mic, system } = *self;
+        if let Some(system) = system {
+            system.stop();
+        }
+        mic.stop();
+    }
+    fn has_failed(&self) -> bool {
+        self.mic.has_failed()
+    }
+}
+
+impl CaptureSource for CombinedCapture {
+    fn start(
+        &self,
+        meeting_id: i64,
+        tx: mpsc::Sender<Utterance>,
+    ) -> Result<Box<dyn CaptureHandle>> {
         let settings = crate::settings::get_settings(&self.app);
-        Ok(Box::new(MeetingCapture::start(&settings, &self.app, tx)?))
+        let mic = Box::new(MeetingCapture::start(&settings, &self.app, tx.clone())?);
+        let system: Option<Box<dyn CaptureHandle>> = if settings.meeting_system_audio_enabled {
+            match SystemCapture::start(&settings, &self.app, tx) {
+                Ok(c) => Some(Box::new(c)),
+                Err(e) => {
+                    // The meeting goes on with the microphone alone.
+                    warn!("system audio capture unavailable: {e:#}");
+                    let payload = MeetingCaptureWarningPayload {
+                        meeting_id,
+                        source: "system_audio".into(),
+                        message: format!("{e:#}"),
+                    };
+                    if let Err(e) = payload.emit(&self.app) {
+                        error!("emit capture warning: {e}");
+                    }
+                    None
+                }
+            }
+        } else {
+            None
+        };
+        Ok(Box::new(CombinedHandle { mic, system }))
     }
 }
 
@@ -78,10 +141,13 @@ pub struct TranscriptLinePayload {
     pub line: TranscriptLine,
 }
 
-/// Emitted once per capture run when the microphone stops delivering audio.
+/// Emitted once per capture run when a capture source fails: the
+/// microphone stops delivering audio, or system audio cannot start.
 #[derive(Clone, Debug, Serialize, Deserialize, Type, tauri_specta::Event)]
 pub struct MeetingCaptureWarningPayload {
     pub meeting_id: i64,
+    /// `"microphone"` or `"system_audio"`.
+    pub source: String,
     pub message: String,
 }
 
@@ -110,6 +176,15 @@ pub struct MeetingManager {
     /// True while capture runs; keeps the transcription model warm.
     live: AtomicBool,
     app: Option<AppHandle>,
+    summarizer: Option<Arc<dyn Summarizer>>,
+    /// Serialises summary jobs: the rolling summary is a chain.
+    summary_lock: Arc<Mutex<()>>,
+}
+
+/// Whether transcript text may go to the cloud provider: the assistant
+/// opt-in must be on. No settings (tests) counts as allowed.
+pub fn cloud_allowed(settings: Option<&crate::settings::AppSettings>) -> bool {
+    settings.is_none_or(|s| s.meeting_assistant_enabled)
 }
 
 fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
@@ -117,16 +192,18 @@ fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
 }
 
 /// Stop capture (dropping the utterance sender) and wait for the worker to
-/// transcribe what is already queued.
-fn stop_and_drain(capture: Option<SharedCapture>, worker: Option<JoinHandle<()>>) {
+/// transcribe what is already queued. Returns the worker if it is still busy
+/// after the timeout, so the caller can wait for it before using the lines.
+fn stop_and_drain(
+    capture: Option<SharedCapture>,
+    worker: Option<JoinHandle<()>>,
+) -> Option<JoinHandle<()>> {
     if let Some(shared) = capture {
         if let Some(handle) = lock(&shared).take() {
             handle.stop();
         }
     }
-    let Some(worker) = worker else {
-        return;
-    };
+    let worker = worker?;
     let deadline = Instant::now() + WORKER_DRAIN_TIMEOUT;
     while !worker.is_finished() && Instant::now() < deadline {
         std::thread::sleep(Duration::from_millis(20));
@@ -135,11 +212,13 @@ fn stop_and_drain(capture: Option<SharedCapture>, worker: Option<JoinHandle<()>>
         if worker.join().is_err() {
             error!("meet-transcriber panicked");
         }
+        None
     } else {
         warn!(
-            "meet-transcriber still busy after {}s; leaving it to finish",
-            WORKER_DRAIN_TIMEOUT.as_secs()
+            "meet-transcriber still busy after {:?}; leaving it to finish",
+            WORKER_DRAIN_TIMEOUT
         );
+        Some(worker)
     }
 }
 
@@ -153,12 +232,16 @@ impl MeetingManager {
         Self {
             store,
             transcriber: Arc::new(ModelTranscriber(tm)),
-            capture: Arc::new(MicCapture { app: app.clone() }),
+            capture: Arc::new(CombinedCapture { app: app.clone() }),
             dictation_recording: Arc::new(move || rm.is_recording()),
             active: Mutex::new(None),
             transition: Mutex::new(()),
             live: AtomicBool::new(false),
             app: Some(app.clone()),
+            summarizer: Some(Arc::new(crate::meeting::summary::LlmSummarizer {
+                app: app.clone(),
+            })),
+            summary_lock: Arc::new(Mutex::new(())),
         }
     }
 
@@ -178,6 +261,89 @@ impl MeetingManager {
             transition: Mutex::new(()),
             live: AtomicBool::new(false),
             app: None,
+            summarizer: None,
+            summary_lock: Arc::new(Mutex::new(())),
+        }
+    }
+
+    #[cfg(test)]
+    pub fn with_summarizer(mut self, s: Arc<dyn Summarizer>) -> Self {
+        self.summarizer = Some(s);
+        self
+    }
+
+    /// Summarize a session on a background thread and emit the result.
+    /// No-op without a summarizer.
+    pub fn spawn_summary(&self, session_id: i64) {
+        self.spawn_summaries(vec![session_id], None);
+    }
+
+    /// Summarize sessions one after another (the rolling summary is a chain,
+    /// so they must not run concurrently) on one background thread.
+    /// `pending` is a transcriber still finishing queued utterances; the
+    /// thread joins it first so the summary sees every line.
+    fn spawn_summaries(&self, session_ids: Vec<i64>, pending: Option<JoinHandle<()>>) {
+        let Some(summarizer) = self.summarizer.clone() else {
+            return;
+        };
+        if session_ids.is_empty() {
+            return;
+        }
+        if !cloud_allowed(
+            self.app
+                .as_ref()
+                .map(crate::settings::get_settings)
+                .as_ref(),
+        ) {
+            log::debug!("meeting assistant is off; not sending sessions for summary");
+            return;
+        }
+        let store = Arc::clone(&self.store);
+        let app = self.app.clone();
+        let summary_lock = Arc::clone(&self.summary_lock);
+        let spawned = std::thread::Builder::new()
+            .name("meet-summary".into())
+            .spawn(move || {
+                if let Some(worker) = pending {
+                    if worker.join().is_err() {
+                        error!("meet-transcriber panicked");
+                    }
+                }
+                for session_id in session_ids {
+                    let result = {
+                        let _guard = lock(&summary_lock);
+                        run_summary_job(&store, summarizer.as_ref(), session_id)
+                    };
+                    match result {
+                        Ok(Some(summary)) => {
+                            let Ok(Some(session)) = store.get_session(session_id) else {
+                                continue;
+                            };
+                            let rolling_summary = store
+                                .get_meeting(session.meeting_id)
+                                .ok()
+                                .flatten()
+                                .and_then(|m| m.rolling_summary)
+                                .unwrap_or_default();
+                            if let Some(app) = &app {
+                                let payload = SessionSummaryPayload {
+                                    meeting_id: session.meeting_id,
+                                    session_id,
+                                    summary,
+                                    rolling_summary,
+                                };
+                                if let Err(e) = payload.emit(app) {
+                                    error!("emit session summary: {e}");
+                                }
+                            }
+                        }
+                        Ok(None) => {}
+                        Err(e) => warn!("summary for session {session_id} failed: {e:#}"),
+                    }
+                }
+            });
+        if let Err(e) = spawned {
+            error!("spawn meet-summary: {e}");
         }
     }
 
@@ -248,7 +414,7 @@ impl MeetingManager {
         session_id: i64,
     ) -> Result<(SharedCapture, JoinHandle<()>)> {
         let (tx, rx) = mpsc::channel::<Utterance>();
-        let handle = self.capture.start(tx)?;
+        let handle = self.capture.start(meeting_id, tx)?;
         let shared: SharedCapture = Arc::new(Mutex::new(Some(handle)));
         let store = Arc::clone(&self.store);
         let transcriber = Arc::clone(&self.transcriber);
@@ -301,6 +467,7 @@ impl MeetingManager {
                 if failed {
                     let payload = MeetingCaptureWarningPayload {
                         meeting_id,
+                        source: "microphone".into(),
                         message: "Check the input device, then pause and resume.".into(),
                     };
                     if let Err(e) = payload.emit(&app) {
@@ -486,7 +653,7 @@ impl MeetingManager {
                 a.worker.take(),
             )
         };
-        stop_and_drain(capture, worker);
+        let leftover = stop_and_drain(capture, worker);
         self.live.store(false, Ordering::SeqCst);
         let result = self.store.end_session(session_id).and_then(|()| {
             self.store
@@ -496,6 +663,9 @@ impl MeetingManager {
         // write failed, and the UI must see that.
         *self.lock_active() = None;
         self.emit_state();
+        if result.is_ok() {
+            self.spawn_summaries(vec![session_id], leftover);
+        }
         result
     }
 
@@ -508,7 +678,15 @@ impl MeetingManager {
         }
         self.store.end_open_sessions(meeting_id)?;
         self.store
-            .set_meeting_status(meeting_id, MeetingStatus::Ended)
+            .set_meeting_status(meeting_id, MeetingStatus::Ended)?;
+        let ids = self
+            .store
+            .sessions_without_summary(meeting_id)?
+            .into_iter()
+            .map(|s| s.id)
+            .collect();
+        self.spawn_summaries(ids, None);
+        Ok(())
     }
 }
 
@@ -559,7 +737,11 @@ mod tests {
         }
     }
     impl CaptureSource for FakeSource {
-        fn start(&self, tx: mpsc::Sender<Utterance>) -> anyhow::Result<Box<dyn CaptureHandle>> {
+        fn start(
+            &self,
+            _meeting_id: i64,
+            tx: mpsc::Sender<Utterance>,
+        ) -> anyhow::Result<Box<dyn CaptureHandle>> {
             if self.0.fail_next.swap(false, Ordering::SeqCst) {
                 return Err(anyhow::anyhow!("capture failed"));
             }
@@ -660,6 +842,214 @@ mod tests {
         assert_eq!(lines[0].text, "heard 4800 samples");
         assert_eq!(lines[1].text, "heard 1600 samples");
         assert!(lines.iter().all(|l| l.speaker == "me"));
+    }
+
+    #[test]
+    fn cloud_allowed_requires_the_assistant_opt_in() {
+        assert!(cloud_allowed(None), "no settings (tests) means allowed");
+        let mut s = crate::settings::get_default_settings();
+        assert!(!cloud_allowed(Some(&s)), "assistant is opt-in");
+        s.meeting_assistant_enabled = true;
+        assert!(cloud_allowed(Some(&s)));
+    }
+
+    struct LinesSeen(Mutex<Vec<usize>>);
+    impl Summarizer for LinesSeen {
+        fn summarize_session(
+            &self,
+            _t: &str,
+            _c: &str,
+            l: &[TranscriptLine],
+        ) -> anyhow::Result<crate::meeting::summary::SessionSummary> {
+            self.0.lock().unwrap().push(l.len());
+            Ok(Default::default())
+        }
+        fn merge_rolling(
+            &self,
+            _p: Option<&str>,
+            _n: &crate::meeting::summary::SessionSummary,
+        ) -> anyhow::Result<String> {
+            Ok("rolled".into())
+        }
+    }
+
+    #[test]
+    fn summary_waits_for_a_transcriber_that_outlives_the_drain_timeout() {
+        // Transcription (700 ms) outlasts the 300 ms test drain timeout.
+        let (_d, m, cap, _dict) = mgr_with_delay(false, 2000);
+        let seen = Arc::new(LinesSeen(Mutex::new(vec![])));
+        let m = m.with_summarizer(seen.clone());
+        let meeting = m.start(None, None).unwrap();
+        let sid = m.state().session_id.unwrap();
+        cap.senders.lock().unwrap()[0]
+            .as_ref()
+            .unwrap()
+            .send(Utterance {
+                speaker: "me".into(),
+                samples: vec![0.1; 4800],
+                started_at: 1,
+            })
+            .unwrap();
+        m.end().unwrap();
+        assert!(m.store().session_lines(sid).unwrap().is_empty());
+        wait_lines(&m, meeting.id, 1);
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while m
+            .store()
+            .get_session(sid)
+            .unwrap()
+            .unwrap()
+            .summary
+            .is_none()
+        {
+            assert!(std::time::Instant::now() < deadline, "summary never landed");
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+        assert_eq!(
+            *seen.0.lock().unwrap(),
+            vec![1],
+            "summary saw the late line"
+        );
+    }
+
+    struct SlowSummarizer;
+    impl Summarizer for SlowSummarizer {
+        fn summarize_session(
+            &self,
+            _t: &str,
+            _c: &str,
+            _l: &[TranscriptLine],
+        ) -> anyhow::Result<crate::meeting::summary::SessionSummary> {
+            std::thread::sleep(std::time::Duration::from_millis(200));
+            Ok(crate::meeting::summary::SessionSummary {
+                recap: "done".into(),
+                ..Default::default()
+            })
+        }
+        fn merge_rolling(
+            &self,
+            _p: Option<&str>,
+            _n: &crate::meeting::summary::SessionSummary,
+        ) -> anyhow::Result<String> {
+            Ok("rolled".into())
+        }
+    }
+
+    #[test]
+    fn end_returns_before_the_summary_finishes_and_summary_lands() {
+        let (_d, m, cap, _dict) = mgr(false);
+        let m = m.with_summarizer(Arc::new(SlowSummarizer));
+        let meeting = m.start(None, None).unwrap();
+        let sid = m.state().session_id.unwrap();
+        let tx = cap.senders.lock().unwrap()[0].clone().unwrap();
+        tx.send(Utterance {
+            speaker: "me".into(),
+            samples: vec![0.1; 4800],
+            started_at: 1,
+        })
+        .unwrap();
+        drop(tx);
+        wait_lines(&m, meeting.id, 1);
+        let t0 = std::time::Instant::now();
+        m.end().unwrap();
+        assert!(t0.elapsed() < std::time::Duration::from_millis(50));
+        assert!(m
+            .store()
+            .get_session(sid)
+            .unwrap()
+            .unwrap()
+            .summary
+            .is_none());
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        loop {
+            if m.store()
+                .get_session(sid)
+                .unwrap()
+                .unwrap()
+                .summary
+                .is_some()
+            {
+                break;
+            }
+            assert!(std::time::Instant::now() < deadline, "summary never landed");
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+    }
+
+    struct ChainSummarizer {
+        seen: Mutex<Vec<Option<String>>>,
+    }
+    impl Summarizer for ChainSummarizer {
+        fn summarize_session(
+            &self,
+            _t: &str,
+            _c: &str,
+            _l: &[TranscriptLine],
+        ) -> anyhow::Result<crate::meeting::summary::SessionSummary> {
+            Ok(Default::default())
+        }
+        fn merge_rolling(
+            &self,
+            p: Option<&str>,
+            _n: &crate::meeting::summary::SessionSummary,
+        ) -> anyhow::Result<String> {
+            let first = self.seen.lock().unwrap().is_empty();
+            self.seen.lock().unwrap().push(p.map(String::from));
+            if first {
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            }
+            Ok(format!("{}+", p.unwrap_or("")))
+        }
+    }
+
+    #[test]
+    fn concurrent_summaries_chain_the_rolling_summary() {
+        let (_d, m, _cap, _dict) = mgr(false);
+        let fake = Arc::new(ChainSummarizer {
+            seen: Mutex::new(vec![]),
+        });
+        let m = m.with_summarizer(fake.clone());
+        let meeting = m.store().create_meeting(None, "M").unwrap();
+        let mut ids = vec![];
+        for _ in 0..2 {
+            let s = m.store().create_session(meeting.id).unwrap();
+            m.store().append_line(s.id, "me", "x", 1).unwrap();
+            m.store().end_session(s.id).unwrap();
+            ids.push(s.id);
+        }
+        m.spawn_summary(ids[0]);
+        m.spawn_summary(ids[1]);
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        loop {
+            let done = ids.iter().all(|id| {
+                m.store()
+                    .get_session(*id)
+                    .unwrap()
+                    .unwrap()
+                    .summary
+                    .is_some()
+            });
+            if done {
+                break;
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "summaries never landed"
+            );
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+        let seen = fake.seen.lock().unwrap().clone();
+        assert_eq!(seen.len(), 2);
+        assert_eq!(seen[0], None);
+        assert_eq!(seen[1], Some("+".to_string()));
+        assert_eq!(
+            m.store()
+                .get_meeting(meeting.id)
+                .unwrap()
+                .unwrap()
+                .rolling_summary,
+            Some("++".into())
+        );
     }
 
     #[test]
@@ -843,5 +1233,117 @@ mod tests {
         cap.fail_next.store(true, Ordering::SeqCst);
         assert!(m.start(None, None).is_err());
         assert_eq!(m.store().list_meetings(None).unwrap().len(), before);
+    }
+
+    /// Records stops; reports a preset failure state.
+    struct CountingHandle {
+        stops: Arc<AtomicUsize>,
+        failed: bool,
+    }
+    impl CaptureHandle for CountingHandle {
+        fn stop(self: Box<Self>) {
+            self.stops.fetch_add(1, Ordering::SeqCst);
+        }
+        fn has_failed(&self) -> bool {
+            self.failed
+        }
+    }
+
+    fn counting(failed: bool) -> (Arc<AtomicUsize>, Box<dyn CaptureHandle>) {
+        let stops = Arc::new(AtomicUsize::new(0));
+        let h = Box::new(CountingHandle {
+            stops: Arc::clone(&stops),
+            failed,
+        });
+        (stops, h)
+    }
+
+    #[test]
+    fn combined_handle_stops_both_streams_once() {
+        let (mic_stops, mic) = counting(false);
+        let (sys_stops, sys) = counting(false);
+        let h: Box<dyn CaptureHandle> = Box::new(CombinedHandle {
+            mic,
+            system: Some(sys),
+        });
+        h.stop();
+        assert_eq!(mic_stops.load(Ordering::SeqCst), 1);
+        assert_eq!(sys_stops.load(Ordering::SeqCst), 1);
+
+        let (mic_stops, mic) = counting(false);
+        let h: Box<dyn CaptureHandle> = Box::new(CombinedHandle { mic, system: None });
+        h.stop();
+        assert_eq!(mic_stops.load(Ordering::SeqCst), 1, "mic-only stops");
+    }
+
+    #[test]
+    fn combined_handle_failure_reports_the_microphone_only() {
+        let (_, mic) = counting(false);
+        let (_, sys) = counting(true);
+        let h = CombinedHandle {
+            mic,
+            system: Some(sys),
+        };
+        assert!(!h.has_failed(), "system failure is warned separately");
+        let (_, mic) = counting(true);
+        let h = CombinedHandle { mic, system: None };
+        assert!(h.has_failed());
+    }
+
+    /// A source that, like `CombinedCapture`, runs a mic and a system stream
+    /// on one channel; each emits one utterance as soon as it starts.
+    struct TwoStreamSource;
+    impl CaptureSource for TwoStreamSource {
+        fn start(
+            &self,
+            _meeting_id: i64,
+            tx: mpsc::Sender<Utterance>,
+        ) -> anyhow::Result<Box<dyn CaptureHandle>> {
+            let sys_tx = tx.clone();
+            tx.send(Utterance {
+                speaker: "me".into(),
+                samples: vec![0.1; 4800],
+                started_at: 1,
+            })?;
+            sys_tx.send(Utterance {
+                speaker: "them".into(),
+                samples: vec![0.1; 3200],
+                started_at: 2,
+            })?;
+            struct Holds(#[allow(dead_code)] mpsc::Sender<Utterance>);
+            impl CaptureHandle for Holds {
+                fn stop(self: Box<Self>) {}
+                fn has_failed(&self) -> bool {
+                    false
+                }
+            }
+            Ok(Box::new(CombinedHandle {
+                mic: Box::new(Holds(tx)),
+                system: Some(Box::new(Holds(sys_tx))),
+            }))
+        }
+    }
+
+    #[test]
+    fn mic_and_system_utterances_store_both_speakers_in_order() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = Arc::new(ProjectStore::open(dir.path().join("meet.db")).unwrap());
+        let m = MeetingManager::new_for_test(
+            store,
+            Arc::new(FakeTranscriber {
+                calls: AtomicUsize::new(0),
+                fail_first: false,
+                delay_ms: 0,
+            }),
+            Arc::new(TwoStreamSource),
+            Arc::new(AtomicBool::new(false)),
+        );
+        let meeting = m.start(None, None).unwrap();
+        let lines = wait_lines(&m, meeting.id, 2);
+        let speakers: Vec<&str> = lines.iter().map(|l| l.speaker.as_str()).collect();
+        assert_eq!(speakers, vec!["me", "them"]);
+        assert_eq!(lines[0].text, "heard 4800 samples");
+        assert_eq!(lines[1].text, "heard 3200 samples");
+        m.end().unwrap();
     }
 }

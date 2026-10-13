@@ -50,6 +50,11 @@ export const MeetingList: React.FC = () => {
                 onClick={() => openMeeting(m.id)}
               >
                 <div className="text-sm font-semibold text-text">{m.title}</div>
+                {m.rolling_summary && (
+                  <div className="text-xs text-text/60 truncate max-w-md">
+                    {m.rolling_summary.split("\n")[0]}
+                  </div>
+                )}
                 <div className="text-xs text-mid-gray">
                   {formatRelativeTime(
                     String(Math.floor(m.updated_at / 1000)),

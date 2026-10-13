@@ -710,6 +710,8 @@ pub fn run(cli_args: CliArgs) {
             shortcut::change_auto_submit_key_setting,
             shortcut::change_post_process_enabled_setting,
             shortcut::change_meeting_assistant_setting,
+            shortcut::change_meeting_system_audio_setting,
+            shortcut::change_meeting_vision_setting,
             shortcut::change_meeting_provider_setting,
             shortcut::change_meeting_sensitivity_setting,
             shortcut::change_meeting_observer_interval_setting,
@@ -832,6 +834,7 @@ pub fn run(cli_args: CliArgs) {
             commands::meeting::hide_intervention_window,
             commands::meeting::focus_meeting,
             commands::meeting::get_observer_readiness,
+            commands::meeting::summarize_session,
         ])
         .events(collect_events![
             managers::history::HistoryUpdatePayload,
@@ -841,6 +844,7 @@ pub fn run(cli_args: CliArgs) {
             meeting::session::MeetingStatePayload,
             meeting::session::TranscriptLinePayload,
             meeting::session::MeetingCaptureWarningPayload,
+            meeting::summary::SessionSummaryPayload,
             meeting::observer::InterventionPayload,
             meeting::observer::ObserverStatusPayload,
             commands::meeting::OpenMeetingPayload,

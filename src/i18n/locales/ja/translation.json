@@ -81,7 +81,10 @@
         "add": "Could not add source.",
         "remove": "Could not remove source.",
         "reindex": "Could not re-index source."
-      }
+      },
+      "digestLabel": "Digest",
+      "digestByModel": "Summarized by {{model}}",
+      "byModel": "by model"
     },
     "errors": {
       "load": "Could not load projects.",
@@ -122,7 +125,8 @@
       "title": "Transcript",
       "empty": "Nothing transcribed yet. Say something.",
       "session": "Session {{n}}",
-      "me": "You"
+      "me": "You",
+      "them": "Them"
     },
     "errors": {
       "load": "Could not load meetings.",
@@ -155,6 +159,22 @@
         "missing_api_key": "No API key for {{detail}}. Add one under Post Processing settings.",
         "no_model": "No model is selected for {{detail}}. Pick one under Post Processing settings."
       }
+    },
+    "summary": {
+      "title": "Summary",
+      "decisions": "Decisions",
+      "openQuestions": "Open questions",
+      "actionItems": "Action items",
+      "recap": "Recap",
+      "rolling": "Live summary",
+      "none": "No summary yet.",
+      "retry": "Retry",
+      "generating": "Generating summary...",
+      "failed": "Summary could not be read."
+    },
+    "capture": {
+      "systemAudioUnavailable": "System audio is unavailable; transcribing your microphone only. {{message}}",
+      "systemAudioHint": "On macOS, allow Meet Assist under System Settings, Privacy & Security, Screen & System Audio Recording, then end and start the meeting again."
     }
   },
   "onboarding": {
@@ -257,6 +277,19 @@
         "checkFailed": "権限の確認に失敗しました。もう一度お試しください。",
         "requestFailed": "権限のリクエストに失敗しました。もう一度お試しください。"
       }
+    },
+    "assistant": {
+      "title": "Set up your assistant",
+      "description": "The meeting assistant and summaries use an LLM provider. Pick one, add your API key if needed, and test the connection.",
+      "test": "Test connection",
+      "testing": "Testing...",
+      "success_one": "{{count}} model available.",
+      "success_other": "{{count}} models available.",
+      "failure": "Connection failed: {{error}}",
+      "continue": "Continue",
+      "skip": "Skip for now",
+      "hint": "You can change this later under Post Processing settings.",
+      "unsupported": "Apple Intelligence cannot be used for meetings. Pick another provider."
     }
   },
   "modelSelector": {
@@ -820,6 +853,10 @@
       "beep": {
         "label": "Beep on nudge",
         "description": "Play a short sound when the assistant speaks up."
+      },
+      "systemAudio": {
+        "label": "Capture system audio",
+        "description": "Hear the other side of the call. Takes effect when the next meeting starts."
       }
     }
   },

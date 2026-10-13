@@ -90,6 +90,9 @@ hf-hub = { git = "https://github.com/cjpais/hf-hub", branch = "cancellable-downl
 ] }
 ignore = "0.4"
 html2text = "0.15"
+handy-cpal = "=0.18.2"
+rubato = "=5.0.0"
+base64 = "0.22"
 
 [target.'cfg(unix)'.dependencies]
 signal-hook = "0.3"

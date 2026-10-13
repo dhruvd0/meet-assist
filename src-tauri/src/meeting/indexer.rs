@@ -219,6 +219,32 @@ pub fn copy_image_into(source_path: &Path, dest_dir: &Path, source_id: i64) -> R
     Ok(dest)
 }
 
+pub fn image_digest_prompt() -> String {
+    "Describe this image for someone who cannot see it, in at most 120 words: what it shows, any text in it, and why it might matter in a meeting.".to_string()
+}
+
+/// Anthropic caps the base64 payload at 5 MB; base64 inflates by 4/3, so
+/// 3.7 MB of raw bytes (about 4.93 MB encoded) stays under it.
+const MAX_VISION_IMAGE_BYTES: u64 = 3_700_000;
+
+/// Read an image for a vision request: known type, at most 3.7 MB.
+pub fn read_image_for_vision(path: &Path) -> Result<(&'static str, Vec<u8>)> {
+    let ext = path
+        .extension()
+        .map(|e| e.to_string_lossy().to_ascii_lowercase())
+        .unwrap_or_default();
+    let mime = crate::llm_client::mime_for_extension(&ext)
+        .ok_or_else(|| anyhow!("unsupported image type: {:?}", ext))?;
+    let len = std::fs::metadata(path)
+        .with_context(|| format!("stat {}", path.display()))?
+        .len();
+    if len > MAX_VISION_IMAGE_BYTES {
+        return Err(anyhow!("image too large for vision: {} bytes", len));
+    }
+    let bytes = std::fs::read(path).with_context(|| format!("read {}", path.display()))?;
+    Ok((mime, bytes))
+}
+
 pub fn chunks_for_caption(caption: &str) -> Vec<(String, String)> {
     chunks_for_text(caption)
 }
@@ -227,6 +253,20 @@ pub fn chunks_for_caption(caption: &str) -> Vec<(String, String)> {
 mod tests {
     use super::*;
     use std::fs;
+
+    #[test]
+    fn read_image_for_vision_rejects_unknown_ext_and_oversize() {
+        let dir = tempfile::tempdir().unwrap();
+        let bad = dir.path().join("a.xyz");
+        fs::write(&bad, b"x").unwrap();
+        assert!(read_image_for_vision(&bad).is_err());
+        let big = dir.path().join("b.png");
+        fs::write(&big, vec![0u8; 3_700_001]).unwrap();
+        assert!(read_image_for_vision(&big).is_err());
+        let ok = dir.path().join("c.png");
+        fs::write(&ok, b"x").unwrap();
+        assert_eq!(read_image_for_vision(&ok).unwrap().0, "image/png");
+    }
 
     #[test]
     fn text_source_yields_chunks_with_empty_path() {

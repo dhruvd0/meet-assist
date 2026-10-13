@@ -2584,6 +2584,7 @@ name = "handy"
 version = "0.9.8"
 dependencies = [
  "anyhow",
+ "base64 0.22.1",
  "chrono",
  "clap",
  "earshot",
@@ -2594,6 +2595,7 @@ dependencies = [
  "futures-util",
  "gtk",
  "gtk-layer-shell",
+ "handy-cpal",
  "handy-keys",
  "handy-recorder",
  "hf-hub",
@@ -2613,6 +2615,7 @@ dependencies = [
  "regex",
  "reqwest 0.12.28",
  "rodio",
+ "rubato",
  "rusqlite",
  "rusqlite_migration",
  "rustfft",
