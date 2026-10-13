@@ -276,11 +276,13 @@
       "description": "The meeting assistant and summaries use an LLM provider. Pick one, add your API key if needed, and test the connection.",
       "test": "Test connection",
       "testing": "Testing...",
-      "success": "Connected. {{count}} models available.",
+      "success_one": "{{count}} model available.",
+      "success_other": "{{count}} models available.",
       "failure": "Connection failed: {{error}}",
       "continue": "Continue",
       "skip": "Skip for now",
-      "hint": "You can change this later under Post Processing settings."
+      "hint": "You can change this later under Post Processing settings.",
+      "unsupported": "Apple Intelligence cannot be used for meetings. Pick another provider."
     }
   },
   "modelSelector": {

@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { commands } from "@/bindings";
 import { Button } from "../ui/Button";
 import { ProviderSelect } from "../settings/PostProcessingSettingsApi/ProviderSelect";
+import { BaseUrlField } from "../settings/PostProcessingSettingsApi/BaseUrlField";
 import { ApiKeyField } from "../settings/PostProcessingSettingsApi/ApiKeyField";
 import { ModelSelect } from "../settings/PostProcessingSettingsApi/ModelSelect";
 import { usePostProcessProviderState } from "../settings/PostProcessingSettingsApi/usePostProcessProviderState";
@@ -55,48 +56,84 @@ export const AssistantOnboarding: React.FC<AssistantOnboardingProps> = ({
       </div>
 
       <div className="max-w-xl w-full flex flex-col gap-3">
-        <ProviderSelect
-          options={state.providerOptions}
-          value={state.selectedProviderId}
-          onChange={state.handleProviderSelect}
-        />
-        <ApiKeyField
-          value={state.apiKey}
-          onBlur={state.handleApiKeyChange}
-          disabled={state.isApiKeyUpdating}
-          className="min-w-0"
-        />
-        <ModelSelect
-          value={state.model}
-          options={state.modelOptions}
-          disabled={state.isModelUpdating}
-          isLoading={state.isFetchingModels}
-          onSelect={state.handleModelSelect}
-          onCreate={state.handleModelCreate}
-          onBlur={() => {}}
-          className="min-w-0"
-        />
+        <label className="flex flex-col gap-1 text-sm">
+          {t("settings.postProcessing.api.provider.title")}
+          <ProviderSelect
+            options={state.providerOptions}
+            value={state.selectedProviderId}
+            onChange={state.handleProviderSelect}
+          />
+        </label>
+        {state.isAppleProvider ? (
+          <p className="text-sm text-red-500">
+            {t("onboarding.assistant.unsupported")}
+          </p>
+        ) : (
+          <>
+            {state.isCustomProvider && (
+              <label className="flex flex-col gap-1 text-sm">
+                {t("settings.postProcessing.api.baseUrl.title")}
+                <BaseUrlField
+                  value={state.baseUrl}
+                  onBlur={state.handleBaseUrlChange}
+                  disabled={state.isBaseUrlUpdating}
+                  placeholder={t(
+                    "settings.postProcessing.api.baseUrl.placeholder",
+                  )}
+                  className="min-w-0"
+                />
+              </label>
+            )}
+            <label className="flex flex-col gap-1 text-sm">
+              {t("settings.postProcessing.api.apiKey.title")}
+              <ApiKeyField
+                value={state.apiKey}
+                onBlur={state.handleApiKeyChange}
+                disabled={state.isApiKeyUpdating}
+                placeholder={t(
+                  "settings.postProcessing.api.apiKey.placeholder",
+                )}
+                className="min-w-0"
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-sm">
+              {t("settings.postProcessing.api.model.title")}
+              <ModelSelect
+                value={state.model}
+                options={state.modelOptions}
+                disabled={state.isModelUpdating}
+                isLoading={state.isFetchingModels}
+                onSelect={state.handleModelSelect}
+                onCreate={state.handleModelCreate}
+                onBlur={() => {}}
+                className="min-w-0"
+              />
+            </label>
+          </>
+        )}
         <div className="flex items-center gap-3">
           <Button
             variant="secondary"
             size="sm"
             onClick={runTest}
-            disabled={test.status === "testing"}
+            disabled={test.status === "testing" || state.isAppleProvider}
           >
             {test.status === "testing"
               ? t("onboarding.assistant.testing")
               : t("onboarding.assistant.test")}
           </Button>
-          {test.status === "success" && (
-            <span className="text-sm text-green-500">
-              {t("onboarding.assistant.success", { count: test.count })}
-            </span>
-          )}
-          {test.status === "failure" && (
-            <span className="text-sm text-red-500">
-              {t("onboarding.assistant.failure", { error: test.error })}
-            </span>
-          )}
+          <div role="status" aria-live="polite">
+            {test.status === "success" && (
+              <span className="text-sm text-green-500">
+                {t("onboarding.assistant.success", { count: test.count })}
+              </span>
+            )}
+            {test.status === "failure" && (
+              <span className="text-sm text-red-500">
+                {t("onboarding.assistant.failure", { error: test.error })}
+              </span>
+            )}
+          </div>
         </div>
         <p className="text-xs text-text/50">{t("onboarding.assistant.hint")}</p>
       </div>
