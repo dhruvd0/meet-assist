@@ -46,8 +46,16 @@ export const TranscriptThread: React.FC<{
                 </div>
                 {lines.map((l) => (
                   <div key={l.id} className="flex gap-2 text-sm">
-                    <span className="shrink-0 text-logo-primary font-semibold">
-                      {t("meetings.transcript.me")}
+                    <span
+                      className={`shrink-0 font-semibold ${
+                        l.speaker === "them"
+                          ? "text-text/70"
+                          : "text-logo-primary"
+                      }`}
+                    >
+                      {l.speaker === "them"
+                        ? t("meetings.transcript.them")
+                        : t("meetings.transcript.me")}
                     </span>
                     <span className="text-text">{l.text}</span>
                   </div>

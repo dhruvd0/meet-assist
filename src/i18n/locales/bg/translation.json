@@ -124,7 +124,8 @@
       "title": "Transcript",
       "empty": "Nothing transcribed yet. Say something.",
       "session": "Session {{n}}",
-      "me": "You"
+      "me": "You",
+      "them": "Them"
     },
     "errors": {
       "load": "Could not load meetings.",
@@ -168,6 +169,10 @@
       "none": "No summary yet.",
       "retry": "Retry",
       "generating": "Generating summary..."
+    },
+    "capture": {
+      "systemAudioUnavailable": "System audio is unavailable; transcribing your microphone only. {{message}}",
+      "systemAudioHint": "On macOS, allow Meet Assist under System Settings, Privacy & Security, Screen & System Audio Recording, then end and start the meeting again."
     }
   },
   "onboarding": {
@@ -846,6 +851,10 @@
       "beep": {
         "label": "Beep on nudge",
         "description": "Play a short sound when the assistant speaks up."
+      },
+      "systemAudio": {
+        "label": "Capture system audio",
+        "description": "Hear the other side of the call. Takes effect when the next meeting starts."
       }
     }
   },
