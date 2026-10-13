@@ -36,6 +36,7 @@ interface MeetingStore {
 }
 
 const t = (key: string) => i18n.t(key);
+const idleObserver = { tools_unavailable: false, consecutive_failures: 0 };
 const idle: MeetingStatePayload = {
   meeting_id: null,
   session_id: null,
@@ -47,7 +48,7 @@ export const useMeetingStore = create<MeetingStore>((set, get) => ({
   activeMeetingId: null,
   detail: null,
   live: idle,
-  observer: { tools_unavailable: false, consecutive_failures: 0 },
+  observer: idleObserver,
   loading: false,
 
   loadMeetings: async (projectId = null) => {
@@ -62,7 +63,7 @@ export const useMeetingStore = create<MeetingStore>((set, get) => ({
   },
 
   openMeeting: async (id) => {
-    set({ activeMeetingId: id, detail: null });
+    set({ activeMeetingId: id, detail: null, observer: idleObserver });
     const res = await commands.getMeetingDetail(id);
     if (res.status !== "ok") {
       toast.error(`${t("meetings.errors.load")} ${res.error}`);
@@ -71,7 +72,8 @@ export const useMeetingStore = create<MeetingStore>((set, get) => ({
     if (get().activeMeetingId === id) set({ detail: res.data });
   },
 
-  closeMeeting: () => set({ activeMeetingId: null, detail: null }),
+  closeMeeting: () =>
+    set({ activeMeetingId: null, detail: null, observer: idleObserver }),
 
   startMeeting: async (projectId, meetingId) => {
     const res = await commands.startMeeting(projectId, meetingId);

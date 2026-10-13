@@ -10,12 +10,14 @@ import { ToggleSwitch } from "../../ui/ToggleSwitch";
 
 const MIN_INTERVAL = 10;
 const MAX_INTERVAL = 120;
+const DEFAULT_INTERVAL_SECS = 20;
 
 export const MeetingAssistantSettings: React.FC = () => {
   const { t } = useTranslation();
   const { settings, getSetting, updateSetting, isUpdating } = useSettings();
 
-  const interval = getSetting("meeting_observer_interval_secs") ?? 30;
+  const interval =
+    getSetting("meeting_observer_interval_secs") ?? DEFAULT_INTERVAL_SECS;
   const [draft, setDraft] = useState(String(interval));
   useEffect(() => setDraft(String(interval)), [interval]);
 
