@@ -1,1 +1,164 @@
-// Filled in by a later task of docs/superpowers/plans/2026-10-13-projects-and-sources.md
+//! Turns a source into searchable chunks. Pure functions over the
+//! filesystem and network so the store and manager stay thin.
+
+use crate::meeting::chunk::{chunk_text, MAX_CHUNK_CHARS};
+use anyhow::{anyhow, Context, Result};
+use std::path::Path;
+
+pub const MAX_FILE_BYTES: u64 = 524_288;
+
+pub fn is_probably_binary(bytes: &[u8]) -> bool {
+    bytes.iter().take(8192).any(|b| *b == 0)
+}
+
+pub fn chunks_for_text(text: &str) -> Vec<(String, String)> {
+    chunk_text(text, MAX_CHUNK_CHARS)
+        .into_iter()
+        .map(|c| (String::new(), c))
+        .collect()
+}
+
+fn read_text_file(path: &Path) -> Result<String> {
+    let meta = std::fs::metadata(path).with_context(|| format!("stat {}", path.display()))?;
+    if meta.len() > MAX_FILE_BYTES {
+        return Err(anyhow!(
+            "{} is {} bytes, over the {} byte limit",
+            path.display(),
+            meta.len(),
+            MAX_FILE_BYTES
+        ));
+    }
+    let bytes = std::fs::read(path).with_context(|| format!("read {}", path.display()))?;
+    if is_probably_binary(&bytes) {
+        return Err(anyhow!("{} looks binary", path.display()));
+    }
+    String::from_utf8(bytes).map_err(|_| anyhow!("{} is not UTF-8", path.display()))
+}
+
+pub fn chunks_for_file(path: &Path) -> Result<Vec<(String, String)>> {
+    let text = read_text_file(path)?;
+    let name = path
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_default();
+    Ok(chunk_text(&text, MAX_CHUNK_CHARS)
+        .into_iter()
+        .map(|c| (name.clone(), c))
+        .collect())
+}
+
+pub fn chunks_for_folder(root: &Path) -> Result<Vec<(String, String)>> {
+    if !root.is_dir() {
+        return Err(anyhow!("{} is not a directory", root.display()));
+    }
+    let mut out: Vec<(String, String)> = Vec::new();
+    let walker = ignore::WalkBuilder::new(root)
+        .hidden(true)
+        .git_ignore(true)
+        .git_global(true)
+        .git_exclude(true)
+        .build();
+    for entry in walker {
+        let entry = match entry {
+            Ok(e) => e,
+            Err(e) => {
+                log::debug!("skip walk entry: {}", e);
+                continue;
+            }
+        };
+        if !entry.file_type().map(|t| t.is_file()).unwrap_or(false) {
+            continue;
+        }
+        let path = entry.path();
+        let text = match read_text_file(path) {
+            Ok(t) => t,
+            Err(e) => {
+                log::debug!("skip {}: {}", path.display(), e);
+                continue;
+            }
+        };
+        let rel = path
+            .strip_prefix(root)
+            .unwrap_or(path)
+            .components()
+            .map(|c| c.as_os_str().to_string_lossy().to_string())
+            .collect::<Vec<_>>()
+            .join("/");
+        for c in chunk_text(&text, MAX_CHUNK_CHARS) {
+            out.push((rel.clone(), c));
+        }
+    }
+    out.sort_by(|a, b| a.0.cmp(&b.0));
+    Ok(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    #[test]
+    fn text_source_yields_chunks_with_empty_path() {
+        let chunks = chunks_for_text("one\n\ntwo");
+        assert_eq!(chunks.len(), 1);
+        assert_eq!(chunks[0].0, "");
+    }
+
+    #[test]
+    fn file_source_uses_file_name_as_path() {
+        let dir = tempfile::tempdir().unwrap();
+        let f = dir.path().join("notes.md");
+        fs::write(&f, "hello").unwrap();
+        let chunks = chunks_for_file(&f).unwrap();
+        assert_eq!(chunks[0].0, "notes.md");
+        assert_eq!(chunks[0].1, "hello");
+    }
+
+    #[test]
+    fn file_over_size_cap_is_error() {
+        let dir = tempfile::tempdir().unwrap();
+        let f = dir.path().join("big.txt");
+        fs::write(&f, vec![b'a'; (MAX_FILE_BYTES + 1) as usize]).unwrap();
+        assert!(chunks_for_file(&f).is_err());
+    }
+
+    #[test]
+    fn folder_respects_gitignore_and_skips_binary_and_hidden() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        fs::write(root.join(".gitignore"), "ignored/\n*.log\n").unwrap();
+        fs::create_dir_all(root.join("ignored")).unwrap();
+        fs::write(root.join("ignored/secret.txt"), "should not index").unwrap();
+        fs::write(root.join("app.log"), "log line").unwrap();
+        fs::create_dir_all(root.join("src")).unwrap();
+        fs::write(root.join("src/main.rs"), "fn main() {}").unwrap();
+        fs::write(root.join("blob.bin"), b"\x00\x01\x02binary").unwrap();
+        fs::create_dir_all(root.join(".git")).unwrap();
+        fs::write(root.join(".git/config"), "[core]").unwrap();
+        fs::write(root.join("README.md"), "readme").unwrap();
+
+        let chunks = chunks_for_folder(root).unwrap();
+        let paths: Vec<&str> = chunks.iter().map(|c| c.0.as_str()).collect();
+        assert_eq!(paths, vec!["README.md", "src/main.rs"]);
+    }
+
+    #[test]
+    fn folder_skips_oversize_files_without_failing() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(
+            dir.path().join("big.txt"),
+            vec![b'a'; (MAX_FILE_BYTES + 1) as usize],
+        )
+        .unwrap();
+        fs::write(dir.path().join("small.txt"), "ok").unwrap();
+        let chunks = chunks_for_folder(dir.path()).unwrap();
+        assert_eq!(chunks.len(), 1);
+        assert_eq!(chunks[0].0, "small.txt");
+    }
+
+    #[test]
+    fn binary_detection() {
+        assert!(is_probably_binary(b"abc\x00def"));
+        assert!(!is_probably_binary("plain text é".as_bytes()));
+    }
+}
