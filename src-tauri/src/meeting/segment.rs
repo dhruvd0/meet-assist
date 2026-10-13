@@ -125,7 +125,7 @@ mod tests {
             seg.push(Some(&speech_frame()));
         }
         for _ in 0..40 {
-            if let Some(_) = seg.push(None) {
+            if seg.push(None).is_some() {
                 panic!("5 frames (100 ms) must be dropped");
             }
         }

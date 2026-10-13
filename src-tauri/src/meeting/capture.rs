@@ -13,6 +13,8 @@ use std::sync::{mpsc, Arc};
 
 pub struct Utterance {
     pub samples: Vec<f32>,
+    /// Capture time in ms; consumed by the system-audio path in a later plan.
+    #[allow(dead_code)]
     pub captured_at: i64,
 }
 
@@ -72,6 +74,8 @@ impl Sink for MeetingSink {
 
 pub struct MeetingCapture {
     recorder: Recorder<MeetingSink>,
+    /// Set by the recorder error callback; read via `has_failed`.
+    #[allow(dead_code)]
     failed: Arc<AtomicBool>,
 }
 
@@ -104,6 +108,8 @@ impl MeetingCapture {
         Ok(Self { recorder, failed })
     }
 
+    /// Whether the recorder reported a failure; polled by a later plan.
+    #[allow(dead_code)]
     pub fn has_failed(&self) -> bool {
         self.failed.load(Ordering::Acquire)
     }

@@ -46,24 +46,24 @@ Both pipelines share `TranscriptionManager`, the model store, settings, the LLM 
 
 ### Existing (Meet Assist)
 
-| Path                  | Role                                                                                                                                                                                                                                 |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `meeting/store.rs`    | SQLite (WAL journal) tables `projects`, `sources`, and FTS5 `source_chunks` with the `porter unicode61` tokenizer. Search ANDs tokens, falls back to OR when that finds nothing, and returns the raw `bm25` score (lower is better). |
-| `meeting/chunk.rs`    | Paragraph-aware chunking                                                                                                                                                                                                             |
-| `meeting/indexer.rs`  | Source indexing: text, file, folder, link, and image caption to FTS5 chunks. Folder walks are capped by files, entries, and total bytes.                                                                                             |
-| `meeting/manager.rs`  | `ProjectManager`: Tauri state, background indexing thread (resumes `pending` sources at startup, survives indexer panics), `source-status-payload` event                                                                             |
-| `commands/project.rs` | Project and source CRUD, `search_sources`, `pick_source_path`                                                                                                                                                                        |
+| Path                  | Role                                                                                                                                                                                                                                                                             |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `meeting/store.rs`    | SQLite (WAL journal) tables `projects`, `sources`, `meetings`, `sessions`, `transcript_lines`, and FTS5 `source_chunks` with the `porter unicode61` tokenizer. Search ANDs tokens, falls back to OR when that finds nothing, and returns the raw `bm25` score (lower is better). |
+| `meeting/chunk.rs`    | Paragraph-aware chunking                                                                                                                                                                                                                                                         |
+| `meeting/indexer.rs`  | Source indexing: text, file, folder, link, and image caption to FTS5 chunks. Folder walks are capped by files, entries, and total bytes.                                                                                                                                         |
+| `meeting/manager.rs`  | `ProjectManager`: Tauri state, background indexing thread (resumes `pending` sources at startup, survives indexer panics), `source-status-payload` event                                                                                                                         |
+| `commands/project.rs` | Project and source CRUD, `search_sources`, `pick_source_path`                                                                                                                                                                                                                    |
+| `meeting/segment.rs`  | Utterance segmentation over VAD frames                                                                                                                                                                                                                                           |
+| `meeting/capture.rs`  | `MeetingCapture`: mic-only capture, 16 kHz mono, `CaptureVad`, emits `Utterance`                                                                                                                                                                                                 |
+| `meeting/session.rs`  | `MeetingManager` (Tauri state). Session state machine `Idle -> Live <-> Paused -> Ended`, plus the transcriber thread that feeds utterances to `TranscriptionManager::transcribe()` and appends `TranscriptLine`. Emits `meeting-state-payload` and `transcript-line-payload`.   |
+| `commands/meeting.rs` | Meeting list, detail, start, pause, resume, end, update, delete commands                                                                                                                                                                                                         |
 
 ### Planned (meeting subsystem)
 
 | Path                                                          | Role                                                                                                                                                                                           |
 | ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `meeting/mod.rs`                                              | `MeetingManager`, Tauri state. Session state machine `Idle -> Live <-> Paused -> Ended`.                                                                                                       |
-| `meeting/capture.rs`                                          | `MeetingCapture`: mic plus system audio, both resampled to 16 kHz mono, one `CaptureVad` per source, emits `Utterance { speaker, samples, started_at }`.                                       |
-| `meeting/transcriber.rs`                                      | Worker thread. Utterances in order to `TranscriptionManager::transcribe()`. Appends `TranscriptLine`, emits `meeting:transcript-line`.                                                         |
 | `meeting/observer.rs`                                         | Timer loop, default 20 s. Builds the judge prompt, calls `llm_client` with a JSON schema, applies 60 s cooldown and dedupe, fires beep and `meeting:intervention`.                             |
 | `meeting/summary.rs`                                          | Session summary on end, then rolling meeting summary merge.                                                                                                                                    |
-| `meeting/store.rs` (meeting tables)                           | Extends the existing store with `meetings`, `sessions`, `transcript_lines`, `interventions`.                                                                                                   |
 | `audio_toolkit/audio/system_capture/{macos,windows,linux}.rs` | Trait `SystemCapture { start(cb), stop() }`. macOS CoreAudio process tap (14.2+) with ScreenCaptureKit fallback; Windows WASAPI loopback; Linux PulseAudio/PipeWire monitor via cpal.          |
 | `commands/meeting.rs`                                         | `list_meetings`, `get_meeting`, `start_meeting`, `pause_meeting`, `resume_meeting`, `end_meeting`, `update_meeting_context`, `update_meeting_title`, `delete_meeting`, `dismiss_intervention`. |
 
@@ -112,9 +112,9 @@ Sensitivity setting adds one instruction: low restricts to loop and explicit stu
 
 ## Events backend to frontend
 
-Existing: `source-status-payload` (tauri-specta derives the name from `SourceStatusPayload`; the frontend listens via `events.sourceStatusPayload`).
+Existing: `meeting-state-payload` and `transcript-line-payload` (from `MeetingStatePayload` and `TranscriptLinePayload`; the frontend uses `events.meetingStatePayload` and `events.transcriptLinePayload`), `source-status-payload` (tauri-specta derives the name from `SourceStatusPayload`; the frontend listens via `events.sourceStatusPayload`).
 
-Planned: `meeting:state`, `meeting:transcript-line`, `meeting:intervention`, `meeting:capture-warning`, `meeting:observer-error`.
+Planned: `meeting:intervention`, `meeting:capture-warning`, `meeting:observer-error`.
 
 ## Frontend (`src/`)
 
@@ -131,23 +131,21 @@ Planned: `meeting:state`, `meeting:transcript-line`, `meeting:intervention`, `me
 
 ### Existing (Meet Assist)
 
-| Path                                      | Role                                                                                                         |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `stores/projectStore.ts`                  | Zustand store for projects and sources, subscribes to `source-status-payload` (`events.sourceStatusPayload`) |
-| `components/projects/ProjectsSection.tsx` | Section root: loads projects, subscribes to status events, reloads open project's sources on mount           |
-| `components/projects/ProjectList.tsx`     | Landing screen, first sidebar entry                                                                          |
-| `components/projects/ProjectDetail.tsx`   | Brief editor and sources list                                                                                |
+| Path                                      | Role                                                                                                                                                |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `stores/projectStore.ts`                  | Zustand store for projects and sources, subscribes to `source-status-payload` (`events.sourceStatusPayload`)                                        |
+| `components/projects/ProjectsSection.tsx` | Section root: loads projects, subscribes to status events, reloads open project's sources on mount                                                  |
+| `components/projects/ProjectList.tsx`     | Landing screen, first sidebar entry                                                                                                                 |
+| `components/projects/ProjectDetail.tsx`   | Brief editor and sources list                                                                                                                       |
+| `stores/meetingStore.ts`                  | Zustand store for the meeting list, active meeting, and live transcript buffer; subscribes to `meeting-state-payload` and `transcript-line-payload` |
+| `components/meetings/*`                   | Meetings section: list, detail with live transcript, controls                                                                                       |
 
 ### Planned
 
-| Path                                      | Role                                                                                                 |
-| ----------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `stores/meetingStore.ts`                  | Meeting list, active meeting, live transcript buffer, interventions. Subscribes to the events above. |
-| `components/meetings/MeetingList.tsx`     | Landing screen, first sidebar entry                                                                  |
-| `components/meetings/MeetingDetail.tsx`   | Title, controls, context editor, transcript thread by session, intervention timeline, summaries      |
-| `components/meetings/MeetingControls.tsx` | Start / Pause / Resume / End, shared with tray actions                                               |
-| `components/settings/meeting/`            | Provider, sensitivity, observer interval, system-audio source, beep, keep-audio toggle               |
-| `intervention/`                           | Separate window entry for the floating intervention card, same pattern as `overlay/`                 |
+| Path                           | Role                                                                                   |
+| ------------------------------ | -------------------------------------------------------------------------------------- |
+| `components/settings/meeting/` | Provider, sensitivity, observer interval, system-audio source, beep, keep-audio toggle |
+| `intervention/`                | Separate window entry for the floating intervention card, same pattern as `overlay/`   |
 
 ## Failure handling (planned)
 
@@ -161,7 +159,7 @@ Planned: `meeting:state`, `meeting:transcript-line`, `meeting:intervention`, `me
 
 1. Docs and vision.
 2. Projects and sources: store, indexer, FTS5, project UI. (done)
-3. Meetings under projects: store, commands, list and detail UI, mic-only capture and transcript.
+3. Meetings under projects: store, commands, list and detail UI, mic-only capture and transcript. (done)
 4. Tool calling in `llm_client`, observer loop, intervention window, beep.
 5. System audio capture, macOS first.
 6. Summaries, image digests, continue polish, onboarding step.

@@ -9,6 +9,7 @@ use anyhow::{anyhow, Result};
 use log::{error, info, warn};
 use serde::{Deserialize, Serialize};
 use specta::Type;
+#[cfg(test)]
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
 use tauri::AppHandle;
@@ -100,6 +101,7 @@ impl MeetingManager {
         }
     }
 
+    #[cfg(test)]
     pub fn new_for_test(
         store: Arc<ProjectStore>,
         transcriber: Arc<dyn Transcriber>,
@@ -205,6 +207,7 @@ impl MeetingManager {
 
     /// Public for tests and for a future system-audio path; the worker uses
     /// the same function.
+    #[allow(dead_code)]
     pub fn ingest(&self, utt: Utterance) -> Result<Option<TranscriptLine>> {
         let session_id = self
             .lock_active()
@@ -501,7 +504,7 @@ mod tests {
     #[test]
     fn continue_ended_meeting_opens_second_session() {
         let (_d, m, _cap, _dict) = mgr(false);
-        let meeting = m.start(Some(1).filter(|_| false), None).unwrap();
+        let meeting = m.start(None, None).unwrap();
         m.end().unwrap();
         let again = m.start(None, Some(meeting.id)).unwrap();
         assert_eq!(again.id, meeting.id);
