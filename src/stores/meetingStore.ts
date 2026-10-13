@@ -31,6 +31,7 @@ interface MeetingStore {
   live: MeetingStatePayload;
   observer: ObserverView;
   loading: boolean;
+  captureWarning: { source: string; message: string } | null;
 
   loadMeetings: (projectId?: number | null) => Promise<void>;
   openMeeting: (id: number) => Promise<void>;
@@ -70,6 +71,7 @@ export const useMeetingStore = create<MeetingStore>((set, get) => ({
   live: idle,
   observer: idleObserver,
   loading: false,
+  captureWarning: null,
 
   loadMeetings: async (projectId = null) => {
     set({ loading: true });
@@ -86,6 +88,7 @@ export const useMeetingStore = create<MeetingStore>((set, get) => ({
     set((s) => ({
       activeMeetingId: id,
       detail: null,
+      captureWarning: null,
       observer: { ...s.observer, ...idleCounters },
     }));
     const res = await commands.getMeetingDetail(id);
@@ -100,10 +103,12 @@ export const useMeetingStore = create<MeetingStore>((set, get) => ({
     set((s) => ({
       activeMeetingId: null,
       detail: null,
+      captureWarning: null,
       observer: { ...s.observer, ...idleCounters },
     })),
 
   startMeeting: async (projectId, meetingId) => {
+    set({ captureWarning: null });
     const res = await commands.startMeeting(projectId, meetingId);
     if (res.status !== "ok") {
       toast.error(`${t("meetings.errors.start")} ${res.error}`);
@@ -245,7 +250,14 @@ export const useMeetingStore = create<MeetingStore>((set, get) => ({
       });
     });
     const un3 = await events.meetingCaptureWarningPayload.listen((e) => {
-      toast.error(`${t("meetings.errors.capture")} ${e.payload.message}`);
+      const { source, message, meeting_id } = e.payload;
+      if (source === "system_audio") {
+        // Shown as a banner in the open meeting instead of a toast.
+        if (get().activeMeetingId === meeting_id)
+          set({ captureWarning: { source, message } });
+        return;
+      }
+      toast.error(`${t("meetings.errors.capture")} ${message}`);
     });
     const un4 = await events.interventionPayload.listen((e) => {
       set((s) => {

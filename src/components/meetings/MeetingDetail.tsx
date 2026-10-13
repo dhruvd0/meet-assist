@@ -15,6 +15,7 @@ export const MeetingDetail: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const detail = useMeetingStore((s) => s.detail);
   const live = useMeetingStore((s) => s.live);
   const observer = useMeetingStore((s) => s.observer);
+  const captureWarning = useMeetingStore((s) => s.captureWarning);
   const renameMeeting = useMeetingStore((s) => s.renameMeeting);
   const refreshLive = useMeetingStore((s) => s.refreshLive);
   const subscribe = useMeetingStore((s) => s.subscribe);
@@ -41,6 +42,14 @@ export const MeetingDetail: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
   return (
     <div className="space-y-6">
+      {captureWarning?.source === "system_audio" && (
+        <Alert variant="warning">
+          {t("meetings.capture.systemAudioUnavailable", {
+            message: captureWarning.message,
+          })}{" "}
+          {t("meetings.capture.systemAudioHint")}
+        </Alert>
+      )}
       <div className="flex items-center gap-2">
         <Button
           variant="ghost"
