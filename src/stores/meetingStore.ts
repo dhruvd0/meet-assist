@@ -48,6 +48,7 @@ interface MeetingStore {
   saveContext: (id: number, context: string) => Promise<void>;
   deleteMeeting: (id: number) => Promise<void>;
   dismiss: (id: number) => Promise<void>;
+  summarize: (sessionId: number) => Promise<void>;
   subscribe: () => Promise<() => void>;
 }
 
@@ -223,6 +224,12 @@ export const useMeetingStore = create<MeetingStore>((set, get) => ({
     );
   },
 
+  summarize: async (sessionId) => {
+    const res = await commands.summarizeSession(sessionId);
+    if (res.status !== "ok")
+      toast.error(`${t("meetings.summary.failed")} ${res.error}`);
+  },
+
   subscribe: async () => {
     const un1 = await events.meetingStatePayload.listen((e) => {
       set({ live: e.payload });
@@ -299,7 +306,28 @@ export const useMeetingStore = create<MeetingStore>((set, get) => ({
     const un6 = await events.openMeetingPayload.listen((e) => {
       get().openMeeting(e.payload.meeting_id);
     });
+    const un7 = await events.sessionSummaryPayload.listen((e) => {
+      const { meeting_id, session_id, summary, rolling_summary } = e.payload;
+      set((s) => ({
+        meetings: s.meetings.map((m) =>
+          m.id === meeting_id ? { ...m, rolling_summary } : m,
+        ),
+        detail:
+          s.detail && s.detail.meeting.id === meeting_id
+            ? {
+                ...s.detail,
+                meeting: { ...s.detail.meeting, rolling_summary },
+                sessions: s.detail.sessions.map((x) =>
+                  x.id === session_id
+                    ? { ...x, summary: JSON.stringify(summary) }
+                    : x,
+                ),
+              }
+            : s.detail,
+      }));
+    });
     return () => {
+      un7();
       un1();
       un2();
       un3();

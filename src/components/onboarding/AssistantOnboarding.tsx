@@ -44,7 +44,8 @@ export const AssistantOnboarding: React.FC<AssistantOnboardingProps> = ({
     }
   };
 
-  const canContinue = Boolean(state.model) || test.status === "success";
+  const canContinue =
+    state.isAppleProvider || Boolean(state.model) || test.status === "success";
 
   return (
     <div className="h-screen w-screen flex flex-col items-center justify-center p-6 gap-6">
@@ -56,14 +57,14 @@ export const AssistantOnboarding: React.FC<AssistantOnboardingProps> = ({
       </div>
 
       <div className="max-w-xl w-full flex flex-col gap-3">
-        <label className="flex flex-col gap-1 text-sm">
-          {t("settings.postProcessing.api.provider.title")}
+        <div className="flex flex-col gap-1 text-sm">
+          <span>{t("settings.postProcessing.api.provider.title")}</span>
           <ProviderSelect
             options={state.providerOptions}
             value={state.selectedProviderId}
             onChange={state.handleProviderSelect}
           />
-        </label>
+        </div>
         {state.isAppleProvider ? (
           <p className="text-sm text-red-500">
             {t("onboarding.assistant.unsupported")}

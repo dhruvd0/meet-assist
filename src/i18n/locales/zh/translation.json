@@ -83,7 +83,8 @@
         "reindex": "Could not re-index source."
       },
       "digestLabel": "Digest",
-      "digestByModel": "Summarized by {{model}}"
+      "digestByModel": "Summarized by {{model}}",
+      "byModel": "by model"
     },
     "errors": {
       "load": "Could not load projects.",
@@ -168,7 +169,8 @@
       "rolling": "Live summary",
       "none": "No summary yet.",
       "retry": "Retry",
-      "generating": "Generating summary..."
+      "generating": "Generating summary...",
+      "failed": "Summary could not be read."
     },
     "capture": {
       "systemAudioUnavailable": "System audio is unavailable; transcribing your microphone only. {{message}}",

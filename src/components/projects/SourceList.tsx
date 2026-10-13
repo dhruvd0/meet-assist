@@ -38,21 +38,29 @@ const CaptionRow: React.FC<{ source: Source }> = ({ source }) => {
   const [value, setValue] = useState(source.digest ?? "");
   useEffect(() => setValue(source.digest ?? ""), [source.digest]);
   return (
-    <div className="flex items-center gap-2 mt-2">
-      <Input
-        variant="compact"
-        className="flex-1"
-        placeholder={t("projects.sources.captionPlaceholder")}
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-      />
-      <Button
-        size="sm"
-        variant="secondary"
-        onClick={() => setCaption(source.id, value)}
-      >
-        {t("projects.sources.saveCaption")}
-      </Button>
+    <div className="mt-2 space-y-1">
+      {source.digest && (
+        <div className="flex items-center gap-2">
+          <Badge variant="secondary">{t("projects.sources.byModel")}</Badge>
+          <span className="text-xs text-text/70 truncate">{source.digest}</span>
+        </div>
+      )}
+      <div className="flex items-center gap-2">
+        <Input
+          variant="compact"
+          className="flex-1"
+          placeholder={t("projects.sources.captionPlaceholder")}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+        />
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={() => setCaption(source.id, value)}
+        >
+          {t("projects.sources.saveCaption")}
+        </Button>
+      </div>
     </div>
   );
 };

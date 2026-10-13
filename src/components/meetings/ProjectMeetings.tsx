@@ -51,8 +51,15 @@ export const ProjectMeetings: React.FC<{ projectId: number }> = ({
       ) : (
         rows.map((m) => (
           <div key={m.id} className="flex items-center gap-3 p-4">
-            <div className="flex-1 text-sm font-semibold text-text truncate">
-              {m.title}
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-semibold text-text truncate">
+                {m.title}
+              </div>
+              {m.rolling_summary && (
+                <div className="text-xs text-text/60 truncate">
+                  {m.rolling_summary.split("\n")[0]}
+                </div>
+              )}
             </div>
             <Badge variant={m.status === "live" ? "success" : "secondary"}>
               {t(`meetings.status.${m.status}`)}

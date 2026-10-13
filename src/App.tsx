@@ -18,7 +18,10 @@ import "./App.css";
 import AccessibilityPermissions from "./components/AccessibilityPermissions";
 import SecureInputWarning from "./components/SecureInputWarning";
 import Footer from "./components/footer";
-import Onboarding, { AccessibilityOnboarding } from "./components/onboarding";
+import Onboarding, {
+  AccessibilityOnboarding,
+  AssistantOnboarding,
+} from "./components/onboarding";
 import {
   DebugSettings,
   type OnboardingPreviewStep,
@@ -32,7 +35,7 @@ import { commands, events } from "@/bindings";
 import { useMeetingStore } from "./stores/meetingStore";
 import { getLanguageDirection, initializeRTL } from "@/lib/utils/rtl";
 
-type OnboardingStep = "accessibility" | "model" | "done";
+type OnboardingStep = "accessibility" | "model" | "assistant" | "done";
 
 // Stable identity so preview effects do not re-run due to callback changes.
 const NOOP = () => {};
@@ -75,7 +78,8 @@ function App() {
   const isShowingOnboarding =
     onboardingPreview !== null ||
     onboardingStep === "accessibility" ||
-    onboardingStep === "model";
+    onboardingStep === "model" ||
+    onboardingStep === "assistant";
 
   // Classic scrollbars consume layout space. Reserve a matching gutter on the
   // opposite edge while onboarding is visible so its content stays centered in
@@ -301,7 +305,11 @@ function App() {
   };
 
   const handleModelSelected = () => {
-    // Transition to main app - user has started a download
+    // User has started a download; new users now pick an assistant provider
+    setOnboardingStep("assistant");
+  };
+
+  const handleAssistantComplete = () => {
     setOnboardingStep("done");
   };
 
@@ -362,6 +370,8 @@ function App() {
     );
   } else if (onboardingStep === "model") {
     content = <Onboarding onModelSelected={handleModelSelected} />;
+  } else if (onboardingStep === "assistant") {
+    content = <AssistantOnboarding onComplete={handleAssistantComplete} />;
   } else {
     content = (
       <div
