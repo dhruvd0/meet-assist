@@ -37,7 +37,12 @@ export const InterventionCard: React.FC = () => {
 
   const hide = async () => {
     if (timer.current) window.clearTimeout(timer.current);
-    await invoke("hide_intervention_window");
+    hovered.current = false;
+    try {
+      await invoke("hide_intervention_window");
+    } catch (err) {
+      console.error("hide_intervention_window failed", err);
+    }
   };
 
   const arm = () => {
@@ -50,6 +55,7 @@ export const InterventionCard: React.FC = () => {
 
   useEffect(() => {
     const un = listen<Intervention>("intervention:show", (e) => {
+      hovered.current = false;
       setIv(e.payload);
       arm();
     });
@@ -73,14 +79,21 @@ export const InterventionCard: React.FC = () => {
           {t(`meetings.intervention.kind.${iv.kind}`)}
         </span>
         <button
+          type="button"
+          aria-label={t("meetings.intervention.dismiss")}
           className="text-mid-gray hover:text-text cursor-pointer"
           title={t("meetings.intervention.dismiss")}
           onClick={async () => {
-            await invoke("dismiss_intervention", { id: iv.id });
-            await hide();
+            try {
+              await invoke("dismiss_intervention", { id: iv.id });
+            } catch (err) {
+              console.error("dismiss_intervention failed", err);
+            } finally {
+              await hide();
+            }
           }}
         >
-          <X className="w-4 h-4" />
+          <X className="w-4 h-4" aria-hidden="true" />
         </button>
       </div>
       <p className="text-sm leading-snug">{iv.text}</p>
