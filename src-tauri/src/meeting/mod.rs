@@ -6,6 +6,7 @@ pub mod chunk;
 pub mod indexer;
 pub mod manager;
 pub mod observer;
+pub mod resample;
 pub mod segment;
 pub mod session;
 pub mod store;
