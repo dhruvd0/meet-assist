@@ -26,6 +26,10 @@ pub struct ProjectManager {
 }
 
 impl ProjectManager {
+    pub fn store_arc(&self) -> Arc<ProjectStore> {
+        Arc::clone(&self.store)
+    }
+
     pub fn new(app: &AppHandle) -> Result<Self> {
         let data_dir = crate::portable::app_data_dir(app)?;
         Self::build(

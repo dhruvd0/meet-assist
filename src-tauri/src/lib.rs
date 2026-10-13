@@ -221,7 +221,20 @@ fn initialize_core_logic(app_handle: &AppHandle) {
         meeting::manager::ProjectManager::new(app_handle)
             .expect("Failed to initialize project manager"),
     );
+    let meeting_store = project_manager.store_arc();
     app_handle.manage(project_manager);
+    match meeting_store.mark_live_sessions_paused() {
+        Ok(n) if n > 0 => log::info!("recovered {} meeting(s) left live by a previous run", n),
+        Ok(_) => {}
+        Err(e) => log::error!("meeting recovery failed: {e:#}"),
+    }
+    let meeting_manager = Arc::new(meeting::session::MeetingManager::new(
+        app_handle,
+        meeting_store,
+        transcription_manager.clone(),
+        recording_manager.clone(),
+    ));
+    app_handle.manage(meeting_manager);
     app_handle.manage(tray::TrayState::new());
 
     // Note: Shortcuts are NOT initialized here.
@@ -795,6 +808,8 @@ pub fn run(cli_args: CliArgs) {
             managers::transcription::StreamTextEvent,
             managers::transcription::StreamPhaseEvent,
             meeting::manager::SourceStatusPayload,
+            meeting::session::MeetingStatePayload,
+            meeting::session::TranscriptLinePayload,
         ]);
 
     #[cfg(debug_assertions)] // <- Only export on non-release builds
