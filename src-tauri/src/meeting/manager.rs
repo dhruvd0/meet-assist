@@ -1,1 +1,287 @@
-// Filled in by a later task of docs/superpowers/plans/2026-10-13-projects-and-sources.md
+//! Tauri-facing owner of the project store. Runs source indexing on a
+//! worker thread and emits status events to the frontend.
+
+use crate::meeting::indexer;
+use crate::meeting::store::{ProjectStore, Source, SourceKind, SourceStatus};
+use anyhow::{anyhow, Result};
+use log::{error, info, warn};
+use serde::{Deserialize, Serialize};
+use specta::Type;
+use std::path::{Path, PathBuf};
+use std::sync::{mpsc, Arc, Mutex};
+use tauri::AppHandle;
+use tauri_specta::Event;
+
+#[derive(Clone, Debug, Serialize, Deserialize, Type, tauri_specta::Event)]
+pub struct SourceStatusPayload {
+    pub source: Source,
+}
+
+pub struct ProjectManager {
+    store: Arc<ProjectStore>,
+    images_dir: PathBuf,
+    tx: Mutex<Option<mpsc::Sender<i64>>>,
+    app: Option<AppHandle>,
+}
+
+impl ProjectManager {
+    pub fn new(app: &AppHandle) -> Result<Self> {
+        let data_dir = crate::portable::app_data_dir(app)?;
+        Self::build(
+            data_dir.join("meet.db"),
+            data_dir.join("sources").join("images"),
+            Some(app.clone()),
+        )
+    }
+
+    pub fn new_for_test(db_path: PathBuf, images_dir: PathBuf) -> Result<Self> {
+        Self::build(db_path, images_dir, None)
+    }
+
+    fn build(db_path: PathBuf, images_dir: PathBuf, app: Option<AppHandle>) -> Result<Self> {
+        let store = Arc::new(ProjectStore::open(db_path)?);
+        std::fs::create_dir_all(&images_dir)?;
+        let (tx, rx) = mpsc::channel::<i64>();
+        let worker_store = Arc::clone(&store);
+        let worker_images = images_dir.clone();
+        let worker_app = app.clone();
+        std::thread::Builder::new()
+            .name("meet-indexer".into())
+            .spawn(move || {
+                let worker = ProjectManager {
+                    store: worker_store,
+                    images_dir: worker_images,
+                    tx: Mutex::new(None),
+                    app: worker_app,
+                };
+                for source_id in rx {
+                    if let Err(e) = worker.index_source_now(source_id) {
+                        warn!("indexing source {} failed: {}", source_id, e);
+                    }
+                }
+            })?;
+        Ok(Self {
+            store,
+            images_dir,
+            tx: Mutex::new(Some(tx)),
+            app,
+        })
+    }
+
+    pub fn store(&self) -> &ProjectStore {
+        &self.store
+    }
+
+    fn emit_status(&self, source: &Source) {
+        if let Some(app) = &self.app {
+            if let Err(e) = (SourceStatusPayload {
+                source: source.clone(),
+            })
+            .emit(app)
+            {
+                error!("emit source status: {}", e);
+            }
+        }
+    }
+
+    fn set_status(&self, id: i64, status: SourceStatus, err: Option<&str>) -> Result<()> {
+        self.store.set_source_status(id, status, err)?;
+        if let Some(s) = self.store.get_source(id)? {
+            self.emit_status(&s);
+        }
+        Ok(())
+    }
+
+    pub fn enqueue_index(&self, source_id: i64) {
+        if let Some(tx) = self.tx.lock().ok().and_then(|g| g.clone()) {
+            if tx.send(source_id).is_err() {
+                error!("indexer worker is gone; source {} not queued", source_id);
+            }
+        }
+    }
+
+    /// Index one source synchronously. Any error marks the source failed
+    /// with the error text and is also returned.
+    pub fn index_source_now(&self, source_id: i64) -> Result<()> {
+        let Some(src) = self.store.get_source(source_id)? else {
+            return Err(anyhow!("source {} not found", source_id));
+        };
+        self.set_status(source_id, SourceStatus::Pending, None)?;
+        let result: Result<Vec<(String, String)>> = match src.kind {
+            SourceKind::Text => Ok(indexer::chunks_for_text(&src.locator)),
+            SourceKind::File => indexer::chunks_for_file(Path::new(&src.locator)),
+            SourceKind::Folder => indexer::chunks_for_folder(Path::new(&src.locator)),
+            SourceKind::Link => {
+                let url = src.locator.clone();
+                match tokio::runtime::Handle::try_current() {
+                    Ok(h) => {
+                        tokio::task::block_in_place(|| h.block_on(indexer::chunks_for_link(&url)))
+                    }
+                    Err(_) => tokio::runtime::Builder::new_current_thread()
+                        .enable_all()
+                        .build()?
+                        .block_on(indexer::chunks_for_link(&url)),
+                }
+            }
+            SourceKind::Image => Ok(indexer::chunks_for_caption(
+                src.digest.as_deref().unwrap_or(""),
+            )),
+        };
+        match result {
+            Ok(chunks) => {
+                let n = self.store.replace_chunks(source_id, &chunks)?;
+                info!("indexed source {} ({} chunks)", source_id, n);
+                self.set_status(source_id, SourceStatus::Ready, None)
+            }
+            Err(e) => {
+                let msg = e.to_string();
+                self.set_status(source_id, SourceStatus::Failed, Some(&msg))?;
+                Err(e)
+            }
+        }
+    }
+
+    pub fn add_and_index(
+        &self,
+        project_id: i64,
+        kind: SourceKind,
+        title: &str,
+        locator: &str,
+    ) -> Result<Source> {
+        let mut source = self.store.add_source(project_id, kind, title, locator)?;
+        if kind == SourceKind::Image {
+            let copied = indexer::copy_image_into(Path::new(locator), &self.images_dir, source.id)?;
+            let copied_str = copied.to_string_lossy().to_string();
+            self.store.update_source_locator(source.id, &copied_str)?;
+            source.locator = copied_str;
+        }
+        self.emit_status(&source);
+        self.enqueue_index(source.id);
+        Ok(source)
+    }
+
+    fn remove_image_file(&self, source: &Source) {
+        if source.kind == SourceKind::Image {
+            let p = Path::new(&source.locator);
+            if p.starts_with(&self.images_dir) {
+                if let Err(e) = std::fs::remove_file(p) {
+                    warn!("remove image {}: {}", p.display(), e);
+                }
+            }
+        }
+    }
+
+    pub fn remove_source(&self, id: i64) -> Result<()> {
+        if let Some(src) = self.store.get_source(id)? {
+            self.remove_image_file(&src);
+        }
+        self.store.remove_source(id)
+    }
+
+    pub fn delete_project(&self, id: i64) -> Result<()> {
+        for src in self.store.list_sources(id)? {
+            self.remove_image_file(&src);
+        }
+        self.store.delete_project(id)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::meeting::store::{SourceKind, SourceStatus};
+    use std::fs;
+
+    fn mgr() -> (tempfile::TempDir, ProjectManager) {
+        let dir = tempfile::tempdir().unwrap();
+        let m = ProjectManager::new_for_test(dir.path().join("meet.db"), dir.path().join("images"))
+            .unwrap();
+        (dir, m)
+    }
+
+    #[test]
+    fn text_source_indexes_to_ready_and_is_searchable() {
+        let (_d, m) = mgr();
+        let p = m.store().create_project("P").unwrap();
+        let s = m
+            .store()
+            .add_source(p.id, SourceKind::Text, "Notes", "retry budget is five")
+            .unwrap();
+        m.index_source_now(s.id).unwrap();
+        let got = m.store().get_source(s.id).unwrap().unwrap();
+        assert_eq!(got.status, SourceStatus::Ready);
+        assert_eq!(m.store().search(p.id, "retry", 5).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn missing_file_marks_failed_with_error() {
+        let (_d, m) = mgr();
+        let p = m.store().create_project("P").unwrap();
+        let s = m
+            .store()
+            .add_source(p.id, SourceKind::File, "Gone", "/definitely/not/here.txt")
+            .unwrap();
+        let _ = m.index_source_now(s.id);
+        let got = m.store().get_source(s.id).unwrap().unwrap();
+        assert_eq!(got.status, SourceStatus::Failed);
+        assert!(got.error.is_some());
+    }
+
+    #[test]
+    fn two_queued_sources_both_reach_ready() {
+        let (_d, m) = mgr();
+        let p = m.store().create_project("P").unwrap();
+        let a = m
+            .add_and_index(p.id, SourceKind::Text, "A", "alpha")
+            .unwrap();
+        let b = m
+            .add_and_index(p.id, SourceKind::Text, "B", "beta")
+            .unwrap();
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        loop {
+            let sa = m.store().get_source(a.id).unwrap().unwrap().status;
+            let sb = m.store().get_source(b.id).unwrap().unwrap().status;
+            if sa == SourceStatus::Ready && sb == SourceStatus::Ready {
+                break;
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "indexing did not finish: {:?} {:?}",
+                sa,
+                sb
+            );
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+    }
+
+    #[test]
+    fn image_is_copied_and_removed_with_source() {
+        let (d, m) = mgr();
+        let p = m.store().create_project("P").unwrap();
+        let pic = d.path().join("shot.png");
+        fs::write(&pic, b"\x89PNG").unwrap();
+        let s = m
+            .add_and_index(p.id, SourceKind::Image, "Shot", pic.to_str().unwrap())
+            .unwrap();
+        let copied = std::path::PathBuf::from(&s.locator);
+        assert!(copied.starts_with(d.path().join("images")));
+        assert!(copied.exists());
+        m.remove_source(s.id).unwrap();
+        assert!(!copied.exists());
+    }
+
+    #[test]
+    fn delete_project_removes_image_files() {
+        let (d, m) = mgr();
+        let p = m.store().create_project("P").unwrap();
+        let pic = d.path().join("shot.jpg");
+        fs::write(&pic, b"JFIF").unwrap();
+        let s = m
+            .add_and_index(p.id, SourceKind::Image, "Shot", pic.to_str().unwrap())
+            .unwrap();
+        let copied = std::path::PathBuf::from(&s.locator);
+        m.delete_project(p.id).unwrap();
+        assert!(!copied.exists());
+        assert!(m.store().get_project(p.id).unwrap().is_none());
+    }
+}

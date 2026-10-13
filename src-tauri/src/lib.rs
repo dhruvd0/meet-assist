@@ -216,6 +216,12 @@ fn initialize_core_logic(app_handle: &AppHandle) {
     app_handle.manage(model_manager.clone());
     app_handle.manage(transcription_manager.clone());
     app_handle.manage(history_manager.clone());
+
+    let project_manager = Arc::new(
+        meeting::manager::ProjectManager::new(app_handle)
+            .expect("Failed to initialize project manager"),
+    );
+    app_handle.manage(project_manager);
     app_handle.manage(tray::TrayState::new());
 
     // Note: Shortcuts are NOT initialized here.
@@ -775,6 +781,7 @@ pub fn run(cli_args: CliArgs) {
             managers::history::HistoryUpdatePayload,
             managers::transcription::StreamTextEvent,
             managers::transcription::StreamPhaseEvent,
+            meeting::manager::SourceStatusPayload,
         ]);
 
     #[cfg(debug_assertions)] // <- Only export on non-release builds

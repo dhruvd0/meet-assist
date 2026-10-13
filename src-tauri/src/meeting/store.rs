@@ -430,6 +430,15 @@ impl ProjectStore {
         Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
     }
 
+    pub fn update_source_locator(&self, id: i64, locator: &str) -> Result<()> {
+        let conn = self.conn()?;
+        conn.execute(
+            "UPDATE sources SET locator = ?1 WHERE id = ?2",
+            params![locator, id],
+        )?;
+        Ok(())
+    }
+
     pub fn remove_source(&self, id: i64) -> Result<()> {
         let mut conn = self.conn()?;
         let tx = conn.transaction()?;
