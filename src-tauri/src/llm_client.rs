@@ -945,7 +945,7 @@ pub async fn send_with_tools_with_client(
     let mut first_request = true;
     loop {
         let final_turn = calls_made >= max_tool_calls;
-        if final_turn {
+        if final_turn && !tools.is_empty() {
             messages.push(serde_json::json!({ "role": "user", "content": "Tool budget exhausted. Answer now with the final JSON only." }));
         }
         let tool_choice_none = final_turn && !tools.is_empty();
@@ -1106,7 +1106,11 @@ pub fn mime_for_extension(ext: &str) -> Option<&'static str> {
 pub fn is_vision_rejection(status: u16, body: &str) -> bool {
     let b = body.to_ascii_lowercase();
     (status == 400 || status == 422)
-        && (b.contains("image") || b.contains("vision") || b.contains("content"))
+        && (b.contains("image")
+            || b.contains("vision")
+            || b.contains("multimodal")
+            || b.contains("image_url")
+            || b.contains("media_type"))
 }
 
 pub fn openai_image_message(prompt: &str, mime: &str, b64: &str) -> Value {
@@ -1681,6 +1685,34 @@ mod tool_tests {
     }
 
     #[tokio::test]
+    async fn zero_tools_call_sends_single_user_message() {
+        let (base, bodies) = scripted_server(vec![final_response()]);
+        let handler = |_c: &ToolCall| String::new();
+        send_with_tools(
+            &openai_provider(&base),
+            "k".into(),
+            "m",
+            "sys".into(),
+            "user".into(),
+            &[],
+            json!({"type":"object"}),
+            0,
+            &handler,
+        )
+        .await
+        .unwrap();
+        let bodies = bodies.lock().unwrap();
+        assert_eq!(bodies.len(), 1);
+        let users = bodies[0]["messages"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|m| m["role"] == "user")
+            .count();
+        assert_eq!(users, 1);
+    }
+
+    #[tokio::test]
     async fn tool_loop_sends_tool_results_then_returns_answer() {
         let (base, bodies) = scripted_server(vec![tool_calls_response(&["c1"]), final_response()]);
         let calls = Mutex::new(0);
@@ -1797,6 +1829,10 @@ mod json_and_vision_tests {
         assert!(is_vision_rejection(422, "invalid content type: image_url"));
         assert!(!is_vision_rejection(401, "image"));
         assert!(!is_vision_rejection(400, "rate limit"));
+        assert!(!is_vision_rejection(
+            400,
+            "messages.0.content: field required"
+        ));
     }
 
     #[test]
