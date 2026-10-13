@@ -410,6 +410,8 @@ impl ProjectStore {
         Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
     }
 
+    /// Not yet called outside tests; reserved for the tool-calling step.
+    #[allow(dead_code)]
     pub fn read_chunks(
         &self,
         source_id: i64,

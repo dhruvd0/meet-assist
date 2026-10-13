@@ -29,20 +29,25 @@ Both pipelines share `TranscriptionManager`, the model store, settings, the LLM 
 
 ### Existing (from Handy)
 
-| Path                          | Role                                                                        |
-| ----------------------------- | --------------------------------------------------------------------------- |
-| `lib.rs`                      | Tauri setup, manager initialization, tray, shortcuts                        |
-| `managers/audio.rs`           | Microphone selection and recording via `handy-recorder`                     |
-| `managers/transcription.rs`   | Model lifecycle, batch `transcribe(Vec<f32>)`, streaming preview            |
-| `managers/model.rs`           | Model download and discovery                                                |
-| `managers/history.rs`         | SQLite transcription history (pattern reused by the meeting store)          |
-| `audio_toolkit/audio/sink.rs` | `CaptureVad`: frames in, speech segments out                                |
-| `audio_toolkit/vad/`          | Silero VAD                                                                  |
-| `llm_client.rs`               | Chat completion client, OpenAI and Anthropic formats, JSON schema responses |
-| `audio_feedback.rs`           | Plays feedback sounds via rodio                                             |
-| `overlay.rs`                  | Always-on-top recording overlay window                                      |
-| `settings.rs`                 | Persisted settings and migrations                                           |
-| `commands/`                   | Tauri commands exposed to the frontend via tauri-specta                     |
+| Path                          | Role                                                                                     |
+| ----------------------------- | ---------------------------------------------------------------------------------------- |
+| `lib.rs`                      | Tauri setup, manager initialization, tray, shortcuts                                     |
+| `managers/audio.rs`           | Microphone selection and recording via `handy-recorder`                                  |
+| `managers/transcription.rs`   | Model lifecycle, batch `transcribe(Vec<f32>)`, streaming preview                         |
+| `managers/model.rs`           | Model download and discovery                                                             |
+| `managers/history.rs`         | SQLite transcription history (pattern reused by the meeting store)                       |
+| `audio_toolkit/audio/sink.rs` | `CaptureVad`: frames in, speech segments out                                             |
+| `audio_toolkit/vad/`          | Silero VAD                                                                               |
+| `llm_client.rs`               | Chat completion client, OpenAI and Anthropic formats, JSON schema responses              |
+| `audio_feedback.rs`           | Plays feedback sounds via rodio                                                          |
+| `overlay.rs`                  | Always-on-top recording overlay window                                                   |
+| `settings.rs`                 | Persisted settings and migrations                                                        |
+| `commands/`                   | Tauri commands exposed to the frontend via tauri-specta                                  |
+| `meeting/store.rs`            | SQLite tables `projects`, `sources`, FTS5 `source_chunks`.                               |
+| `meeting/chunk.rs`            | Paragraph-aware chunking                                                                 |
+| `meeting/indexer.rs`          | Source indexing: text, file, folder, link, and image caption to FTS5 chunks              |
+| `meeting/manager.rs`          | `ProjectManager`: Tauri state, background indexing thread, `source-status-payload` event |
+| `commands/project.rs`         | Project and source CRUD, `search_sources`, `pick_source_path`                            |
 
 ### Planned (meeting subsystem)
 
@@ -53,7 +58,7 @@ Both pipelines share `TranscriptionManager`, the model store, settings, the LLM 
 | `meeting/transcriber.rs`                                      | Worker thread. Utterances in order to `TranscriptionManager::transcribe()`. Appends `TranscriptLine`, emits `meeting:transcript-line`.                                                         |
 | `meeting/observer.rs`                                         | Timer loop, default 20 s. Builds the judge prompt, calls `llm_client` with a JSON schema, applies 60 s cooldown and dedupe, fires beep and `meeting:intervention`.                             |
 | `meeting/summary.rs`                                          | Session summary on end, then rolling meeting summary merge.                                                                                                                                    |
-| `meeting/store.rs`                                            | SQLite tables `meetings`, `sessions`, `transcript_lines`, `interventions`.                                                                                                                     |
+| `meeting/store.rs` (meeting tables)                           | Extends the existing store with `meetings`, `sessions`, `transcript_lines`, `interventions`.                                                                                                   |
 | `audio_toolkit/audio/system_capture/{macos,windows,linux}.rs` | Trait `SystemCapture { start(cb), stop() }`. macOS CoreAudio process tap (14.2+) with ScreenCaptureKit fallback; Windows WASAPI loopback; Linux PulseAudio/PipeWire monitor via cpal.          |
 | `commands/meeting.rs`                                         | `list_meetings`, `get_meeting`, `start_meeting`, `pause_meeting`, `resume_meeting`, `end_meeting`, `update_meeting_context`, `update_meeting_title`, `delete_meeting`, `dismiss_intervention`. |
 
@@ -106,14 +111,17 @@ Sensitivity setting adds one instruction: low restricts to loop and explicit stu
 
 ### Existing
 
-| Path                      | Role                                                                            |
-| ------------------------- | ------------------------------------------------------------------------------- |
-| `App.tsx`                 | Shell, onboarding, sidebar routing                                              |
-| `components/settings/`    | Dictation and provider settings                                                 |
-| `components/ui/`          | Shared primitives (buttons, inputs, selects). Meeting screens must reuse these. |
-| `stores/settingsStore.ts` | Zustand settings store                                                          |
-| `overlay/`                | Separate window entry for the recording overlay                                 |
-| `bindings.ts`             | Generated by tauri-specta, do not edit by hand                                  |
+| Path                                    | Role                                                                            |
+| --------------------------------------- | ------------------------------------------------------------------------------- |
+| `App.tsx`                               | Shell, onboarding, sidebar routing                                              |
+| `components/settings/`                  | Dictation and provider settings                                                 |
+| `components/ui/`                        | Shared primitives (buttons, inputs, selects). Meeting screens must reuse these. |
+| `stores/settingsStore.ts`               | Zustand settings store                                                          |
+| `stores/projectStore.ts`                | Zustand store for projects and sources, subscribes to `project:source-status`   |
+| `components/projects/ProjectList.tsx`   | Landing screen, first sidebar entry                                             |
+| `components/projects/ProjectDetail.tsx` | Brief editor and sources list                                                   |
+| `overlay/`                              | Separate window entry for the recording overlay                                 |
+| `bindings.ts`                           | Generated by tauri-specta, do not edit by hand                                  |
 
 ### Planned
 
@@ -137,7 +145,7 @@ Sensitivity setting adds one instruction: low restricts to loop and explicit stu
 ## Delivery order
 
 1. Docs and vision.
-2. Projects and sources: store, indexer, FTS5, project UI.
+2. Projects and sources: store, indexer, FTS5, project UI. (done)
 3. Meetings under projects: store, commands, list and detail UI, mic-only capture and transcript.
 4. Tool calling in `llm_client`, observer loop, intervention window, beep.
 5. System audio capture, macOS first.

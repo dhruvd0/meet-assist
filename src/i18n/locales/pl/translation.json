@@ -10,6 +10,7 @@
     "secureInputWarning": "⚠ Skróty zablokowane przez Secure Input"
   },
   "sidebar": {
+    "projects": "Projects",
     "general": "Ogólne",
     "models": "Modele",
     "advanced": "Zaawansowane",
@@ -17,6 +18,75 @@
     "history": "Historia",
     "debug": "Debugowanie",
     "about": "O programie"
+  },
+  "projects": {
+    "title": "Projects",
+    "description": "A project holds a brief and sources the assistant can search during meetings.",
+    "new": "New project",
+    "newPlaceholder": "Project name",
+    "create": "Create",
+    "empty": "No projects yet. Create one and add the notes, files, and links the assistant should know.",
+    "open": "Open",
+    "delete": "Delete project",
+    "deleteConfirm": "Delete this project, its sources, and its meetings?",
+    "back": "All projects",
+    "rename": "Rename",
+    "sourcesCount_one": "{{count}} source",
+    "sourcesCount_other": "{{count}} sources",
+    "brief": {
+      "title": "Brief",
+      "description": "Always sent to the assistant. Keep it short: what this project is, who is involved, what matters.",
+      "placeholder": "What is this project about?",
+      "saved": "Brief saved"
+    },
+    "sources": {
+      "title": "Sources",
+      "description": "Indexed locally. The assistant searches these on its own when the conversation needs them.",
+      "add": "Add source",
+      "empty": "No sources yet.",
+      "remove": "Remove source",
+      "reindex": "Re-index",
+      "caption": "Caption",
+      "captionPlaceholder": "Describe this image for the assistant",
+      "saveCaption": "Save caption",
+      "status": {
+        "pending": "Indexing",
+        "ready": "Ready",
+        "failed": "Failed"
+      },
+      "kind": {
+        "text": "Text",
+        "file": "File",
+        "folder": "Folder",
+        "link": "Link",
+        "image": "Image"
+      },
+      "dialog": {
+        "title": "Add source",
+        "kind": "Type",
+        "titleLabel": "Title",
+        "titlePlaceholder": "Short name for this source",
+        "textLabel": "Text",
+        "textPlaceholder": "Paste notes, an agenda, anything useful",
+        "linkLabel": "URL",
+        "linkPlaceholder": "https://",
+        "pathLabel": "Path",
+        "pick": "Choose",
+        "add": "Add",
+        "cancel": "Cancel",
+        "close": "Close"
+      },
+      "errors": {
+        "add": "Could not add source.",
+        "remove": "Could not remove source."
+      }
+    },
+    "errors": {
+      "load": "Could not load projects.",
+      "create": "Could not create project.",
+      "delete": "Could not delete project.",
+      "save": "Could not save."
+    }
   },
   "onboarding": {
     "subtitle": "Aby rozpocząć, wybierz model transkrypcji",

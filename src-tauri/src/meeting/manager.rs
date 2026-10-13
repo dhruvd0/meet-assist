@@ -34,6 +34,7 @@ impl ProjectManager {
         )
     }
 
+    #[cfg(test)]
     pub fn new_for_test(db_path: PathBuf, images_dir: PathBuf) -> Result<Self> {
         Self::build(db_path, images_dir, None)
     }
