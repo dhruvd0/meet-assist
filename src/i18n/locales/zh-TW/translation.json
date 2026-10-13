@@ -11,6 +11,7 @@
   },
   "sidebar": {
     "projects": "Projects",
+    "meetings": "Meetings",
     "general": "一般",
     "models": "模型",
     "advanced": "進階",
@@ -87,6 +88,48 @@
       "create": "Could not create project.",
       "delete": "Could not delete project.",
       "save": "Could not save."
+    }
+  },
+  "meetings": {
+    "title": "Meetings",
+    "description": "Live transcript of your microphone. Start a meeting, speak, and lines appear here.",
+    "empty": "No meetings yet. Start one from a project or with the button above.",
+    "quickStart": "Start quick meeting",
+    "newInProject": "New meeting",
+    "continue": "Continue",
+    "open": "Open",
+    "delete": "Delete meeting",
+    "deleteConfirm": "Delete this meeting and its transcript?",
+    "back": "All meetings",
+    "rename": "Rename",
+    "status": {
+      "live": "Live",
+      "paused": "Paused",
+      "ended": "Ended"
+    },
+    "controls": {
+      "pause": "Pause",
+      "resume": "Resume",
+      "end": "End meeting",
+      "listening": "Listening…"
+    },
+    "context": {
+      "title": "Meeting context",
+      "description": "Agenda or notes for this meeting only. Sent to the assistant alongside the project brief.",
+      "placeholder": "What is this meeting about?"
+    },
+    "transcript": {
+      "title": "Transcript",
+      "empty": "Nothing transcribed yet. Say something.",
+      "session": "Session {{n}}",
+      "me": "You"
+    },
+    "errors": {
+      "load": "Could not load meetings.",
+      "start": "Could not start the meeting.",
+      "control": "Could not change the meeting state.",
+      "save": "Could not save.",
+      "delete": "Could not delete the meeting."
     }
   },
   "onboarding": {
