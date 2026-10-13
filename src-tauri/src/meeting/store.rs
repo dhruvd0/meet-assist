@@ -40,6 +40,35 @@ static MIGRATIONS: &[M] = &[
             tokenize = 'porter unicode61'
         );",
     ),
+    M::up(
+        "CREATE TABLE meetings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL,
+            title TEXT NOT NULL,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL,
+            status TEXT NOT NULL DEFAULT 'live',
+            context TEXT NOT NULL DEFAULT '',
+            rolling_summary TEXT
+        );
+        CREATE INDEX meetings_project_idx ON meetings(project_id);
+        CREATE TABLE sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            meeting_id INTEGER NOT NULL REFERENCES meetings(id) ON DELETE CASCADE,
+            started_at INTEGER NOT NULL,
+            ended_at INTEGER,
+            summary TEXT
+        );
+        CREATE INDEX sessions_meeting_idx ON sessions(meeting_id);
+        CREATE TABLE transcript_lines (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id INTEGER NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+            ts INTEGER NOT NULL,
+            speaker TEXT NOT NULL,
+            text TEXT NOT NULL
+        );
+        CREATE INDEX transcript_lines_session_idx ON transcript_lines(session_id);",
+    ),
 ];
 
 #[derive(Clone, Debug, Serialize, Deserialize, Type)]
@@ -186,6 +215,16 @@ impl ProjectStore {
             "DELETE FROM source_chunks WHERE source_id IN (SELECT id FROM sources WHERE project_id = ?1)",
             params![id],
         )?;
+        tx.execute(
+            "DELETE FROM transcript_lines WHERE session_id IN
+               (SELECT s.id FROM sessions s JOIN meetings m ON m.id = s.meeting_id WHERE m.project_id = ?1)",
+            params![id],
+        )?;
+        tx.execute(
+            "DELETE FROM sessions WHERE meeting_id IN (SELECT id FROM meetings WHERE project_id = ?1)",
+            params![id],
+        )?;
+        tx.execute("DELETE FROM meetings WHERE project_id = ?1", params![id])?;
         tx.execute("DELETE FROM sources WHERE project_id = ?1", params![id])?;
         tx.execute("DELETE FROM projects WHERE id = ?1", params![id])?;
         tx.commit()?;
@@ -510,6 +549,300 @@ impl ProjectStore {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "lowercase")]
+pub enum MeetingStatus {
+    Live,
+    Paused,
+    Ended,
+}
+
+impl MeetingStatus {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            MeetingStatus::Live => "live",
+            MeetingStatus::Paused => "paused",
+            MeetingStatus::Ended => "ended",
+        }
+    }
+    pub fn parse(s: &str) -> Option<Self> {
+        match s {
+            "live" => Some(Self::Live),
+            "paused" => Some(Self::Paused),
+            "ended" => Some(Self::Ended),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Type)]
+pub struct Meeting {
+    pub id: i64,
+    pub project_id: Option<i64>,
+    pub title: String,
+    pub created_at: i64,
+    pub updated_at: i64,
+    pub status: MeetingStatus,
+    pub context: String,
+    pub rolling_summary: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Type)]
+pub struct Session {
+    pub id: i64,
+    pub meeting_id: i64,
+    pub started_at: i64,
+    pub ended_at: Option<i64>,
+    pub summary: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Type)]
+pub struct TranscriptLine {
+    pub id: i64,
+    pub session_id: i64,
+    pub ts: i64,
+    pub speaker: String,
+    pub text: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Type)]
+pub struct MeetingDetail {
+    pub meeting: Meeting,
+    pub sessions: Vec<Session>,
+    pub lines: Vec<TranscriptLine>,
+}
+
+const MEETING_COLS: &str =
+    "id, project_id, title, created_at, updated_at, status, context, rolling_summary";
+
+impl ProjectStore {
+    fn map_meeting(row: &rusqlite::Row<'_>) -> rusqlite::Result<Meeting> {
+        let status: String = row.get("status")?;
+        Ok(Meeting {
+            id: row.get("id")?,
+            project_id: row.get("project_id")?,
+            title: row.get("title")?,
+            created_at: row.get("created_at")?,
+            updated_at: row.get("updated_at")?,
+            status: MeetingStatus::parse(&status).unwrap_or(MeetingStatus::Ended),
+            context: row.get("context")?,
+            rolling_summary: row.get("rolling_summary")?,
+        })
+    }
+
+    fn map_session(row: &rusqlite::Row<'_>) -> rusqlite::Result<Session> {
+        Ok(Session {
+            id: row.get("id")?,
+            meeting_id: row.get("meeting_id")?,
+            started_at: row.get("started_at")?,
+            ended_at: row.get("ended_at")?,
+            summary: row.get("summary")?,
+        })
+    }
+
+    fn map_line(row: &rusqlite::Row<'_>) -> rusqlite::Result<TranscriptLine> {
+        Ok(TranscriptLine {
+            id: row.get("id")?,
+            session_id: row.get("session_id")?,
+            ts: row.get("ts")?,
+            speaker: row.get("speaker")?,
+            text: row.get("text")?,
+        })
+    }
+
+    fn touch_meeting(conn: &Connection, id: i64) -> Result<()> {
+        let changed = conn.execute(
+            "UPDATE meetings SET updated_at = ?1 WHERE id = ?2",
+            params![now(), id],
+        )?;
+        if changed == 0 {
+            return Err(anyhow!("meeting {} not found", id));
+        }
+        Ok(())
+    }
+
+    pub fn create_meeting(&self, project_id: Option<i64>, title: &str) -> Result<Meeting> {
+        let conn = self.conn()?;
+        let ts = now();
+        conn.execute(
+            "INSERT INTO meetings (project_id, title, created_at, updated_at, status, context)
+             VALUES (?1, ?2, ?3, ?3, 'live', '')",
+            params![project_id, title, ts],
+        )?;
+        let id = conn.last_insert_rowid();
+        if let Some(pid) = project_id {
+            Self::touch_project(&conn, pid)?;
+        }
+        Ok(Meeting {
+            id,
+            project_id,
+            title: title.to_string(),
+            created_at: ts,
+            updated_at: ts,
+            status: MeetingStatus::Live,
+            context: String::new(),
+            rolling_summary: None,
+        })
+    }
+
+    pub fn list_meetings(&self, project_id: Option<i64>) -> Result<Vec<Meeting>> {
+        let conn = self.conn()?;
+        let mut stmt = conn.prepare(&format!(
+            "SELECT {MEETING_COLS} FROM meetings
+             WHERE (?1 IS NULL OR project_id = ?1)
+             ORDER BY updated_at DESC, id DESC"
+        ))?;
+        let rows = stmt.query_map(params![project_id], Self::map_meeting)?;
+        Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+    }
+
+    pub fn get_meeting(&self, id: i64) -> Result<Option<Meeting>> {
+        let conn = self.conn()?;
+        Ok(conn
+            .query_row(
+                &format!("SELECT {MEETING_COLS} FROM meetings WHERE id = ?1"),
+                params![id],
+                Self::map_meeting,
+            )
+            .optional()?)
+    }
+
+    pub fn get_meeting_detail(&self, id: i64) -> Result<Option<MeetingDetail>> {
+        let Some(meeting) = self.get_meeting(id)? else {
+            return Ok(None);
+        };
+        let conn = self.conn()?;
+        let sessions = {
+            let mut stmt = conn.prepare(
+                "SELECT id, meeting_id, started_at, ended_at, summary FROM sessions
+                 WHERE meeting_id = ?1 ORDER BY started_at ASC, id ASC",
+            )?;
+            let rows = stmt.query_map(params![id], Self::map_session)?;
+            rows.collect::<rusqlite::Result<Vec<_>>>()?
+        };
+        let lines = {
+            let mut stmt = conn.prepare(
+                "SELECT l.id, l.session_id, l.ts, l.speaker, l.text FROM transcript_lines l
+                 JOIN sessions s ON s.id = l.session_id
+                 WHERE s.meeting_id = ?1 ORDER BY l.ts ASC, l.id ASC",
+            )?;
+            let rows = stmt.query_map(params![id], Self::map_line)?;
+            rows.collect::<rusqlite::Result<Vec<_>>>()?
+        };
+        Ok(Some(MeetingDetail {
+            meeting,
+            sessions,
+            lines,
+        }))
+    }
+
+    pub fn set_meeting_status(&self, id: i64, status: MeetingStatus) -> Result<()> {
+        let conn = self.conn()?;
+        let changed = conn.execute(
+            "UPDATE meetings SET status = ?1, updated_at = ?2 WHERE id = ?3",
+            params![status.as_str(), now(), id],
+        )?;
+        if changed == 0 {
+            return Err(anyhow!("meeting {} not found", id));
+        }
+        Ok(())
+    }
+
+    pub fn update_meeting_title(&self, id: i64, title: &str) -> Result<()> {
+        let conn = self.conn()?;
+        conn.execute(
+            "UPDATE meetings SET title = ?1 WHERE id = ?2",
+            params![title, id],
+        )?;
+        Self::touch_meeting(&conn, id)
+    }
+
+    pub fn update_meeting_context(&self, id: i64, context: &str) -> Result<()> {
+        let conn = self.conn()?;
+        conn.execute(
+            "UPDATE meetings SET context = ?1 WHERE id = ?2",
+            params![context, id],
+        )?;
+        Self::touch_meeting(&conn, id)
+    }
+
+    pub fn delete_meeting(&self, id: i64) -> Result<()> {
+        let mut conn = self.conn()?;
+        let tx = conn.transaction()?;
+        tx.execute(
+            "DELETE FROM transcript_lines WHERE session_id IN (SELECT id FROM sessions WHERE meeting_id = ?1)",
+            params![id],
+        )?;
+        tx.execute("DELETE FROM sessions WHERE meeting_id = ?1", params![id])?;
+        tx.execute("DELETE FROM meetings WHERE id = ?1", params![id])?;
+        tx.commit()?;
+        Ok(())
+    }
+
+    pub fn create_session(&self, meeting_id: i64) -> Result<Session> {
+        let conn = self.conn()?;
+        let ts = now();
+        conn.execute(
+            "INSERT INTO sessions (meeting_id, started_at) VALUES (?1, ?2)",
+            params![meeting_id, ts],
+        )?;
+        let id = conn.last_insert_rowid();
+        Self::touch_meeting(&conn, meeting_id)?;
+        Ok(Session {
+            id,
+            meeting_id,
+            started_at: ts,
+            ended_at: None,
+            summary: None,
+        })
+    }
+
+    pub fn end_session(&self, session_id: i64) -> Result<()> {
+        let conn = self.conn()?;
+        conn.execute(
+            "UPDATE sessions SET ended_at = ?1 WHERE id = ?2 AND ended_at IS NULL",
+            params![now(), session_id],
+        )?;
+        Ok(())
+    }
+
+    pub fn append_line(
+        &self,
+        session_id: i64,
+        speaker: &str,
+        text: &str,
+    ) -> Result<TranscriptLine> {
+        let conn = self.conn()?;
+        let ts = now();
+        conn.execute(
+            "INSERT INTO transcript_lines (session_id, ts, speaker, text) VALUES (?1, ?2, ?3, ?4)",
+            params![session_id, ts, speaker, text],
+        )?;
+        let id = conn.last_insert_rowid();
+        let meeting_id: i64 = conn.query_row(
+            "SELECT meeting_id FROM sessions WHERE id = ?1",
+            params![session_id],
+            |r| r.get(0),
+        )?;
+        Self::touch_meeting(&conn, meeting_id)?;
+        Ok(TranscriptLine {
+            id,
+            session_id,
+            ts,
+            speaker: speaker.to_string(),
+            text: text.to_string(),
+        })
+    }
+
+    pub fn mark_live_sessions_paused(&self) -> Result<usize> {
+        let conn = self.conn()?;
+        Ok(conn.execute(
+            "UPDATE meetings SET status = 'paused', updated_at = ?1 WHERE status = 'live'",
+            params![now()],
+        )?)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -731,5 +1064,95 @@ mod tests {
         assert_eq!(s.search(p.id, "follow-up", 10).unwrap().len(), 1);
         assert_eq!(s.search(p.id, "foo:bar", 10).unwrap().len(), 0);
         assert_eq!(s.search(p.id, "   ", 10).unwrap().len(), 0);
+    }
+
+    #[test]
+    fn create_meeting_is_live_and_listed_by_project() {
+        let (_d, s) = store();
+        let p = s.create_project("P").unwrap();
+        let m = s.create_meeting(Some(p.id), "Standup").unwrap();
+        assert_eq!(m.status, MeetingStatus::Live);
+        let q = s.create_meeting(None, "Quick").unwrap();
+        assert_eq!(
+            s.list_meetings(Some(p.id))
+                .unwrap()
+                .iter()
+                .map(|x| x.id)
+                .collect::<Vec<_>>(),
+            vec![m.id]
+        );
+        let all = s.list_meetings(None).unwrap();
+        assert!(all.iter().any(|x| x.id == q.id) && all.iter().any(|x| x.id == m.id));
+    }
+
+    #[test]
+    fn session_lines_and_detail_ordering() {
+        let (_d, s) = store();
+        let m = s.create_meeting(None, "M").unwrap();
+        let sess = s.create_session(m.id).unwrap();
+        let a = s.append_line(sess.id, "me", "first").unwrap();
+        let b = s.append_line(sess.id, "me", "second").unwrap();
+        let d = s.get_meeting_detail(m.id).unwrap().unwrap();
+        assert_eq!(d.sessions.len(), 1);
+        assert_eq!(
+            d.lines.iter().map(|l| l.id).collect::<Vec<_>>(),
+            vec![a.id, b.id]
+        );
+        assert!(d.meeting.updated_at >= m.updated_at);
+        s.end_session(sess.id).unwrap();
+        let d = s.get_meeting_detail(m.id).unwrap().unwrap();
+        assert!(d.sessions[0].ended_at.is_some());
+    }
+
+    #[test]
+    fn status_title_context_updates() {
+        let (_d, s) = store();
+        let m = s.create_meeting(None, "M").unwrap();
+        s.set_meeting_status(m.id, MeetingStatus::Paused).unwrap();
+        s.update_meeting_title(m.id, "Renamed").unwrap();
+        s.update_meeting_context(m.id, "agenda").unwrap();
+        let got = s.get_meeting(m.id).unwrap().unwrap();
+        assert_eq!(got.status, MeetingStatus::Paused);
+        assert_eq!(got.title, "Renamed");
+        assert_eq!(got.context, "agenda");
+    }
+
+    #[test]
+    fn mark_live_sessions_paused_only_touches_live() {
+        let (_d, s) = store();
+        let live = s.create_meeting(None, "L").unwrap();
+        let ended = s.create_meeting(None, "E").unwrap();
+        s.set_meeting_status(ended.id, MeetingStatus::Ended)
+            .unwrap();
+        assert_eq!(s.mark_live_sessions_paused().unwrap(), 1);
+        assert_eq!(
+            s.get_meeting(live.id).unwrap().unwrap().status,
+            MeetingStatus::Paused
+        );
+        assert_eq!(
+            s.get_meeting(ended.id).unwrap().unwrap().status,
+            MeetingStatus::Ended
+        );
+    }
+
+    #[test]
+    fn delete_meeting_and_delete_project_cascade_lines() {
+        let (_d, s) = store();
+        let p = s.create_project("P").unwrap();
+        let m1 = s.create_meeting(Some(p.id), "A").unwrap();
+        let s1 = s.create_session(m1.id).unwrap();
+        s.append_line(s1.id, "me", "x").unwrap();
+        let m2 = s.create_meeting(Some(p.id), "B").unwrap();
+        let s2 = s.create_session(m2.id).unwrap();
+        s.append_line(s2.id, "me", "y").unwrap();
+        s.delete_meeting(m1.id).unwrap();
+        assert!(s.get_meeting_detail(m1.id).unwrap().is_none());
+        s.delete_project(p.id).unwrap();
+        assert!(s.get_meeting(m2.id).unwrap().is_none());
+        let conn = rusqlite::Connection::open(_d.path().join("meet.db")).unwrap();
+        let n: i64 = conn
+            .query_row("SELECT COUNT(*) FROM transcript_lines", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(n, 0);
     }
 }
