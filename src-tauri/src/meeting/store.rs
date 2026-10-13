@@ -843,6 +843,67 @@ impl ProjectStore {
         })
     }
 
+    pub fn set_session_summary(&self, session_id: i64, summary_json: &str) -> Result<()> {
+        let conn = self.conn()?;
+        let changed = conn.execute(
+            "UPDATE sessions SET summary = ?1 WHERE id = ?2",
+            params![summary_json, session_id],
+        )?;
+        if changed == 0 {
+            return Err(anyhow!("session {} not found", session_id));
+        }
+        Ok(())
+    }
+
+    /// Store the rolling summary, truncated to 2500 chars on a char boundary.
+    pub fn set_rolling_summary(&self, meeting_id: i64, text: &str) -> Result<()> {
+        let capped: String = text.chars().take(2500).collect();
+        let conn = self.conn()?;
+        let changed = conn.execute(
+            "UPDATE meetings SET rolling_summary = ?1, updated_at = ?2 WHERE id = ?3",
+            params![capped, now(), meeting_id],
+        )?;
+        if changed == 0 {
+            return Err(anyhow!("meeting {} not found", meeting_id));
+        }
+        Ok(())
+    }
+
+    pub fn get_session(&self, session_id: i64) -> Result<Option<Session>> {
+        let conn = self.conn()?;
+        Ok(conn
+            .query_row(
+                "SELECT id, meeting_id, started_at, ended_at, summary FROM sessions WHERE id = ?1",
+                params![session_id],
+                Self::map_session,
+            )
+            .optional()?)
+    }
+
+    /// Lines of one session, oldest first.
+    pub fn session_lines(&self, session_id: i64) -> Result<Vec<TranscriptLine>> {
+        let conn = self.conn()?;
+        let mut stmt = conn.prepare(
+            "SELECT id, session_id, ts, speaker, text FROM transcript_lines
+             WHERE session_id = ?1 ORDER BY ts ASC, id ASC",
+        )?;
+        let rows = stmt.query_map(params![session_id], Self::map_line)?;
+        Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+    }
+
+    /// Ended sessions with no summary yet and at least one line.
+    pub fn sessions_without_summary(&self, meeting_id: i64) -> Result<Vec<Session>> {
+        let conn = self.conn()?;
+        let mut stmt = conn.prepare(
+            "SELECT s.id, s.meeting_id, s.started_at, s.ended_at, s.summary FROM sessions s
+             WHERE s.meeting_id = ?1 AND s.ended_at IS NOT NULL AND s.summary IS NULL
+               AND EXISTS (SELECT 1 FROM transcript_lines l WHERE l.session_id = s.id)
+             ORDER BY s.started_at ASC, s.id ASC",
+        )?;
+        let rows = stmt.query_map(params![meeting_id], Self::map_session)?;
+        Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+    }
+
     pub fn end_session(&self, session_id: i64) -> Result<()> {
         let conn = self.conn()?;
         conn.execute(
@@ -1042,6 +1103,42 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let store = ProjectStore::open(dir.path().join("meet.db")).unwrap();
         (dir, store)
+    }
+
+    #[test]
+    fn summary_setters_and_queries() {
+        let (_d, s) = store();
+        let m = s.create_meeting(None, "M").unwrap();
+        let sess = s.create_session(m.id).unwrap();
+        s.append_line(sess.id, "me", "hello", 1000).unwrap();
+        s.end_session(sess.id).unwrap();
+        assert_eq!(s.sessions_without_summary(m.id).unwrap().len(), 1);
+        s.set_session_summary(sess.id, "{\"recap\":\"hi\"}")
+            .unwrap();
+        assert_eq!(
+            s.get_session(sess.id).unwrap().unwrap().summary.as_deref(),
+            Some("{\"recap\":\"hi\"}")
+        );
+        assert!(s.sessions_without_summary(m.id).unwrap().is_empty());
+        let long = "é".repeat(3000);
+        s.set_rolling_summary(m.id, &long).unwrap();
+        let got = s
+            .get_meeting(m.id)
+            .unwrap()
+            .unwrap()
+            .rolling_summary
+            .unwrap();
+        assert!(got.chars().count() <= 2500);
+        assert_eq!(s.session_lines(sess.id).unwrap()[0].text, "hello");
+    }
+
+    #[test]
+    fn empty_sessions_are_not_summary_candidates() {
+        let (_d, s) = store();
+        let m = s.create_meeting(None, "M").unwrap();
+        let sess = s.create_session(m.id).unwrap();
+        s.end_session(sess.id).unwrap();
+        assert!(s.sessions_without_summary(m.id).unwrap().is_empty());
     }
 
     #[test]
