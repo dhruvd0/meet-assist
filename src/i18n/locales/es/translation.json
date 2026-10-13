@@ -131,6 +131,23 @@
       "save": "Could not save.",
       "delete": "Could not delete the meeting.",
       "capture": "Microphone stopped delivering audio."
+    },
+    "intervention": {
+      "kind": {
+        "loop": "Going in circles",
+        "stuck": "Someone is stuck",
+        "info": "Quick fact",
+        "idea": "An idea"
+      },
+      "dismiss": "Dismiss",
+      "open": "Open meeting",
+      "timeline": "Assistant nudges",
+      "empty": "No nudges yet.",
+      "dismissed": "Dismissed"
+    },
+    "observer": {
+      "toolsUnavailable": "This provider does not support tools; the assistant answers from the transcript only.",
+      "failing": "The assistant has failed {{count}} times in a row. Check the provider settings."
     }
   },
   "onboarding": {
@@ -768,6 +785,30 @@
       "whatsNewUpdates": {
         "label": "Mostrar novedades",
         "description": "Mostrar notas de la versión después de las actualizaciones de Handy"
+      }
+    },
+    "meeting": {
+      "title": "Meeting assistant",
+      "description": "How the assistant watches live meetings.",
+      "provider": {
+        "label": "Provider",
+        "description": "Which post-processing provider answers during meetings. Empty uses the post-processing default.",
+        "default": "Same as post-processing"
+      },
+      "sensitivity": {
+        "label": "Sensitivity",
+        "description": "How eager the assistant is to speak up.",
+        "low": "Low",
+        "medium": "Medium",
+        "high": "High"
+      },
+      "interval": {
+        "label": "Check interval",
+        "description": "Seconds between checks of the live transcript."
+      },
+      "beep": {
+        "label": "Beep on nudge",
+        "description": "Play a short sound when the assistant speaks up."
       }
     }
   },
