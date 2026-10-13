@@ -114,7 +114,6 @@ export const MeetingAssistantSettings: React.FC = () => {
         checked={getSetting("meeting_system_audio_enabled") ?? true}
         onChange={(v) => updateSetting("meeting_system_audio_enabled", v)}
         isUpdating={isUpdating("meeting_system_audio_enabled")}
-        disabled={!enabled}
         label={t("settings.meeting.systemAudio.label")}
         description={t("settings.meeting.systemAudio.description")}
         descriptionMode="tooltip"

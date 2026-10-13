@@ -39,12 +39,6 @@ const CaptionRow: React.FC<{ source: Source }> = ({ source }) => {
   useEffect(() => setValue(source.digest ?? ""), [source.digest]);
   return (
     <div className="mt-2 space-y-1">
-      {source.digest && (
-        <div className="flex items-center gap-2">
-          <Badge variant="secondary">{t("projects.sources.byModel")}</Badge>
-          <span className="text-xs text-text/70 truncate">{source.digest}</span>
-        </div>
-      )}
       <div className="flex items-center gap-2">
         <Input
           variant="compact"

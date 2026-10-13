@@ -45,14 +45,15 @@ export const MeetingDetail: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
   return (
     <div className="space-y-6">
-      {captureWarning?.source === "system_audio" && (
-        <Alert variant="warning">
-          {t("meetings.capture.systemAudioUnavailable", {
-            message: captureWarning.message,
-          })}{" "}
-          {t("meetings.capture.systemAudioHint")}
-        </Alert>
-      )}
+      {captureWarning?.source === "system_audio" &&
+        captureWarning.meeting_id === detail.meeting.id && (
+          <Alert variant="warning">
+            {t("meetings.capture.systemAudioUnavailable", {
+              message: captureWarning.message,
+            })}{" "}
+            {t("meetings.capture.systemAudioHint")}
+          </Alert>
+        )}
       <div className="flex items-center gap-2">
         <Button
           variant="ghost"

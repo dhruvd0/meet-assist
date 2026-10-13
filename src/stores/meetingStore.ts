@@ -31,7 +31,11 @@ interface MeetingStore {
   live: MeetingStatePayload;
   observer: ObserverView;
   loading: boolean;
-  captureWarning: { source: string; message: string } | null;
+  captureWarning: {
+    meeting_id: number;
+    source: string;
+    message: string;
+  } | null;
 
   loadMeetings: (projectId?: number | null) => Promise<void>;
   openMeeting: (id: number) => Promise<void>;
@@ -89,7 +93,8 @@ export const useMeetingStore = create<MeetingStore>((set, get) => ({
     set((s) => ({
       activeMeetingId: id,
       detail: null,
-      captureWarning: null,
+      captureWarning:
+        s.captureWarning?.meeting_id === id ? s.captureWarning : null,
       observer: { ...s.observer, ...idleCounters },
     }));
     const res = await commands.getMeetingDetail(id);
@@ -260,8 +265,7 @@ export const useMeetingStore = create<MeetingStore>((set, get) => ({
       const { source, message, meeting_id } = e.payload;
       if (source === "system_audio") {
         // Shown as a banner in the open meeting instead of a toast.
-        if (get().activeMeetingId === meeting_id)
-          set({ captureWarning: { source, message } });
+        set({ captureWarning: { meeting_id, source, message } });
         return;
       }
       toast.error(`${t("meetings.errors.capture")} ${message}`);
