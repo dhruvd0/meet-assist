@@ -321,7 +321,7 @@ pub fn recording_error_type(error: &anyhow::Error) -> &'static str {
 
 /* ──────────────────────────────────────────────────────────────── */
 
-fn create_capture_vad(
+pub(crate) fn create_capture_vad(
     backend: VadBackend,
     app_handle: &tauri::AppHandle,
 ) -> Result<CaptureVad, anyhow::Error> {
@@ -376,7 +376,7 @@ fn create_capture_vad(
 /// 16 kHz mono in VAD-frame chunks, from `device` (`None`: the system
 /// default). `channel` picks one zero-based input channel; `None` averages
 /// them all.
-fn microphone_config(
+pub(crate) fn microphone_config(
     device: Option<String>,
     channel: Option<u16>,
     frames_per_chunk: usize,

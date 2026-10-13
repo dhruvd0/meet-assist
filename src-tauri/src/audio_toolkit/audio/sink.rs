@@ -51,6 +51,24 @@ impl CaptureVad {
         self.detector.frame_samples()
     }
 
+    /// Configure the detector for offline-style hangover and clear state.
+    /// Used by meeting capture, which drives the detector frame by frame.
+    pub fn prepare_offline(&mut self) {
+        self.detector
+            .set_hangover_frames(self.offline_hangover_frames);
+        self.detector.reset();
+    }
+
+    /// Push one frame and return the speech samples the detector passes
+    /// (prefill plus current plus hangover may make this longer than one
+    /// frame), or `None` for noise.
+    pub fn push_frame(&mut self, frame: &[f32]) -> anyhow::Result<Option<Vec<f32>>> {
+        Ok(match self.detector.push_frame(frame)? {
+            VadFrame::Speech(samples) => Some(samples.to_vec()),
+            VadFrame::Noise => None,
+        })
+    }
+
     /// Post-speech hangover tail (in detector frames) for the given policy.
     /// `Disabled` never reaches the detector, so it maps to the offline value.
     fn hangover_for(&self, policy: VadPolicy) -> usize {
