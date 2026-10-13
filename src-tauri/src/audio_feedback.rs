@@ -135,3 +135,24 @@ fn play_audio_file(
 
     Ok(())
 }
+
+/// Short alert for assistant interventions. Not gated by `audio_feedback`;
+/// the caller checks `meeting_beep_enabled`.
+pub fn play_alert_sound(app: &AppHandle) {
+    let app = app.clone();
+    thread::spawn(move || {
+        let path = match app.path().resolve(
+            "resources/pop_start.wav",
+            tauri::path::BaseDirectory::Resource,
+        ) {
+            Ok(p) => p,
+            Err(e) => {
+                warn!("alert sound path: {e}");
+                return;
+            }
+        };
+        if let Err(e) = play_sound_at_path(&app, &path) {
+            warn!("alert sound: {e}");
+        }
+    });
+}

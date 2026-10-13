@@ -194,6 +194,16 @@ impl MeetingManager {
         self.live.load(Ordering::SeqCst)
     }
 
+    /// Meeting id of the running (live or paused) meeting, if any.
+    pub fn active_meeting_id(&self) -> Option<i64> {
+        self.lock_active().as_ref().map(|a| a.meeting_id)
+    }
+
+    /// Session id of the running (live or paused) meeting, if any.
+    pub fn active_session_id(&self) -> Option<i64> {
+        self.lock_active().as_ref().map(|a| a.session_id)
+    }
+
     /// Project of the running (live or paused) meeting, if any.
     pub fn active_project_id(&self) -> Option<i64> {
         self.lock_active().as_ref().and_then(|a| a.project_id)

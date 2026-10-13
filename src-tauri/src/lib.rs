@@ -12,6 +12,7 @@ mod commands;
 pub mod engine_supervisor;
 mod helpers;
 mod input;
+mod intervention;
 mod llm_client;
 mod managers;
 mod meeting;
@@ -230,11 +231,19 @@ fn initialize_core_logic(app_handle: &AppHandle) {
     }
     let meeting_manager = Arc::new(meeting::session::MeetingManager::new(
         app_handle,
-        meeting_store,
+        meeting_store.clone(),
         transcription_manager.clone(),
         recording_manager.clone(),
     ));
-    app_handle.manage(meeting_manager);
+    app_handle.manage(meeting_manager.clone());
+    meeting::observer::spawn_observer(
+        app_handle.clone(),
+        meeting_store,
+        meeting_manager,
+        Arc::new(meeting::observer::LlmJudge {
+            app: app_handle.clone(),
+        }),
+    );
     app_handle.manage(tray::TrayState::new());
 
     // Note: Shortcuts are NOT initialized here.
@@ -825,6 +834,8 @@ pub fn run(cli_args: CliArgs) {
             meeting::session::MeetingStatePayload,
             meeting::session::TranscriptLinePayload,
             meeting::session::MeetingCaptureWarningPayload,
+            meeting::observer::InterventionPayload,
+            meeting::observer::ObserverStatusPayload,
         ]);
 
     #[cfg(debug_assertions)] // <- Only export on non-release builds

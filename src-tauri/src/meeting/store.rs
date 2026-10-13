@@ -123,6 +123,13 @@ fn now() -> i64 {
 }
 
 impl ProjectStore {
+    /// Cheap handle to the same database (connections are opened per call).
+    pub fn clone_handle(&self) -> ProjectStore {
+        ProjectStore {
+            db_path: self.db_path.clone(),
+        }
+    }
+
     pub fn open(db_path: PathBuf) -> Result<Self> {
         if let Some(parent) = db_path.parent() {
             std::fs::create_dir_all(parent)?;
