@@ -81,7 +81,9 @@
         "add": "Could not add source.",
         "remove": "Could not remove source.",
         "reindex": "Could not re-index source."
-      }
+      },
+      "digestLabel": "Digest",
+      "digestByModel": "Summarized by {{model}}"
     },
     "errors": {
       "load": "Could not load projects.",
@@ -155,6 +157,17 @@
         "missing_api_key": "No API key for {{detail}}. Add one under Post Processing settings.",
         "no_model": "No model is selected for {{detail}}. Pick one under Post Processing settings."
       }
+    },
+    "summary": {
+      "title": "Summary",
+      "decisions": "Decisions",
+      "openQuestions": "Open questions",
+      "actionItems": "Action items",
+      "recap": "Recap",
+      "rolling": "Live summary",
+      "none": "No summary yet.",
+      "retry": "Retry",
+      "generating": "Generating summary..."
     }
   },
   "onboarding": {
@@ -257,6 +270,17 @@
         "checkFailed": "检查权限失败。请重试。",
         "requestFailed": "请求权限失败。请重试。"
       }
+    },
+    "assistant": {
+      "title": "Set up your assistant",
+      "description": "The meeting assistant and summaries use an LLM provider. Pick one, add your API key if needed, and test the connection.",
+      "test": "Test connection",
+      "testing": "Testing...",
+      "success": "Connected. {{count}} models available.",
+      "failure": "Connection failed: {{error}}",
+      "continue": "Continue",
+      "skip": "Skip for now",
+      "hint": "You can change this later under Post Processing settings."
     }
   },
   "modelSelector": {
