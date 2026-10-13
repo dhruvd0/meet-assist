@@ -835,11 +835,21 @@ impl ProjectStore {
     }
 
     pub fn mark_live_sessions_paused(&self) -> Result<usize> {
-        let conn = self.conn()?;
-        Ok(conn.execute(
+        let mut conn = self.conn()?;
+        let tx = conn.transaction()?;
+        let ts = now();
+        // A crash or quit leaves open sessions behind; close them so they do
+        // not stay open forever.
+        tx.execute(
+            "UPDATE sessions SET ended_at = ?1 WHERE ended_at IS NULL AND meeting_id IN (SELECT id FROM meetings WHERE status = 'live')",
+            params![ts],
+        )?;
+        let flipped = tx.execute(
             "UPDATE meetings SET status = 'paused', updated_at = ?1 WHERE status = 'live'",
-            params![now()],
-        )?)
+            params![ts],
+        )?;
+        tx.commit()?;
+        Ok(flipped)
     }
 }
 
@@ -1124,7 +1134,26 @@ mod tests {
         let ended = s.create_meeting(None, "E").unwrap();
         s.set_meeting_status(ended.id, MeetingStatus::Ended)
             .unwrap();
+        let live_session = s.create_session(live.id).unwrap();
+        let ended_session = s.create_session(ended.id).unwrap();
         assert_eq!(s.mark_live_sessions_paused().unwrap(), 1);
+        let detail = s.get_meeting_detail(live.id).unwrap().unwrap();
+        let ls = detail
+            .sessions
+            .iter()
+            .find(|x| x.id == live_session.id)
+            .unwrap();
+        assert!(ls.ended_at.is_some(), "open session of live meeting closed");
+        let detail = s.get_meeting_detail(ended.id).unwrap().unwrap();
+        let es = detail
+            .sessions
+            .iter()
+            .find(|x| x.id == ended_session.id)
+            .unwrap();
+        assert!(
+            es.ended_at.is_none(),
+            "session of non-live meeting untouched"
+        );
         assert_eq!(
             s.get_meeting(live.id).unwrap().unwrap().status,
             MeetingStatus::Paused
