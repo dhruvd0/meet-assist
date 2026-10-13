@@ -7,6 +7,22 @@ use std::path::Path;
 
 pub const MAX_FILE_BYTES: u64 = 524_288;
 
+/// Directories never indexed, regardless of .gitignore. Dependency and
+/// build output trees are huge and never useful meeting context.
+pub const SKIP_DIRS: &[&str] = &[
+    "node_modules",
+    "target",
+    ".venv",
+    "venv",
+    "dist",
+    "build",
+    "__pycache__",
+];
+
+/// Upper bound on files read per folder source. Hit the cap and the walk
+/// stops with a warning; the source still indexes what was read.
+pub const MAX_FOLDER_FILES: usize = 5000;
+
 pub fn is_probably_binary(bytes: &[u8]) -> bool {
     bytes.iter().take(8192).any(|b| *b == 0)
 }
@@ -57,7 +73,16 @@ pub fn chunks_for_folder(root: &Path) -> Result<Vec<(String, String)>> {
         .git_ignore(true)
         .git_global(true)
         .git_exclude(true)
+        .require_git(false)
+        .filter_entry(|e| {
+            !(e.file_type().map(|t| t.is_dir()).unwrap_or(false)
+                && e.file_name()
+                    .to_str()
+                    .map(|n| SKIP_DIRS.contains(&n))
+                    .unwrap_or(false))
+        })
         .build();
+    let mut files_read = 0usize;
     for entry in walker {
         let entry = match entry {
             Ok(e) => e,
@@ -77,6 +102,7 @@ pub fn chunks_for_folder(root: &Path) -> Result<Vec<(String, String)>> {
                 continue;
             }
         };
+        files_read += 1;
         let rel = path
             .strip_prefix(root)
             .unwrap_or(path)
@@ -86,6 +112,14 @@ pub fn chunks_for_folder(root: &Path) -> Result<Vec<(String, String)>> {
             .join("/");
         for c in chunk_text(&text, MAX_CHUNK_CHARS) {
             out.push((rel.clone(), c));
+        }
+        if files_read >= MAX_FOLDER_FILES {
+            log::warn!(
+                "folder {} hit the {} file limit; indexing what was read",
+                root.display(),
+                MAX_FOLDER_FILES
+            );
+            break;
         }
     }
     out.sort_by(|a, b| a.0.cmp(&b.0));
@@ -160,5 +194,37 @@ mod tests {
     fn binary_detection() {
         assert!(is_probably_binary(b"abc\x00def"));
         assert!(!is_probably_binary("plain text é".as_bytes()));
+    }
+
+    #[test]
+    fn folder_respects_gitignore_without_git_dir() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        fs::write(root.join(".gitignore"), "*.log\n").unwrap();
+        fs::write(root.join("app.log"), "log").unwrap();
+        fs::write(root.join("keep.txt"), "keep").unwrap();
+        let paths: Vec<String> = chunks_for_folder(root)
+            .unwrap()
+            .into_iter()
+            .map(|c| c.0)
+            .collect();
+        assert_eq!(paths, vec!["keep.txt"]);
+    }
+
+    #[test]
+    fn folder_skips_dependency_dirs_even_without_gitignore() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        fs::create_dir_all(root.join("node_modules/pkg")).unwrap();
+        fs::write(root.join("node_modules/pkg/index.js"), "x").unwrap();
+        fs::create_dir_all(root.join("target")).unwrap();
+        fs::write(root.join("target/out.txt"), "y").unwrap();
+        fs::write(root.join("main.rs"), "fn main() {}").unwrap();
+        let paths: Vec<String> = chunks_for_folder(root)
+            .unwrap()
+            .into_iter()
+            .map(|c| c.0)
+            .collect();
+        assert_eq!(paths, vec!["main.rs"]);
     }
 }
