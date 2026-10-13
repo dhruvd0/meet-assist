@@ -107,6 +107,7 @@ impl FrameSlicer {
         frames
     }
 
+    #[cfg(test)]
     pub fn take_partial(&mut self) -> Option<Vec<f32>> {
         if self.buf.is_empty() {
             None
