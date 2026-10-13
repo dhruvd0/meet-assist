@@ -816,6 +816,18 @@ pub fn anthropic_tool_result_message(results: &[(ToolCall, String)]) -> Value {
     })
 }
 
+/// Truncate `s` to at most `max` bytes without splitting a UTF-8 character.
+fn truncate_at_char_boundary(s: &mut String, max: usize) {
+    if s.len() <= max {
+        return;
+    }
+    let mut cut = max;
+    while !s.is_char_boundary(cut) {
+        cut -= 1;
+    }
+    s.truncate(cut);
+}
+
 /// Run a tool-calling conversation until the model answers without tool
 /// calls, or `max_tool_calls` is reached (then one final no-tools request
 /// demanding the answer). Returns the final assistant text.
@@ -907,7 +919,7 @@ pub async fn send_with_tools(
             calls_made += 1;
             let mut r = handler(c);
             if r.len() > 4096 {
-                r.truncate(4096);
+                truncate_at_char_boundary(&mut r, 4096);
                 r.push_str("\n[truncated]");
             }
             results.push((c.clone(), r));
@@ -1321,6 +1333,14 @@ mod tool_tests {
         assert_eq!(a["role"], "user");
         assert_eq!(a["content"][0]["type"], "tool_result");
         assert_eq!(a["content"][0]["tool_use_id"], "c1");
+    }
+
+    #[test]
+    fn truncation_respects_char_boundaries() {
+        let mut s = "é".repeat(5000);
+        truncate_at_char_boundary(&mut s, 4096);
+        assert!(s.len() <= 4096);
+        assert_eq!(s.chars().count(), 2048);
     }
 
     #[test]
