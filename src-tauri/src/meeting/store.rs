@@ -55,14 +55,16 @@ pub struct ProjectStore {
     db_path: PathBuf,
 }
 
-/// FTS5 reports malformed MATCH queries as plain SQLITE_ERROR with messages
-/// such as "unterminated string", "fts5: syntax error near ..." or
-/// "no such column: ...", surfaced while stepping rows rather than at prepare.
-fn is_fts_syntax_error(msg: &str) -> bool {
-    msg.contains("fts5")
-        || msg.contains("syntax error")
-        || msg.contains("unterminated string")
-        || msg.contains("no such column")
+/// Turn free text into a safe FTS5 MATCH expression: each whitespace token
+/// becomes a quoted phrase (inner quotes doubled), joined by implicit AND.
+/// Raw FTS operators are deliberately not exposed; queries come from users
+/// and the model, not from code.
+fn fts_query(input: &str) -> String {
+    input
+        .split_whitespace()
+        .map(|tok| format!("\"{}\"", tok.replace('"', "\"\"")))
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 fn now() -> i64 {
@@ -379,10 +381,13 @@ impl ProjectStore {
         Ok(chunks.len())
     }
 
-    /// Full-text search scoped to one project. Query syntax errors yield an
-    /// empty result instead of an error so a stray quote from the model or
-    /// user never surfaces as a failure.
+    /// Full-text search scoped to one project. The query is sanitized via
+    /// `fts_query`, so any input is valid FTS5 and real errors propagate.
     pub fn search(&self, project_id: i64, query: &str, limit: usize) -> Result<Vec<SearchHit>> {
+        let q = fts_query(query);
+        if q.is_empty() {
+            return Ok(Vec::new());
+        }
         let conn = self.conn()?;
         let mut stmt = conn.prepare(
             "SELECT c.source_id, s.title, c.path, c.ord,
@@ -393,7 +398,7 @@ impl ProjectStore {
              ORDER BY bm25(source_chunks)
              LIMIT ?3",
         )?;
-        let rows = stmt.query_map(params![project_id, query, limit as i64], |row| {
+        let rows = stmt.query_map(params![project_id, q, limit as i64], |row| {
             Ok(SearchHit {
                 source_id: row.get(0)?,
                 source_title: row.get(1)?,
@@ -401,15 +406,8 @@ impl ProjectStore {
                 ord: row.get(3)?,
                 snippet: row.get(4)?,
             })
-        });
-        let result = rows.and_then(|rows| rows.collect::<rusqlite::Result<Vec<_>>>());
-        match result {
-            Ok(hits) => Ok(hits),
-            Err(rusqlite::Error::SqliteFailure(_, Some(msg))) if is_fts_syntax_error(&msg) => {
-                Ok(Vec::new())
-            }
-            Err(e) => Err(e.into()),
-        }
+        })?;
+        Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
     }
 
     pub fn read_chunks(
@@ -591,5 +589,24 @@ mod tests {
             .unwrap();
         s.remove_source(src.id).unwrap();
         assert!(s.search(p.id, "needle", 10).unwrap().is_empty());
+        assert!(s.read_chunks(src.id, None, 0, 10).unwrap().is_empty());
+    }
+
+    #[test]
+    fn search_handles_punctuation_tokens_without_error() {
+        let (_d, s) = store();
+        let p = s.create_project("P").unwrap();
+        let src = s.add_source(p.id, SourceKind::Text, "N", "").unwrap();
+        s.replace_chunks(
+            src.id,
+            &[(
+                "a".into(),
+                "schedule a follow-up with e.g. the C++ team".into(),
+            )],
+        )
+        .unwrap();
+        assert_eq!(s.search(p.id, "follow-up", 10).unwrap().len(), 1);
+        assert_eq!(s.search(p.id, "foo:bar", 10).unwrap().len(), 0);
+        assert_eq!(s.search(p.id, "   ", 10).unwrap().len(), 0);
     }
 }
