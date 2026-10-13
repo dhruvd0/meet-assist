@@ -195,11 +195,13 @@ impl MeetingManager {
     }
 
     /// Meeting id of the running (live or paused) meeting, if any.
+    #[allow(dead_code)] // public accessor with no caller yet
     pub fn active_meeting_id(&self) -> Option<i64> {
         self.lock_active().as_ref().map(|a| a.meeting_id)
     }
 
     /// Session id of the running (live or paused) meeting, if any.
+    #[allow(dead_code)] // public accessor with no caller yet
     pub fn active_session_id(&self) -> Option<i64> {
         self.lock_active().as_ref().map(|a| a.session_id)
     }

@@ -831,6 +831,7 @@ fn truncate_at_char_boundary(s: &mut String, max: usize) {
 /// Run a tool-calling conversation until the model answers without tool
 /// calls, or `max_tool_calls` is reached (then one final no-tools request
 /// demanding the answer). Returns the final assistant text.
+#[allow(clippy::too_many_arguments)] // mirrors the request shape; a params struct adds no clarity
 pub async fn send_with_tools(
     provider: &PostProcessProvider,
     api_key: String,

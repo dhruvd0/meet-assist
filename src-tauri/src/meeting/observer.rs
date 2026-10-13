@@ -66,6 +66,9 @@ pub struct JudgeInput {
 #[derive(Debug)]
 pub enum JudgeError {
     ToolsRejected,
+    /// Failure detail; read only through the derived `Debug` in log lines,
+    /// which dead-code analysis ignores.
+    #[allow(dead_code)]
     Other(String),
 }
 

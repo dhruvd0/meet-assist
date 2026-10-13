@@ -130,6 +130,8 @@ Loop limits: 5 tool calls per tick, 15 s wall budget, tool results capped at 4 K
 
 `llm_client` gains `send_with_tools(messages, tools, handler)` supporting tool calls in both OpenAI and Anthropic formats. If the provider rejects tools, the observer runs the no-tools path with only the base prompt and shows a banner. Session and rolling summaries use the same loop so they can verify against sources.
 
+`response_format` (the output schema) is applied only on the final, tool-less request, because providers reject or ignore it alongside tools. Anthropic has no `response_format`, so it receives the schema in the system prompt instead.
+
 ### Observer output schema
 
 ```json
