@@ -5,6 +5,7 @@ use crate::managers::audio::AudioRecordingManager;
 use crate::managers::transcription::TranscriptionManager;
 use crate::meeting::capture::{MeetingCapture, Utterance};
 use crate::meeting::store::{Meeting, MeetingStatus, ProjectStore, TranscriptLine};
+use crate::meeting::summary::{run_summary_job, SessionSummaryPayload, Summarizer};
 use crate::meeting::system_capture::SystemCapture;
 use anyhow::{anyhow, Result};
 use log::{error, info, warn};
@@ -172,6 +173,7 @@ pub struct MeetingManager {
     /// True while capture runs; keeps the transcription model warm.
     live: AtomicBool,
     app: Option<AppHandle>,
+    summarizer: Option<Arc<dyn Summarizer>>,
 }
 
 fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
@@ -221,6 +223,9 @@ impl MeetingManager {
             transition: Mutex::new(()),
             live: AtomicBool::new(false),
             app: Some(app.clone()),
+            summarizer: Some(Arc::new(crate::meeting::summary::LlmSummarizer {
+                app: app.clone(),
+            })),
         }
     }
 
@@ -240,6 +245,67 @@ impl MeetingManager {
             transition: Mutex::new(()),
             live: AtomicBool::new(false),
             app: None,
+            summarizer: None,
+        }
+    }
+
+    #[cfg(test)]
+    pub fn with_summarizer(mut self, s: Arc<dyn Summarizer>) -> Self {
+        self.summarizer = Some(s);
+        self
+    }
+
+    /// Summarize a session on a background thread and emit the result.
+    /// No-op without a summarizer.
+    pub fn spawn_summary(&self, session_id: i64) {
+        self.spawn_summaries(vec![session_id]);
+    }
+
+    /// Summarize sessions one after another (the rolling summary is a chain,
+    /// so they must not run concurrently) on one background thread.
+    fn spawn_summaries(&self, session_ids: Vec<i64>) {
+        let Some(summarizer) = self.summarizer.clone() else {
+            return;
+        };
+        if session_ids.is_empty() {
+            return;
+        }
+        let store = Arc::clone(&self.store);
+        let app = self.app.clone();
+        let spawned = std::thread::Builder::new()
+            .name("meet-summary".into())
+            .spawn(move || {
+                for session_id in session_ids {
+                    match run_summary_job(&store, summarizer.as_ref(), session_id) {
+                        Ok(Some(summary)) => {
+                            let Ok(Some(session)) = store.get_session(session_id) else {
+                                continue;
+                            };
+                            let rolling_summary = store
+                                .get_meeting(session.meeting_id)
+                                .ok()
+                                .flatten()
+                                .and_then(|m| m.rolling_summary)
+                                .unwrap_or_default();
+                            if let Some(app) = &app {
+                                let payload = SessionSummaryPayload {
+                                    meeting_id: session.meeting_id,
+                                    session_id,
+                                    summary,
+                                    rolling_summary,
+                                };
+                                if let Err(e) = payload.emit(app) {
+                                    error!("emit session summary: {e}");
+                                }
+                            }
+                        }
+                        Ok(None) => {}
+                        Err(e) => warn!("summary for session {session_id} failed: {e:#}"),
+                    }
+                }
+            });
+        if let Err(e) = spawned {
+            error!("spawn meet-summary: {e}");
         }
     }
 
@@ -559,6 +625,9 @@ impl MeetingManager {
         // write failed, and the UI must see that.
         *self.lock_active() = None;
         self.emit_state();
+        if result.is_ok() {
+            self.spawn_summary(session_id);
+        }
         result
     }
 
@@ -571,7 +640,15 @@ impl MeetingManager {
         }
         self.store.end_open_sessions(meeting_id)?;
         self.store
-            .set_meeting_status(meeting_id, MeetingStatus::Ended)
+            .set_meeting_status(meeting_id, MeetingStatus::Ended)?;
+        let ids = self
+            .store
+            .sessions_without_summary(meeting_id)?
+            .into_iter()
+            .map(|s| s.id)
+            .collect();
+        self.spawn_summaries(ids);
+        Ok(())
     }
 }
 
@@ -727,6 +804,70 @@ mod tests {
         assert_eq!(lines[0].text, "heard 4800 samples");
         assert_eq!(lines[1].text, "heard 1600 samples");
         assert!(lines.iter().all(|l| l.speaker == "me"));
+    }
+
+    struct SlowSummarizer;
+    impl Summarizer for SlowSummarizer {
+        fn summarize_session(
+            &self,
+            _t: &str,
+            _c: &str,
+            _l: &[TranscriptLine],
+        ) -> anyhow::Result<crate::meeting::summary::SessionSummary> {
+            std::thread::sleep(std::time::Duration::from_millis(200));
+            Ok(crate::meeting::summary::SessionSummary {
+                recap: "done".into(),
+                ..Default::default()
+            })
+        }
+        fn merge_rolling(
+            &self,
+            _p: Option<&str>,
+            _n: &crate::meeting::summary::SessionSummary,
+        ) -> anyhow::Result<String> {
+            Ok("rolled".into())
+        }
+    }
+
+    #[test]
+    fn end_returns_before_the_summary_finishes_and_summary_lands() {
+        let (_d, m, cap, _dict) = mgr(false);
+        let m = m.with_summarizer(Arc::new(SlowSummarizer));
+        let meeting = m.start(None, None).unwrap();
+        let sid = m.state().session_id.unwrap();
+        let tx = cap.senders.lock().unwrap()[0].clone().unwrap();
+        tx.send(Utterance {
+            speaker: "me".into(),
+            samples: vec![0.1; 4800],
+            started_at: 1,
+        })
+        .unwrap();
+        drop(tx);
+        wait_lines(&m, meeting.id, 1);
+        let t0 = std::time::Instant::now();
+        m.end().unwrap();
+        assert!(t0.elapsed() < std::time::Duration::from_millis(50));
+        assert!(m
+            .store()
+            .get_session(sid)
+            .unwrap()
+            .unwrap()
+            .summary
+            .is_none());
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        loop {
+            if m.store()
+                .get_session(sid)
+                .unwrap()
+                .unwrap()
+                .summary
+                .is_some()
+            {
+                break;
+            }
+            assert!(std::time::Instant::now() < deadline, "summary never landed");
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
     }
 
     #[test]

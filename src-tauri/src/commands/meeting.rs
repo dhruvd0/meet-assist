@@ -145,3 +145,12 @@ pub fn get_observer_readiness(app: tauri::AppHandle) -> ObserverReadiness {
         detail: r.detail(),
     }
 }
+
+/// Summarize a session in the background (also the UI's Retry). The result
+/// arrives as a `SessionSummaryPayload` event.
+#[tauri::command]
+#[specta::specta]
+pub fn summarize_session(mm: Mm<'_>, session_id: i64) -> Result<(), String> {
+    mm.spawn_summary(session_id);
+    Ok(())
+}

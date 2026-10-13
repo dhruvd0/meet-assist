@@ -834,6 +834,7 @@ pub fn run(cli_args: CliArgs) {
             commands::meeting::hide_intervention_window,
             commands::meeting::focus_meeting,
             commands::meeting::get_observer_readiness,
+            commands::meeting::summarize_session,
         ])
         .events(collect_events![
             managers::history::HistoryUpdatePayload,
@@ -843,6 +844,7 @@ pub fn run(cli_args: CliArgs) {
             meeting::session::MeetingStatePayload,
             meeting::session::TranscriptLinePayload,
             meeting::session::MeetingCaptureWarningPayload,
+            meeting::summary::SessionSummaryPayload,
             meeting::observer::InterventionPayload,
             meeting::observer::ObserverStatusPayload,
             commands::meeting::OpenMeetingPayload,

@@ -10,5 +10,6 @@ pub mod resample;
 pub mod segment;
 pub mod session;
 pub mod store;
+pub mod summary;
 pub mod system_capture;
 pub mod tools;
