@@ -136,6 +136,7 @@ pub struct SystemCapture {
     stream: handy_cpal::Stream,
     #[cfg(any(target_os = "macos", target_os = "windows"))]
     worker: std::thread::JoinHandle<()>,
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
     stopping: Arc<AtomicBool>,
     #[cfg(any(target_os = "macos", target_os = "windows"))]
     dropped: Arc<AtomicU64>,

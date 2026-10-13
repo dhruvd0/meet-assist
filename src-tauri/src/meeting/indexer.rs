@@ -223,9 +223,11 @@ pub fn image_digest_prompt() -> String {
     "Describe this image for someone who cannot see it, in at most 120 words: what it shows, any text in it, and why it might matter in a meeting.".to_string()
 }
 
-const MAX_VISION_IMAGE_BYTES: u64 = 4 * 1024 * 1024;
+/// Anthropic caps the base64 payload at 5 MB; base64 inflates by 4/3, so
+/// 3.7 MB of raw bytes (about 4.93 MB encoded) stays under it.
+const MAX_VISION_IMAGE_BYTES: u64 = 3_700_000;
 
-/// Read an image for a vision request: known type, at most 4 MB.
+/// Read an image for a vision request: known type, at most 3.7 MB.
 pub fn read_image_for_vision(path: &Path) -> Result<(&'static str, Vec<u8>)> {
     let ext = path
         .extension()
@@ -259,7 +261,7 @@ mod tests {
         fs::write(&bad, b"x").unwrap();
         assert!(read_image_for_vision(&bad).is_err());
         let big = dir.path().join("b.png");
-        fs::write(&big, vec![0u8; 4 * 1024 * 1024 + 1]).unwrap();
+        fs::write(&big, vec![0u8; 3_700_001]).unwrap();
         assert!(read_image_for_vision(&big).is_err());
         let ok = dir.path().join("c.png");
         fs::write(&ok, b"x").unwrap();

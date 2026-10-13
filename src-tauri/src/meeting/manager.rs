@@ -24,6 +24,8 @@ pub trait Describer: Send + Sync {
     fn describe(&self, mime: &str, bytes: &[u8]) -> Result<String, String>;
 }
 
+const DESCRIBE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60);
+
 /// Production describer backed by the configured meeting provider.
 pub struct LlmDescriber {
     app: AppHandle,
@@ -40,14 +42,21 @@ impl Describer for LlmDescriber {
             .meeting_model()
             .ok_or_else(|| "no provider".to_string())?;
         let key = settings.meeting_api_key();
-        let fut = crate::llm_client::describe_image(
-            &provider,
-            key,
-            &model,
-            indexer::image_digest_prompt(),
-            mime,
-            bytes,
-        );
+        let fut = async {
+            tokio::time::timeout(
+                DESCRIBE_TIMEOUT,
+                crate::llm_client::describe_image(
+                    &provider,
+                    key,
+                    &model,
+                    indexer::image_digest_prompt(),
+                    mime,
+                    bytes,
+                ),
+            )
+            .await
+            .unwrap_or_else(|_| Err("image description timed out".to_string()))
+        };
         match tokio::runtime::Handle::try_current() {
             Ok(h) => tokio::task::block_in_place(|| h.block_on(fut)),
             Err(_) => tokio::runtime::Builder::new_current_thread()
@@ -219,11 +228,11 @@ impl ProjectManager {
     /// to the (empty) caption path.
     fn describe_image_source(&self, src: &Source) -> Option<String> {
         let describer = self.describer.as_ref()?;
-        let enabled = match &self.app {
-            Some(app) => crate::settings::get_settings(app).meeting_vision_enabled,
-            None => true,
-        };
-        if !enabled {
+        // Images leave the machine, so both the assistant opt-in and the
+        // vision toggle must be on.
+        let settings = self.app.as_ref().map(crate::settings::get_settings);
+        let vision_on = settings.as_ref().is_none_or(|s| s.meeting_vision_enabled);
+        if !vision_on || !crate::meeting::session::cloud_allowed(settings.as_ref()) {
             return None;
         }
         let (mime, bytes) = match indexer::read_image_for_vision(Path::new(&src.locator)) {
@@ -347,6 +356,15 @@ impl ProjectManager {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn image_digests_need_the_assistant_opt_in() {
+        let mut s = crate::settings::get_default_settings();
+        s.meeting_vision_enabled = true;
+        assert!(!crate::meeting::session::cloud_allowed(Some(&s)));
+        s.meeting_assistant_enabled = true;
+        assert!(crate::meeting::session::cloud_allowed(Some(&s)));
+    }
+
     use super::*;
     use crate::meeting::store::{SourceKind, SourceStatus};
     use std::fs;

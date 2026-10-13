@@ -19,7 +19,10 @@ use tauri::AppHandle;
 use tauri_specta::Event;
 
 /// How long pause/end wait for the transcriber to finish queued utterances.
+#[cfg(not(test))]
 const WORKER_DRAIN_TIMEOUT: Duration = Duration::from_secs(10);
+#[cfg(test)]
+const WORKER_DRAIN_TIMEOUT: Duration = Duration::from_millis(300);
 
 pub trait Transcriber: Send + Sync {
     fn transcribe(&self, samples: Vec<f32>) -> Result<String>;
@@ -178,21 +181,29 @@ pub struct MeetingManager {
     summary_lock: Arc<Mutex<()>>,
 }
 
+/// Whether transcript text may go to the cloud provider: the assistant
+/// opt-in must be on. No settings (tests) counts as allowed.
+pub fn cloud_allowed(settings: Option<&crate::settings::AppSettings>) -> bool {
+    settings.is_none_or(|s| s.meeting_assistant_enabled)
+}
+
 fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
     m.lock().unwrap_or_else(|p| p.into_inner())
 }
 
 /// Stop capture (dropping the utterance sender) and wait for the worker to
-/// transcribe what is already queued.
-fn stop_and_drain(capture: Option<SharedCapture>, worker: Option<JoinHandle<()>>) {
+/// transcribe what is already queued. Returns the worker if it is still busy
+/// after the timeout, so the caller can wait for it before using the lines.
+fn stop_and_drain(
+    capture: Option<SharedCapture>,
+    worker: Option<JoinHandle<()>>,
+) -> Option<JoinHandle<()>> {
     if let Some(shared) = capture {
         if let Some(handle) = lock(&shared).take() {
             handle.stop();
         }
     }
-    let Some(worker) = worker else {
-        return;
-    };
+    let worker = worker?;
     let deadline = Instant::now() + WORKER_DRAIN_TIMEOUT;
     while !worker.is_finished() && Instant::now() < deadline {
         std::thread::sleep(Duration::from_millis(20));
@@ -201,11 +212,13 @@ fn stop_and_drain(capture: Option<SharedCapture>, worker: Option<JoinHandle<()>>
         if worker.join().is_err() {
             error!("meet-transcriber panicked");
         }
+        None
     } else {
         warn!(
-            "meet-transcriber still busy after {}s; leaving it to finish",
-            WORKER_DRAIN_TIMEOUT.as_secs()
+            "meet-transcriber still busy after {:?}; leaving it to finish",
+            WORKER_DRAIN_TIMEOUT
         );
+        Some(worker)
     }
 }
 
@@ -262,16 +275,27 @@ impl MeetingManager {
     /// Summarize a session on a background thread and emit the result.
     /// No-op without a summarizer.
     pub fn spawn_summary(&self, session_id: i64) {
-        self.spawn_summaries(vec![session_id]);
+        self.spawn_summaries(vec![session_id], None);
     }
 
     /// Summarize sessions one after another (the rolling summary is a chain,
     /// so they must not run concurrently) on one background thread.
-    fn spawn_summaries(&self, session_ids: Vec<i64>) {
+    /// `pending` is a transcriber still finishing queued utterances; the
+    /// thread joins it first so the summary sees every line.
+    fn spawn_summaries(&self, session_ids: Vec<i64>, pending: Option<JoinHandle<()>>) {
         let Some(summarizer) = self.summarizer.clone() else {
             return;
         };
         if session_ids.is_empty() {
+            return;
+        }
+        if !cloud_allowed(
+            self.app
+                .as_ref()
+                .map(crate::settings::get_settings)
+                .as_ref(),
+        ) {
+            log::debug!("meeting assistant is off; not sending sessions for summary");
             return;
         }
         let store = Arc::clone(&self.store);
@@ -280,6 +304,11 @@ impl MeetingManager {
         let spawned = std::thread::Builder::new()
             .name("meet-summary".into())
             .spawn(move || {
+                if let Some(worker) = pending {
+                    if worker.join().is_err() {
+                        error!("meet-transcriber panicked");
+                    }
+                }
                 for session_id in session_ids {
                     let result = {
                         let _guard = lock(&summary_lock);
@@ -624,7 +653,7 @@ impl MeetingManager {
                 a.worker.take(),
             )
         };
-        stop_and_drain(capture, worker);
+        let leftover = stop_and_drain(capture, worker);
         self.live.store(false, Ordering::SeqCst);
         let result = self.store.end_session(session_id).and_then(|()| {
             self.store
@@ -635,7 +664,7 @@ impl MeetingManager {
         *self.lock_active() = None;
         self.emit_state();
         if result.is_ok() {
-            self.spawn_summary(session_id);
+            self.spawn_summaries(vec![session_id], leftover);
         }
         result
     }
@@ -656,7 +685,7 @@ impl MeetingManager {
             .into_iter()
             .map(|s| s.id)
             .collect();
-        self.spawn_summaries(ids);
+        self.spawn_summaries(ids, None);
         Ok(())
     }
 }
@@ -813,6 +842,74 @@ mod tests {
         assert_eq!(lines[0].text, "heard 4800 samples");
         assert_eq!(lines[1].text, "heard 1600 samples");
         assert!(lines.iter().all(|l| l.speaker == "me"));
+    }
+
+    #[test]
+    fn cloud_allowed_requires_the_assistant_opt_in() {
+        assert!(cloud_allowed(None), "no settings (tests) means allowed");
+        let mut s = crate::settings::get_default_settings();
+        assert!(!cloud_allowed(Some(&s)), "assistant is opt-in");
+        s.meeting_assistant_enabled = true;
+        assert!(cloud_allowed(Some(&s)));
+    }
+
+    struct LinesSeen(Mutex<Vec<usize>>);
+    impl Summarizer for LinesSeen {
+        fn summarize_session(
+            &self,
+            _t: &str,
+            _c: &str,
+            l: &[TranscriptLine],
+        ) -> anyhow::Result<crate::meeting::summary::SessionSummary> {
+            self.0.lock().unwrap().push(l.len());
+            Ok(Default::default())
+        }
+        fn merge_rolling(
+            &self,
+            _p: Option<&str>,
+            _n: &crate::meeting::summary::SessionSummary,
+        ) -> anyhow::Result<String> {
+            Ok("rolled".into())
+        }
+    }
+
+    #[test]
+    fn summary_waits_for_a_transcriber_that_outlives_the_drain_timeout() {
+        // Transcription (700 ms) outlasts the 300 ms test drain timeout.
+        let (_d, m, cap, _dict) = mgr_with_delay(false, 700);
+        let seen = Arc::new(LinesSeen(Mutex::new(vec![])));
+        let m = m.with_summarizer(seen.clone());
+        let meeting = m.start(None, None).unwrap();
+        let sid = m.state().session_id.unwrap();
+        cap.senders.lock().unwrap()[0]
+            .as_ref()
+            .unwrap()
+            .send(Utterance {
+                speaker: "me".into(),
+                samples: vec![0.1; 4800],
+                started_at: 1,
+            })
+            .unwrap();
+        m.end().unwrap();
+        assert!(m.store().session_lines(sid).unwrap().is_empty());
+        wait_lines(&m, meeting.id, 1);
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while m
+            .store()
+            .get_session(sid)
+            .unwrap()
+            .unwrap()
+            .summary
+            .is_none()
+        {
+            assert!(std::time::Instant::now() < deadline, "summary never landed");
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+        assert_eq!(
+            *seen.0.lock().unwrap(),
+            vec![1],
+            "summary saw the late line"
+        );
     }
 
     struct SlowSummarizer;
