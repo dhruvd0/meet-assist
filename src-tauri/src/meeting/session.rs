@@ -174,6 +174,8 @@ pub struct MeetingManager {
     live: AtomicBool,
     app: Option<AppHandle>,
     summarizer: Option<Arc<dyn Summarizer>>,
+    /// Serialises summary jobs: the rolling summary is a chain.
+    summary_lock: Arc<Mutex<()>>,
 }
 
 fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
@@ -226,6 +228,7 @@ impl MeetingManager {
             summarizer: Some(Arc::new(crate::meeting::summary::LlmSummarizer {
                 app: app.clone(),
             })),
+            summary_lock: Arc::new(Mutex::new(())),
         }
     }
 
@@ -246,6 +249,7 @@ impl MeetingManager {
             live: AtomicBool::new(false),
             app: None,
             summarizer: None,
+            summary_lock: Arc::new(Mutex::new(())),
         }
     }
 
@@ -272,11 +276,16 @@ impl MeetingManager {
         }
         let store = Arc::clone(&self.store);
         let app = self.app.clone();
+        let summary_lock = Arc::clone(&self.summary_lock);
         let spawned = std::thread::Builder::new()
             .name("meet-summary".into())
             .spawn(move || {
                 for session_id in session_ids {
-                    match run_summary_job(&store, summarizer.as_ref(), session_id) {
+                    let result = {
+                        let _guard = lock(&summary_lock);
+                        run_summary_job(&store, summarizer.as_ref(), session_id)
+                    };
+                    match result {
                         Ok(Some(summary)) => {
                             let Ok(Some(session)) = store.get_session(session_id) else {
                                 continue;
@@ -381,6 +390,7 @@ impl MeetingManager {
         let store = Arc::clone(&self.store);
         let transcriber = Arc::clone(&self.transcriber);
         let app = self.app.clone();
+        let summary_lock = Arc::clone(&self.summary_lock);
         let spawned = std::thread::Builder::new()
             .name("meet-transcriber".into())
             .spawn(move || {
@@ -868,6 +878,82 @@ mod tests {
             assert!(std::time::Instant::now() < deadline, "summary never landed");
             std::thread::sleep(std::time::Duration::from_millis(20));
         }
+    }
+
+    struct ChainSummarizer {
+        seen: Mutex<Vec<Option<String>>>,
+    }
+    impl Summarizer for ChainSummarizer {
+        fn summarize_session(
+            &self,
+            _t: &str,
+            _c: &str,
+            _l: &[TranscriptLine],
+        ) -> anyhow::Result<crate::meeting::summary::SessionSummary> {
+            Ok(Default::default())
+        }
+        fn merge_rolling(
+            &self,
+            p: Option<&str>,
+            _n: &crate::meeting::summary::SessionSummary,
+        ) -> anyhow::Result<String> {
+            let first = self.seen.lock().unwrap().is_empty();
+            self.seen.lock().unwrap().push(p.map(String::from));
+            if first {
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            }
+            Ok(format!("{}+", p.unwrap_or("")))
+        }
+    }
+
+    #[test]
+    fn concurrent_summaries_chain_the_rolling_summary() {
+        let (_d, m, _cap, _dict) = mgr(false);
+        let fake = Arc::new(ChainSummarizer {
+            seen: Mutex::new(vec![]),
+        });
+        let m = m.with_summarizer(fake.clone());
+        let meeting = m.store().create_meeting(None, "M").unwrap();
+        let mut ids = vec![];
+        for _ in 0..2 {
+            let s = m.store().create_session(meeting.id).unwrap();
+            m.store().append_line(s.id, "me", "x", 1).unwrap();
+            m.store().end_session(s.id).unwrap();
+            ids.push(s.id);
+        }
+        m.spawn_summary(ids[0]);
+        m.spawn_summary(ids[1]);
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        loop {
+            let done = ids.iter().all(|id| {
+                m.store()
+                    .get_session(*id)
+                    .unwrap()
+                    .unwrap()
+                    .summary
+                    .is_some()
+            });
+            if done {
+                break;
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "summaries never landed"
+            );
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+        let seen = fake.seen.lock().unwrap().clone();
+        assert_eq!(seen.len(), 2);
+        assert_eq!(seen[0], None);
+        assert_eq!(seen[1], Some("+".to_string()));
+        assert_eq!(
+            m.store()
+                .get_meeting(meeting.id)
+                .unwrap()
+                .unwrap()
+                .rolling_summary,
+            Some("++".into())
+        );
     }
 
     #[test]

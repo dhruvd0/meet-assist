@@ -179,7 +179,9 @@ impl Summarizer for LlmSummarizer {
 }
 
 /// Summarize one session and fold it into the meeting's rolling summary.
-/// `Ok(None)` when the session has no transcript.
+/// `Ok(None)` when the session has no transcript, is still open, or already
+/// has a summary. All-or-nothing: both summaries are written only after both
+/// LLM calls succeed. Callers must serialise jobs (see `MeetingManager`).
 pub fn run_summary_job(
     store: &ProjectStore,
     summarizer: &dyn Summarizer,
@@ -188,6 +190,9 @@ pub fn run_summary_job(
     let session = store
         .get_session(session_id)?
         .ok_or_else(|| anyhow!("session {session_id} not found"))?;
+    if session.summary.is_some() || session.ended_at.is_none() {
+        return Ok(None);
+    }
     let meeting = store
         .get_meeting(session.meeting_id)?
         .ok_or_else(|| anyhow!("meeting {} not found", session.meeting_id))?;
@@ -196,8 +201,9 @@ pub fn run_summary_job(
         return Ok(None);
     }
     let summary = summarizer.summarize_session(&meeting.title, &meeting.context, &lines)?;
-    store.set_session_summary(session_id, &serde_json::to_string(&summary)?)?;
     let rolling = summarizer.merge_rolling(meeting.rolling_summary.as_deref(), &summary)?;
+    // `set_rolling_summary` truncates at its cap rather than erroring.
+    store.set_session_summary(session_id, &serde_json::to_string(&summary)?)?;
     store.set_rolling_summary(meeting.id, &rolling)?;
     Ok(Some(summary))
 }
@@ -238,6 +244,7 @@ mod tests {
         let store = ProjectStore::open(dir.path().join("m.db")).unwrap();
         let m = store.create_meeting(None, "Kickoff").unwrap();
         let s = store.create_session(m.id).unwrap();
+        store.end_session(s.id).unwrap();
         (dir, store, m.id, s.id)
     }
 
@@ -297,6 +304,58 @@ mod tests {
             fake.previous_seen.lock().unwrap().as_slice(),
             &[Some("earlier".to_string())]
         );
+    }
+
+    struct FailMerge;
+    impl Summarizer for FailMerge {
+        fn summarize_session(
+            &self,
+            _t: &str,
+            _c: &str,
+            _l: &[TranscriptLine],
+        ) -> Result<SessionSummary> {
+            Ok(SessionSummary::default())
+        }
+        fn merge_rolling(&self, _p: Option<&str>, _n: &SessionSummary) -> Result<String> {
+            Err(anyhow!("merge down"))
+        }
+    }
+
+    #[test]
+    fn merge_failure_stores_nothing() {
+        let (_d, store, mid, sid) = setup();
+        store.set_rolling_summary(mid, "earlier").unwrap();
+        store.append_line(sid, "me", "hello", 1).unwrap();
+        assert!(run_summary_job(&store, &FailMerge, sid).is_err());
+        assert!(store.get_session(sid).unwrap().unwrap().summary.is_none());
+        assert_eq!(
+            store.get_meeting(mid).unwrap().unwrap().rolling_summary,
+            Some("earlier".into())
+        );
+    }
+
+    #[test]
+    fn already_summarised_session_is_skipped() {
+        let (_d, store, _mid, sid) = setup();
+        store.append_line(sid, "me", "hello", 1).unwrap();
+        let fake = Fake {
+            previous_seen: Mutex::new(vec![]),
+        };
+        assert!(run_summary_job(&store, &fake, sid).unwrap().is_some());
+        assert!(run_summary_job(&store, &fake, sid).unwrap().is_none());
+        assert_eq!(fake.previous_seen.lock().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn open_session_is_not_summarised() {
+        let (_d, store, mid, _sid) = setup();
+        let open = store.create_session(mid).unwrap();
+        store.append_line(open.id, "me", "hello", 1).unwrap();
+        let fake = Fake {
+            previous_seen: Mutex::new(vec![]),
+        };
+        assert!(run_summary_job(&store, &fake, open.id).unwrap().is_none());
+        assert!(fake.previous_seen.lock().unwrap().is_empty());
     }
 
     #[test]
