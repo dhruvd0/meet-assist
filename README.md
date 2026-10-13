@@ -2,7 +2,7 @@
 
 **A private meeting copilot that listens to your call and nudges only you when the conversation needs it.**
 
-Meet Assist runs on your desktop. It transcribes both sides of a call locally, watches for loops, stuck moments, missing facts, and untried ideas, and shows you a quiet card with a beep. It never joins the call and never speaks into it.
+Meet Assist runs on your desktop. It is being built to transcribe both sides of a call locally, watch for loops, stuck moments, missing facts, and untried ideas, and show you a quiet card with a beep. It never joins the call and never speaks into it.
 
 It is a fork of [Handy](https://github.com/cjpais/Handy), the open source offline dictation app. Handy's dictation still works here. Read the [vision](docs/VISION.md) for why this exists and the [architecture](docs/ARCHITECTURE.md) for how it is built.
 
@@ -21,7 +21,7 @@ Until step 2 lands, this app behaves like Handy with a new name.
 ## How it works
 
 1. **Start a meeting.** Button or global shortcut. A meeting is a thread; you can pause, resume, end, and continue it on another day.
-2. **It listens.** Your microphone and, where supported, system audio for the remote side. Each utterance is transcribed locally and tagged as you or them.
+2. **It listens.** Your microphone and, where supported, system audio for the remote side (macOS first; Windows/Linux not yet verified). Each utterance is transcribed locally and tagged as you or them.
 3. **It watches.** Every ~20 seconds the recent transcript, your pasted context (agenda, notes), and a rolling summary go to the language model you chose with one question: should I speak up?
 4. **It nudges.** If yes, you hear a beep and see a floating card: looping, stuck, quick fact, or idea. Dismiss it or open the meeting.
 5. **It remembers.** Ending a session writes a summary. Continuing a meeting carries the summary forward.
@@ -50,7 +50,19 @@ Platform-specific details are in [BUILD.md](BUILD.md).
 
 ### Migrating from Handy
 
-Meet Assist uses its own bundle identifier (`com.meetassist.app`), so it gets a fresh app-data directory. Handy's settings, history, and downloaded models are not picked up automatically. To reuse downloaded models, copy the `models` folder from Handy's app-data directory into Meet Assist's (paths in [Manual Model Installation](#manual-model-installation-for-proxy-users-or-network-restrictions)).
+Meet Assist uses its own bundle identifier (`com.meetassist.app`), so it gets a fresh app-data directory and macOS treats it as a new app. Handy's settings, history, and downloaded models are not picked up automatically, and you will be asked to grant Microphone and Accessibility permissions again.
+
+To reuse what Handy already has, copy `models/`, `settings_store.json`, and `history.db` from Handy's directory into Meet Assist's:
+
+| OS      | Handy                                           | Meet Assist                                         |
+| ------- | ----------------------------------------------- | --------------------------------------------------- |
+| macOS   | `~/Library/Application Support/com.pais.handy/` | `~/Library/Application Support/com.meetassist.app/` |
+| Windows | `%APPDATA%\com.pais.handy\`                     | `%APPDATA%\com.meetassist.app\`                     |
+| Linux   | `~/.local/share/com.pais.handy/`                | `~/.local/share/com.meetassist.app/`                |
+
+Quit or uninstall Handy before using Meet Assist, or change one app's shortcut. Both apps register the same default shortcut, so one key press would record and paste twice.
+
+**Updater:** the self-update check is inherited from Handy and is not yet pointed at Meet Assist releases. Until it is, turn off update checks in Settings or launch with `HANDY_DISABLE_UPDATER=1`.
 
 ## Dictation (inherited from Handy)
 
@@ -257,15 +269,18 @@ The typical paths are:
 
 - **macOS**: `~/Library/Application Support/com.meetassist.app/`
 - **Windows**: `C:\Users\{username}\AppData\Roaming\com.meetassist.app\`
-- **Linux**: `~/.config/com.meetassist.app/`
+- **Linux**: `~/.local/share/com.meetassist.app/`
 
 #### Step 2: Create Models Directory
 
 Inside your app data directory, create a `models` folder if it doesn't already exist:
 
 ```bash
-# macOS/Linux
+# macOS
 mkdir -p ~/Library/Application\ Support/com.meetassist.app/models
+
+# Linux
+mkdir -p ~/.local/share/com.meetassist.app/models
 
 # Windows (PowerShell)
 New-Item -ItemType Directory -Force -Path "$env:APPDATA\com.meetassist.app\models"

@@ -30,7 +30,7 @@ bun run tauri dev
 2. Follow existing patterns. Reuse `TranscriptionManager`, `CaptureVad`, `llm_client`, `audio_feedback`, and `components/ui`. Keep the current design language.
 3. Before committing: `bun run lint`, `bun run format`, `cargo clippy` in `src-tauri`.
 4. Conventional commits: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`. Say why.
-5. Open a PR using [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md). Link the spec or plan task in place of community feedback. Disclose AI assistance: whether, which tools, how much.
+5. Open a PR using [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md). Fill the "Spec or Plan" section with the spec section or plan task the PR implements. Disclose AI assistance: whether, which tools, how much.
 
 ## Code style
 

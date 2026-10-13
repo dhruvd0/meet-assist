@@ -150,15 +150,15 @@ Resources only need re-copying if they change upstream (new icons, sounds, model
 
 Local builds use the ad-hoc `signingIdentity: "-"`. A rebuild can have a new macOS code
 identity while the old **System Settings > Privacy & Security > Accessibility** entry
-remains visibly enabled, leaving Handy on `Waiting...`.
+remains visibly enabled, leaving Meet Assist on `Waiting...`.
 
-After installing the final bundle at `/Applications/Handy.app`, quit Handy, clear only its
+After installing the final bundle at `"/Applications/Meet Assist.app"`, quit Meet Assist, clear only its
 stale Accessibility record, then reopen it:
 
 ```bash
 osascript -e 'tell application id "com.meetassist.app" to quit' || true
 tccutil reset Accessibility com.meetassist.app
-open /Applications/Handy.app
+open "/Applications/Meet Assist.app"
 ```
 
 Grant Accessibility again when prompted. This does not reset Microphone or other TCC
@@ -168,8 +168,8 @@ For optional diagnosis, compare the designated requirements of the previous and 
 bundles:
 
 ```bash
-codesign -dr - /path/to/previous/Handy.app 2>&1
-codesign -dr - /Applications/Handy.app 2>&1
+codesign -dr - "/path/to/previous/Meet Assist.app" 2>&1
+codesign -dr - "/Applications/Meet Assist.app" 2>&1
 ```
 
 An ad-hoc requirement contains a `cdhash`; a changed requirement confirms the rebuild is

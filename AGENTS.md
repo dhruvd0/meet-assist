@@ -214,7 +214,7 @@ See the [Troubleshooting](README.md#troubleshooting) section in README.md.
 
 This fork is not under Handy's feature freeze. Meeting-subsystem features are in scope when they follow the design spec. Keep these rules:
 
-- **Opening a PR:** Read [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md) and fill every section. The "Community Feedback" section may be answered with a link to the relevant spec or plan instead of a Discussion. Leave "Human Written Description" as a TODO for the human contributor.
+- **Opening a PR:** Read [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md) and fill every section. The "Spec or Plan" section must link the spec section or plan task the PR implements. Leave "Human Written Description" as a TODO for the human contributor.
 - **Opening an issue:** Use [`.github/ISSUE_TEMPLATE/bug_report.md`](.github/ISSUE_TEMPLATE/bug_report.md) for bugs. Feature ideas for the meeting subsystem go in a spec change under `docs/superpowers/specs/`, not an issue.
 - **Upstream sync:** Dictation fixes from Handy are welcome; cherry-pick with the upstream commit referenced in the message.
 - **Translations:** Follow [CONTRIBUTING_TRANSLATIONS.md](CONTRIBUTING_TRANSLATIONS.md). New `meetings.*` keys land in `en/translation.json` first; other locales fall back to English.
