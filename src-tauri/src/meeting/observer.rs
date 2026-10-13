@@ -565,7 +565,11 @@ mod tests {
         }
     }
     impl CaptureSource for NoCapture {
-        fn start(&self, _tx: mpsc::Sender<Utterance>) -> anyhow::Result<Box<dyn CaptureHandle>> {
+        fn start(
+            &self,
+            _meeting_id: i64,
+            _tx: mpsc::Sender<Utterance>,
+        ) -> anyhow::Result<Box<dyn CaptureHandle>> {
             Ok(Box::new(NoHandle))
         }
     }

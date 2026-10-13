@@ -5,6 +5,7 @@ use crate::managers::audio::AudioRecordingManager;
 use crate::managers::transcription::TranscriptionManager;
 use crate::meeting::capture::{MeetingCapture, Utterance};
 use crate::meeting::store::{Meeting, MeetingStatus, ProjectStore, TranscriptLine};
+use crate::meeting::system_capture::SystemCapture;
 use anyhow::{anyhow, Result};
 use log::{error, info, warn};
 use serde::{Deserialize, Serialize};
@@ -42,10 +43,14 @@ pub trait CaptureHandle: Send {
 }
 
 pub trait CaptureSource: Send + Sync {
-    fn start(&self, tx: mpsc::Sender<Utterance>) -> Result<Box<dyn CaptureHandle>>;
+    /// Start capturing for `meeting_id`, sending utterances to `tx`.
+    fn start(&self, meeting_id: i64, tx: mpsc::Sender<Utterance>)
+        -> Result<Box<dyn CaptureHandle>>;
 }
 
-struct MicCapture {
+/// The production source: the microphone ("me") always, plus system audio
+/// ("them") when enabled, both on one utterance channel.
+struct CombinedCapture {
     app: AppHandle,
 }
 
@@ -58,10 +63,64 @@ impl CaptureHandle for MeetingCapture {
     }
 }
 
-impl CaptureSource for MicCapture {
-    fn start(&self, tx: mpsc::Sender<Utterance>) -> Result<Box<dyn CaptureHandle>> {
+impl CaptureHandle for SystemCapture {
+    fn stop(self: Box<Self>) {
+        SystemCapture::stop(*self);
+    }
+    fn has_failed(&self) -> bool {
+        SystemCapture::has_failed(self)
+    }
+}
+
+/// Both capture streams of one run. Stopping stops both; failure reflects
+/// the microphone only, since a system-audio failure is warned at start.
+struct CombinedHandle {
+    mic: Box<dyn CaptureHandle>,
+    system: Option<Box<dyn CaptureHandle>>,
+}
+
+impl CaptureHandle for CombinedHandle {
+    fn stop(self: Box<Self>) {
+        let CombinedHandle { mic, system } = *self;
+        if let Some(system) = system {
+            system.stop();
+        }
+        mic.stop();
+    }
+    fn has_failed(&self) -> bool {
+        self.mic.has_failed()
+    }
+}
+
+impl CaptureSource for CombinedCapture {
+    fn start(
+        &self,
+        meeting_id: i64,
+        tx: mpsc::Sender<Utterance>,
+    ) -> Result<Box<dyn CaptureHandle>> {
         let settings = crate::settings::get_settings(&self.app);
-        Ok(Box::new(MeetingCapture::start(&settings, &self.app, tx)?))
+        let mic = Box::new(MeetingCapture::start(&settings, &self.app, tx.clone())?);
+        let system: Option<Box<dyn CaptureHandle>> = if settings.meeting_system_audio_enabled {
+            match SystemCapture::start(&settings, &self.app, tx) {
+                Ok(c) => Some(Box::new(c)),
+                Err(e) => {
+                    // The meeting goes on with the microphone alone.
+                    warn!("system audio capture unavailable: {e:#}");
+                    let payload = MeetingCaptureWarningPayload {
+                        meeting_id,
+                        source: "system_audio".into(),
+                        message: format!("{e:#}"),
+                    };
+                    if let Err(e) = payload.emit(&self.app) {
+                        error!("emit capture warning: {e}");
+                    }
+                    None
+                }
+            }
+        } else {
+            None
+        };
+        Ok(Box::new(CombinedHandle { mic, system }))
     }
 }
 
@@ -78,10 +137,13 @@ pub struct TranscriptLinePayload {
     pub line: TranscriptLine,
 }
 
-/// Emitted once per capture run when the microphone stops delivering audio.
+/// Emitted once per capture run when a capture source fails: the
+/// microphone stops delivering audio, or system audio cannot start.
 #[derive(Clone, Debug, Serialize, Deserialize, Type, tauri_specta::Event)]
 pub struct MeetingCaptureWarningPayload {
     pub meeting_id: i64,
+    /// `"microphone"` or `"system_audio"`.
+    pub source: String,
     pub message: String,
 }
 
@@ -153,7 +215,7 @@ impl MeetingManager {
         Self {
             store,
             transcriber: Arc::new(ModelTranscriber(tm)),
-            capture: Arc::new(MicCapture { app: app.clone() }),
+            capture: Arc::new(CombinedCapture { app: app.clone() }),
             dictation_recording: Arc::new(move || rm.is_recording()),
             active: Mutex::new(None),
             transition: Mutex::new(()),
@@ -248,7 +310,7 @@ impl MeetingManager {
         session_id: i64,
     ) -> Result<(SharedCapture, JoinHandle<()>)> {
         let (tx, rx) = mpsc::channel::<Utterance>();
-        let handle = self.capture.start(tx)?;
+        let handle = self.capture.start(meeting_id, tx)?;
         let shared: SharedCapture = Arc::new(Mutex::new(Some(handle)));
         let store = Arc::clone(&self.store);
         let transcriber = Arc::clone(&self.transcriber);
@@ -301,6 +363,7 @@ impl MeetingManager {
                 if failed {
                     let payload = MeetingCaptureWarningPayload {
                         meeting_id,
+                        source: "microphone".into(),
                         message: "Check the input device, then pause and resume.".into(),
                     };
                     if let Err(e) = payload.emit(&app) {
@@ -559,7 +622,11 @@ mod tests {
         }
     }
     impl CaptureSource for FakeSource {
-        fn start(&self, tx: mpsc::Sender<Utterance>) -> anyhow::Result<Box<dyn CaptureHandle>> {
+        fn start(
+            &self,
+            _meeting_id: i64,
+            tx: mpsc::Sender<Utterance>,
+        ) -> anyhow::Result<Box<dyn CaptureHandle>> {
             if self.0.fail_next.swap(false, Ordering::SeqCst) {
                 return Err(anyhow::anyhow!("capture failed"));
             }
@@ -843,5 +910,117 @@ mod tests {
         cap.fail_next.store(true, Ordering::SeqCst);
         assert!(m.start(None, None).is_err());
         assert_eq!(m.store().list_meetings(None).unwrap().len(), before);
+    }
+
+    /// Records stops; reports a preset failure state.
+    struct CountingHandle {
+        stops: Arc<AtomicUsize>,
+        failed: bool,
+    }
+    impl CaptureHandle for CountingHandle {
+        fn stop(self: Box<Self>) {
+            self.stops.fetch_add(1, Ordering::SeqCst);
+        }
+        fn has_failed(&self) -> bool {
+            self.failed
+        }
+    }
+
+    fn counting(failed: bool) -> (Arc<AtomicUsize>, Box<dyn CaptureHandle>) {
+        let stops = Arc::new(AtomicUsize::new(0));
+        let h = Box::new(CountingHandle {
+            stops: Arc::clone(&stops),
+            failed,
+        });
+        (stops, h)
+    }
+
+    #[test]
+    fn combined_handle_stops_both_streams_once() {
+        let (mic_stops, mic) = counting(false);
+        let (sys_stops, sys) = counting(false);
+        let h: Box<dyn CaptureHandle> = Box::new(CombinedHandle {
+            mic,
+            system: Some(sys),
+        });
+        h.stop();
+        assert_eq!(mic_stops.load(Ordering::SeqCst), 1);
+        assert_eq!(sys_stops.load(Ordering::SeqCst), 1);
+
+        let (mic_stops, mic) = counting(false);
+        let h: Box<dyn CaptureHandle> = Box::new(CombinedHandle { mic, system: None });
+        h.stop();
+        assert_eq!(mic_stops.load(Ordering::SeqCst), 1, "mic-only stops");
+    }
+
+    #[test]
+    fn combined_handle_failure_reports_the_microphone_only() {
+        let (_, mic) = counting(false);
+        let (_, sys) = counting(true);
+        let h = CombinedHandle {
+            mic,
+            system: Some(sys),
+        };
+        assert!(!h.has_failed(), "system failure is warned separately");
+        let (_, mic) = counting(true);
+        let h = CombinedHandle { mic, system: None };
+        assert!(h.has_failed());
+    }
+
+    /// A source that, like `CombinedCapture`, runs a mic and a system stream
+    /// on one channel; each emits one utterance as soon as it starts.
+    struct TwoStreamSource;
+    impl CaptureSource for TwoStreamSource {
+        fn start(
+            &self,
+            _meeting_id: i64,
+            tx: mpsc::Sender<Utterance>,
+        ) -> anyhow::Result<Box<dyn CaptureHandle>> {
+            let sys_tx = tx.clone();
+            tx.send(Utterance {
+                speaker: "me".into(),
+                samples: vec![0.1; 4800],
+                started_at: 1,
+            })?;
+            sys_tx.send(Utterance {
+                speaker: "them".into(),
+                samples: vec![0.1; 3200],
+                started_at: 2,
+            })?;
+            struct Holds(#[allow(dead_code)] mpsc::Sender<Utterance>);
+            impl CaptureHandle for Holds {
+                fn stop(self: Box<Self>) {}
+                fn has_failed(&self) -> bool {
+                    false
+                }
+            }
+            Ok(Box::new(CombinedHandle {
+                mic: Box::new(Holds(tx)),
+                system: Some(Box::new(Holds(sys_tx))),
+            }))
+        }
+    }
+
+    #[test]
+    fn mic_and_system_utterances_store_both_speakers_in_order() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = Arc::new(ProjectStore::open(dir.path().join("meet.db")).unwrap());
+        let m = MeetingManager::new_for_test(
+            store,
+            Arc::new(FakeTranscriber {
+                calls: AtomicUsize::new(0),
+                fail_first: false,
+                delay_ms: 0,
+            }),
+            Arc::new(TwoStreamSource),
+            Arc::new(AtomicBool::new(false)),
+        );
+        let meeting = m.start(None, None).unwrap();
+        let lines = wait_lines(&m, meeting.id, 2);
+        let speakers: Vec<&str> = lines.iter().map(|l| l.speaker.as_str()).collect();
+        assert_eq!(speakers, vec!["me", "them"]);
+        assert_eq!(lines[0].text, "heard 4800 samples");
+        assert_eq!(lines[1].text, "heard 3200 samples");
+        m.end().unwrap();
     }
 }
