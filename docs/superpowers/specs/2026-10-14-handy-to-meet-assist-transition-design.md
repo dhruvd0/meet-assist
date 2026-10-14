@@ -38,17 +38,17 @@ This spec gives the shortcut an interim start behaviour (below) that sub-project
 
 ## Sidebar and settings layout
 
-| Page | Contents |
-| --- | --- |
-| Projects | Unchanged. |
-| Meetings | Unchanged. |
+| Page                            | Contents                                                                                                                                                  |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Projects                        | Unchanged.                                                                                                                                                |
+| Meetings                        | Unchanged.                                                                                                                                                |
 | Assistant (new, always visible) | Provider card first: provider, base URL, API key, model, "Test connection". Then assistant behaviour: on/off, sensitivity, interval, beep, image digests. |
-| Audio (replaces General) | Meeting shortcut, microphone, system audio toggle, output device, audio feedback and volume. |
-| Models | Transcription model, language, custom words, filler-word removal, VAD. |
-| General | Theme, app language, autostart, tray icon, start hidden. |
-| Advanced | Only settings that still apply after the cut. |
-| Debug | Hidden unless debug mode, as today. Dictation-only diagnostics removed. |
-| About | Unchanged. |
+| Audio (replaces General)        | Meeting shortcut, microphone, system audio toggle, output device, audio feedback and volume.                                                              |
+| Models                          | Transcription model, language, custom words, filler-word removal, VAD.                                                                                    |
+| General                         | Theme, app language, autostart, tray icon, start hidden.                                                                                                  |
+| Advanced                        | Only settings that still apply after the cut.                                                                                                             |
+| Debug                           | Hidden unless debug mode, as today. Dictation-only diagnostics removed.                                                                                   |
+| About                           | Unchanged.                                                                                                                                                |
 
 Removed pages: History, Post Processing.
 
@@ -92,12 +92,12 @@ Meetings depend on `AudioRecordingManager` and the transcription manager. They d
 
 ### CLI
 
-| Before | After |
-| --- | --- |
-| `--toggle-transcription` | `--toggle-meeting` |
-| `--toggle-post-process` | removed |
-| `--cancel` | removed |
-| `--start-hidden`, `--no-tray`, `--debug` | unchanged |
+| Before                                   | After              |
+| ---------------------------------------- | ------------------ |
+| `--toggle-transcription`                 | `--toggle-meeting` |
+| `--toggle-post-process`                  | removed            |
+| `--cancel`                               | removed            |
+| `--start-hidden`, `--no-tray`, `--debug` | unchanged          |
 
 No compatibility alias for the old flag. This fork has no external script users yet.
 
@@ -111,12 +111,12 @@ Settings deserialization already ignores unknown fields, so removed fields need 
 
 Provider fields are renamed, keeping the old names as serde aliases so existing stores load:
 
-| Old | New |
-| --- | --- |
+| Old                        | New               |
+| -------------------------- | ----------------- |
 | `post_process_provider_id` | `llm_provider_id` |
-| `post_process_providers` | `llm_providers` |
-| `post_process_api_keys` | `llm_api_keys` |
-| `post_process_models` | `llm_models` |
+| `post_process_providers`   | `llm_providers`   |
+| `post_process_api_keys`    | `llm_api_keys`    |
+| `post_process_models`      | `llm_models`      |
 
 Type and command renames follow: `PostProcessProvider` becomes `LlmProvider`, `fetch_post_process_models` becomes `fetch_llm_models`. `ensure_post_process_defaults` becomes `ensure_llm_defaults`.
 
@@ -144,15 +144,15 @@ Onboarding drops the accessibility step: model, then assistant, then done.
 
 Each guards against losing or corrupting user data:
 
-| Test | File | Guards |
-| --- | --- | --- |
-| `handy_era_settings_keep_provider` (new) | `settings.rs` | Old settings JSON with `post_process_*` and `meeting_provider_id` loads into `llm_*` with key, model, and chosen provider intact. |
-| `open_enables_wal` | `meeting/store.rs` | Database opens and initialises its schema. |
-| `startup_recovery_closes_open_sessions_and_pauses_live` | `meeting/store.rs` | Crash recovery does not leave sessions stuck open. |
-| `delete_project_cascades_sources_and_chunks` | `meeting/store.rs` | No orphaned rows after deleting a project. |
-| `delete_meeting_and_delete_project_cascade_lines` | `meeting/store.rs` | No orphaned transcript lines. |
-| `job_stores_session_and_rolling_summary` | `meeting/summary.rs` | Summaries are written. |
-| `merge_failure_stores_nothing` | `meeting/summary.rs` | A failed merge does not half-write a summary. |
+| Test                                                    | File                 | Guards                                                                                                                            |
+| ------------------------------------------------------- | -------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `handy_era_settings_keep_provider` (new)                | `settings.rs`        | Old settings JSON with `post_process_*` and `meeting_provider_id` loads into `llm_*` with key, model, and chosen provider intact. |
+| `open_enables_wal`                                      | `meeting/store.rs`   | Database opens and initialises its schema.                                                                                        |
+| `startup_recovery_closes_open_sessions_and_pauses_live` | `meeting/store.rs`   | Crash recovery does not leave sessions stuck open.                                                                                |
+| `delete_project_cascades_sources_and_chunks`            | `meeting/store.rs`   | No orphaned rows after deleting a project.                                                                                        |
+| `delete_meeting_and_delete_project_cascade_lines`       | `meeting/store.rs`   | No orphaned transcript lines.                                                                                                     |
+| `job_stores_session_and_rolling_summary`                | `meeting/summary.rs` | Summaries are written.                                                                                                            |
+| `merge_failure_stores_nothing`                          | `meeting/summary.rs` | A failed merge does not half-write a summary.                                                                                     |
 
 ### CI after the cut
 

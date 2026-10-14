@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- Branch: `feat/meet-assist-transition`. Commit after each task with conventional prefixes (`feat:`, `fix:`, `refactor:`, `chore:`, `docs:`), message about *why*, ending with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
+- Branch: `feat/meet-assist-transition`. Commit after each task with conventional prefixes (`feat:`, `fix:`, `refactor:`, `chore:`, `docs:`), message about _why_, ending with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 - Test policy: no new tests except `handy_era_settings_keep_provider`. Exactly 7 Rust tests remain at the end (listed in Task 1).
 - Every task ends green on: `cd src-tauri && cargo clippy --all-targets -- -D warnings && cargo test`, plus `bun run build && bun run lint` once frontend files are touched.
 - Do not rename crates or internal identifiers like `handy-recorder` or `handy_keys`.
@@ -26,7 +26,7 @@
 
 1. **Stored Handy bindings.** An old store has `transcribe`, `transcribe_with_post_process`, `cancel` in `bindings`. The load path merges defaults but never prunes, so stale ids would be registered as global shortcuts with no handler, and `escape` would stay grabbed. Expected: only `toggle_meeting` exists after load, carrying the user's old `transcribe` key combo. Pinned by `handy_era_settings_keep_provider` (Task 4).
 2. **Assistant on with no usable provider.** Expected: the toggle stays on and the page shows the backend readiness message (missing key, model, or provider). It doesn't re-derive the rule in TypeScript. Checked in Task 5's manual step.
-3. **Shortcut pressed while a meeting is paused.** `MeetingManager::state().meeting_id` is `Some` for live *and* paused meetings. Expected: the shortcut ends it. Pinned by the `toggle` match in Task 2.
+3. **Shortcut pressed while a meeting is paused.** `MeetingManager::state().meeting_id` is `Some` for live _and_ paused meetings. Expected: the shortcut ends it. Pinned by the `toggle` match in Task 2.
 4. **Shortcut with no projects and no meetings.** Expected: the main window opens on Projects. No meeting with a dangling project is created. Task 2.
 5. **Locales missing new tray keys.** `build.rs` currently writes `""` for a missing key, which gives a blank tray item in non-English locales. Expected: English fallback. Fixed in Task 2.
 
@@ -47,10 +47,12 @@
 ### Task 1: Cut tests and CI to the core
 
 **Files:**
+
 - Delete: `tests/`, `playwright.config.ts` (or `.js`), `src/lib/utils/keyboard.test.ts`, `src/components/update-checker/portableInstaller.test.ts`, `src/components/settings/history/clipboard.test.ts`, `.github/workflows/playwright.yml`
 - Modify: `package.json`, `.github/workflows/code-quality.yml`, every `src-tauri/src/**/*.rs` containing `#[cfg(test)]`
 
 **Interfaces:**
+
 - Produces: a Rust test suite of exactly these 6 existing tests (the 7th arrives in Task 4):
   - `meeting::store::tests::open_enables_wal`
   - `meeting::store::tests::startup_recovery_closes_open_sessions_and_pauses_live`
@@ -75,8 +77,8 @@ In `package.json`, remove the scripts `test:keyboard`, `test:playwright`, `test:
 In `.github/workflows/code-quality.yml`, delete the step that runs `bun run test:keyboard`. After the `bun run lint` step, add:
 
 ```yaml
-      - name: Typecheck frontend
-        run: bunx tsc --noEmit
+- name: Typecheck frontend
+  run: bunx tsc --noEmit
 ```
 
 If the workflow already has a Rust job running `cargo clippy`, make its command `cargo clippy --all-targets -- -D warnings`. If there is no Rust job, leave Rust linting to `test.yml` (next step).
@@ -84,9 +86,9 @@ If the workflow already has a Rust job running `cargo clippy`, make its command 
 In `.github/workflows/test.yml`, change the line `run: cargo test` to:
 
 ```yaml
-        run: |
-          cargo clippy --all-targets -- -D warnings
-          cargo test
+run: |
+  cargo clippy --all-targets -- -D warnings
+  cargo test
 ```
 
 Grep the remaining workflows for `playwright` and `test:keyboard` and delete those steps: `grep -n "playwright\|test:keyboard" .github/workflows/*.yml` must print nothing.
@@ -94,6 +96,7 @@ Grep the remaining workflows for `playwright` and `test:keyboard` and delete tho
 - [ ] **Step 3: Delete Rust tests outside the core**
 
 For each file listed by `grep -rl '#\[cfg(test)\]' src-tauri/src`:
+
 - Not `meeting/store.rs` or `meeting/summary.rs`: delete the whole `#[cfg(test)] mod … { … }` block. Also delete standalone `#[cfg(test)]` items in that file (helpers like `MeetingManager::new_for_test`, `with_summarizer`, fake structs, `#[cfg(test)] fn` helpers) **unless** `meeting/store.rs` or `meeting/summary.rs` tests use them. Check with `grep -n "<name>" src-tauri/src/meeting/store.rs src-tauri/src/meeting/summary.rs`.
 - `meeting/store.rs`: inside its `mod tests`, keep the 4 listed functions and any helper they call (e.g. a `fn store()` constructor). Delete every other `#[test]` fn.
 - `meeting/summary.rs`: keep the 2 listed functions and the fakes they use. Delete the rest.
@@ -129,10 +132,12 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 Additive: dictation still compiles after this task. The new `toggle_meeting` binding works alongside the old ones.
 
 **Files:**
+
 - Create: `src-tauri/src/meeting/toggle.rs`
 - Modify: `src-tauri/src/meeting/mod.rs`, `src-tauri/src/settings.rs` (default bindings), `src-tauri/src/shortcut/handler.rs`, `src-tauri/src/meeting/session.rs` (`emit_state`), `src-tauri/src/tray.rs`, `src-tauri/src/lib.rs` (tray menu handler, single-instance args), `src-tauri/src/cli.rs`, `src-tauri/src/signal_handle.rs`, `src-tauri/build.rs`, `src/i18n/locales/en/translation.json`
 
 **Interfaces:**
+
 - Produces: `pub fn crate::meeting::toggle::toggle_meeting(app: &tauri::AppHandle)` ends the running meeting (live or paused) or starts one. Never panics. Logs and emits `show-main-window` style focus on failure.
 - Produces: binding id `"toggle_meeting"` in `get_default_settings().bindings`.
 - Produces: tray menu ids `"start_meeting"`, `"end_meeting"`; tray strings `start_meeting`, `end_meeting` (from en keys `startMeeting`, `endMeeting`).
@@ -209,16 +214,16 @@ Add `pub mod toggle;` to `src-tauri/src/meeting/mod.rs`.
 In `src/App.tsx`, next to the existing `listen(...)` effects, add:
 
 ```tsx
-  useEffect(() => {
-    const unlisten = listen<string>("navigate-section", (e) => {
-      if (e.payload in SECTIONS_CONFIG) {
-        setCurrentSection(e.payload as SidebarSection);
-      }
-    });
-    return () => {
-      unlisten.then((fn) => fn());
-    };
-  }, []);
+useEffect(() => {
+  const unlisten = listen<string>("navigate-section", (e) => {
+    if (e.payload in SECTIONS_CONFIG) {
+      setCurrentSection(e.payload as SidebarSection);
+    }
+  });
+  return () => {
+    unlisten.then((fn) => fn());
+  };
+}, []);
 ```
 
 - [ ] **Step 3: Add the default binding**
@@ -354,10 +359,12 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ### Task 3: Delete the dictation pipeline (backend)
 
 **Files:**
+
 - Delete: `actions.rs`, `transcription_coordinator.rs`, `clipboard.rs`, `input.rs`, `paste_tx/`, `secure_input.rs`, `apple_intelligence.rs`, `overlay.rs`, `managers/history.rs`, `commands/history.rs`
 - Modify: `lib.rs`, `managers/audio.rs`, `managers/mod.rs`, `managers/transcription.rs`, `commands/mod.rs`, `commands/audio.rs`, `shortcut/mod.rs`, `shortcut/handler.rs`, `signal_handle.rs`, `tray.rs`, `utils.rs`, `cli.rs`, `intervention.rs`, `meeting/session.rs`, `capabilities/default.json`, `tauri.conf.json` (if the overlay window is declared there)
 
 **Interfaces:**
+
 - Consumes: `toggle_meeting` (Task 2).
 - Produces: `managers::audio` exports only `create_capture_vad`, `microphone_config` and their private dependencies. `MeetingManager::new(app, store, tm)` drops its `rm` parameter.
 
@@ -431,6 +438,7 @@ pub fn handle_shortcut_event(
 ```
 
 In `shortcut/mod.rs`:
+
 - Delete every `"cancel"` special case (dynamic register/unregister, `unregister_cancel_shortcut`, `register_cancel_shortcut`) and the `transcribe_with_post_process` checks.
 - Delete the setting commands for removed settings: `change_shortcut_activation_setting`, `change_hold_threshold_ms_setting`, `change_overlay_position_setting`, `change_overlay_style_setting`, `change_extra_recording_buffer_setting`, `change_paste_delay_ms_setting`, `change_paste_delay_after_ms_setting`, `change_reliable_paste_setting`, `change_paste_method_setting`, `get_available_typing_tools`, `change_typing_tool_setting`, `change_external_script_path_setting`, `change_clipboard_handling_setting`, `change_auto_submit_setting`, `change_auto_submit_key_setting`, `change_post_process_enabled_setting`, `add_post_process_prompt`, `update_post_process_prompt`, `delete_post_process_prompt`, `set_post_process_selected_prompt`, `change_mute_while_recording_setting`, `change_append_trailing_space_setting`, `change_lazy_stream_close_setting`.
 - Delete the matching lines in `lib.rs` `collect_commands!`, plus `secure_input::*`, `commands::cancel_operation`, `commands::check_apple_intelligence_available`, `commands::initialize_enigo`, `commands::open_recordings_folder`, all `commands::history::*`, the deleted `commands::audio::*`, `helpers::clamshell::is_laptop` (if deleted), and `managers::history::HistoryUpdatePayload` from `collect_events!`.
@@ -465,6 +473,7 @@ pub fn setup_signal_handler(app_handle: AppHandle) {
 `cli.rs`: delete `toggle_transcription`, `toggle_post_process`, `cancel`. `lib.rs` single-instance handler keeps only the `--toggle-meeting` branch and the `else` show-window branch. Update `main.rs` if it references the removed fields.
 
 `tray.rs`:
+
 - Delete `TrayIconState::Transcribing` and its icon arms. Delete `copy_last_transcript`, `last_transcript_text`, and the secure-input `warning` input (pass `false` or remove the field and `secureInputWarning` handling).
 - Delete the `cancel` menu item.
 - In `lib.rs` `on_menu_event`, delete the `"secure_input_warning"`, `"copy_last_transcript"`, `"cancel"` arms.
@@ -504,10 +513,12 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ### Task 4: Settings: single LLM provider, removed fields, schema 3 migration
 
 **Files:**
+
 - Modify: `src-tauri/src/settings.rs`, `src-tauri/src/shortcut/mod.rs`, `src-tauri/src/llm_client.rs`, `src-tauri/src/meeting/{manager,observer,summary}.rs`, `src-tauri/src/lib.rs`
 - Test: `src-tauri/src/settings.rs` (`#[cfg(test)] mod tests`)
 
 **Interfaces:**
+
 - Produces (Rust, exported to TS via specta):
   - `pub struct LlmProvider` (was `PostProcessProvider`), `pub enum LlmApiFormat` (was `PostProcessApiFormat`). Same fields and serde shape.
   - `AppSettings` fields `llm_provider_id: String`, `llm_providers: Vec<LlmProvider>`, `llm_api_keys: SecretMap`, `llm_models: HashMap<String, String>`, each with `#[serde(alias = "post_process_…")]`.
@@ -581,6 +592,7 @@ Expected: FAIL to compile (`llm_provider_id` unknown).
 - [ ] **Step 2: Rename provider types and fields**
 
 In `settings.rs`:
+
 - Rename `PostProcessApiFormat` to `LlmApiFormat` and `PostProcessProvider` to `LlmProvider`. Update `llm_client.rs` imports and signatures.
 - Rename the four fields with aliases:
 
@@ -709,12 +721,14 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ### Task 5: Frontend: Assistant page, new sidebar, removed UI
 
 **Files:**
+
 - Create: `src/components/settings/assistant/AssistantSettings.tsx`, `src/components/settings/audio/AudioSettings.tsx`
 - Move: `src/components/settings/PostProcessingSettingsApi/*` → `src/components/settings/assistant/provider/*`; `src/components/settings/meeting/MeetingAssistantSettings.tsx` → `src/components/settings/assistant/AssistantBehaviour.tsx`
 - Modify: `src/components/Sidebar.tsx`, `src/App.tsx`, `src/components/settings/index.ts`, `src/components/settings/general/GeneralSettings.tsx`, `src/components/settings/advanced/AdvancedSettings.tsx`, `src/components/settings/debug/DebugSettings.tsx`, `src/components/settings/models/ModelsSettings.tsx`, `src/components/onboarding/{AssistantOnboarding,index}.tsx`, `src/components/settings/debug/OnboardingPreview.tsx`, `src/stores/settingsStore.ts`, `src/lib/types/events.ts`, `vite.config.ts`, `src/i18n/locales/en/translation.json`
 - Delete: `src/overlay/`, `src/components/settings/history/`, `src/components/settings/post-processing/`, `src/components/AccessibilityPermissions.tsx`, `src/components/SecureInputWarning.tsx`, `src/components/onboarding/AccessibilityOnboarding.tsx`, and these settings components: `PasteMethod`, `TypingTool`, `ClipboardHandling`, `AutoSubmit`, `AppendTrailingSpace`, `PostProcessingToggle`, `PostProcessingSettingsPrompts`, `ShortcutActivation`, `ShowOverlay`, `HistoryLimit`, `RecordingRetentionPeriod`, `MuteWhileRecording`, `AlwaysOnMicrophone`, `ClamshellMicrophoneSelector`, `LazyStreamClose`, and debug `PasteDelay`, `ReliablePaste`, `HoldThreshold`, `RecordingBuffer`, `KeyboardDiagnostic`
 
 **Interfaces:**
+
 - Consumes: regenerated `src/bindings.ts` with the Task 4 command and type names (`LlmProvider`, `fetchLlmModels`, `setLlmProvider`, `changeLlmApiKeySetting`, `changeLlmModelSetting`, `changeLlmBaseUrlSetting`, `changeLlmApiFormatSetting`; settings fields `llm_provider_id`, `llm_providers`, `llm_api_keys`, `llm_models`).
 - Produces: sidebar section ids `projects`, `meetings`, `assistant`, `audio`, `models`, `general`, `advanced`, `debug`, `about`.
 
@@ -850,6 +864,7 @@ Format it multi-line as in the existing file (Prettier will do it). Import `Audi
 - [ ] **Step 6: App shell and onboarding**
 
 In `App.tsx`:
+
 - `type OnboardingStep = "model" | "assistant" | "done";`
 - Delete the accessibility step, `isReturningUser`, `checkAccessibilityPermission` and its import, `AccessibilityPermissions`, `SecureInputWarning`, `commands.initializeEnigo()` (keep `commands.initializeShortcuts()`), and the `RecordingErrorEvent` listener plus its type in `lib/types/events.ts`.
 - `checkOnboardingStatus` routes a new user to `"model"` and a returning user to `"done"`. On macOS, keep the `checkMicrophonePermission` call only if `AssistantOnboarding` doesn't already request the microphone. Grep before deleting.
@@ -878,6 +893,7 @@ Run: `grep -rn "post_process\|PostProcess\|history\|overlay" src --include=*.ts 
 Expected: no hits for removed features. Hits for the intervention card are fine.
 
 Manual (`bun run tauri dev`):
+
 1. The sidebar shows Projects, Meetings, Assistant, Audio, Models, General, Advanced, About.
 2. On the Assistant page, turn the assistant on with a cloud provider and no key: the red message names the provider and says the key is missing. Pick a provider, paste a key, choose a model: the message disappears. "Test connection" shows a model count or the provider's error.
 3. Start a meeting. A nudge arrives within the interval when the conversation warrants one.
@@ -898,6 +914,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ### Task 6: Docs and final verification
 
 **Files:**
+
 - Modify: `docs/VISION.md`, `docs/ARCHITECTURE.md`, `AGENTS.md`, `README.md` (CLI and features mentions only)
 
 - [ ] **Step 1: VISION.md**
@@ -932,6 +949,7 @@ bun run build && bun run lint && bun run format:check && bun run check:translati
 Expected: clippy clean, `7 passed`, frontend green.
 
 Manual checklist from the spec's Verification section:
+
 1. Copy a pre-transition `settings_store.json` into the app data dir (or keep the dev one from before Task 4) and launch. The provider, key, and model show on Assistant. The meeting shortcut is your old dictation combo.
 2. Fresh install (empty app data dir): onboarding is model, then assistant, then done. No accessibility prompt.
 3. Assistant setup is one page.

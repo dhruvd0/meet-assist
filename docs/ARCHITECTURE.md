@@ -1,16 +1,13 @@
 # Meet Assist Architecture
 
-Meet Assist is a Tauri 2 desktop app: Rust backend, React/TypeScript frontend. It inherits [Handy](https://github.com/cjpais/Handy)'s dictation pipeline unchanged and adds a meeting subsystem beside it.
+Meet Assist is a Tauri 2 desktop app: Rust backend, React/TypeScript frontend. It reuses [Handy](https://github.com/cjpais/Handy)'s transcription engine, model store, and audio capture. The dictation output path (paste, post-processing, history, overlay) was removed; the app is meeting-only.
 
 Everything below ships today. The meeting subsystem was built in six plans from [the design spec](superpowers/specs/2026-10-13-meeting-assistant-design.md); all six are merged as of 2026-10-14.
 
-## Two pipelines, one engine
+## Pipeline
 
 ```
-Dictation (existing)
-  shortcut -> mic capture -> VAD -> transcribe -> paste into active app
-
-Meeting (existing)
+Meeting
   project sources -> indexer -> FTS5 chunks  <-- tools <-- observer
 
   start -> mic capture ("me") ----\
@@ -25,36 +22,41 @@ Meeting (existing)
   end -> Summarizer (session summary) -> rolling meeting summary      image source -> Describer -> digest
 ```
 
-Both pipelines share `TranscriptionManager`, the model store, settings, the LLM provider client, and the feedback-sound player.
+## Entry points
+
+The global shortcut (the only binding, `toggle_meeting`), the tray Start/End Meeting item, the `--toggle-meeting` CLI flag, and SIGUSR2 all call `meeting::toggle::toggle_meeting`. It ends a running (live or paused) meeting; otherwise it starts one in the most recently used project; with no project it opens the window on Projects.
+
+## Settings
+
+One LLM provider serves the observer, summaries, and vision digests: `llm_provider_id`, `llm_providers`, `llm_api_keys`, `llm_models` (serde aliases accept the old `post_process_*` names). Settings schema version 3 migrates `meeting_provider_id` into `llm_provider_id`, moves the old transcribe shortcut to `toggle_meeting`, prunes stale bindings, and drops the `apple_intelligence` provider.
 
 ## Backend (`src-tauri/src/`)
 
-### Existing (from Handy)
+### Inherited from Handy
 
 | Path                          | Role                                                                                                               |
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `lib.rs`                      | Tauri setup, manager initialization, tray, shortcuts                                                               |
-| `managers/audio.rs`           | Microphone selection and recording via `handy-recorder`                                                            |
+| `lib.rs`                      | Tauri setup, manager initialization, tray, shortcut registration                                                   |
+| `managers/audio.rs`           | `create_capture_vad` and `microphone_config` helpers used by meeting capture                                       |
 | `managers/transcription.rs`   | Model lifecycle, batch `transcribe(Vec<f32>)`, streaming preview                                                   |
 | `managers/model.rs`           | Model download and discovery                                                                                       |
-| `managers/history.rs`         | SQLite transcription history (pattern reused by the meeting store)                                                 |
 | `audio_toolkit/audio/sink.rs` | `CaptureVad`: frames in, speech segments out                                                                       |
 | `audio_toolkit/vad/`          | Silero VAD                                                                                                         |
 | `llm_client.rs`               | Chat completion client, OpenAI and Anthropic formats, JSON schema responses, tool-calling loop (`send_with_tools`) |
 | `audio_feedback.rs`           | Plays feedback sounds via rodio                                                                                    |
-| `overlay.rs`                  | Always-on-top recording overlay window                                                                             |
 | `settings.rs`                 | Persisted settings and migrations                                                                                  |
 | `commands/`                   | Tauri commands exposed to the frontend via tauri-specta                                                            |
 
-### Existing (Meet Assist)
+### Meet Assist
 
 | Path                        | Role                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `meeting/store.rs`          | SQLite (WAL journal) tables `projects`, `sources`, `meetings`, `sessions`, `transcript_lines`, and FTS5 `source_chunks` with the `porter unicode61` tokenizer. Search ANDs tokens, falls back to OR when that finds nothing, and returns the raw `bm25` score (lower is better). Write transactions are `IMMEDIATE` so concurrent writers wait on the busy timeout instead of failing; `transcript_lines` has a `(session_id, ts)` index. The `interventions` table holds observer nudges per session with a dismissed flag.                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `meeting/chunk.rs`          | Paragraph-aware chunking                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | `meeting/indexer.rs`        | Source indexing: text, file, folder, link, and image caption to FTS5 chunks. Folder walks are capped by files, entries, and total bytes.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| `meeting/manager.rs`        | `ProjectManager`: Tauri state, vision digests (`Describer` trait, `LlmDescriber` using the meeting provider; images over 3.7 MB are skipped; gated by `meeting_vision_enabled` and the assistant opt-in `meeting_assistant_enabled`, which also gates summaries; digest capped at 1200 chars), background indexing thread (resumes `pending` sources at startup, survives indexer panics), `source-status-payload` event                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `meeting/manager.rs`        | `ProjectManager`: Tauri state, vision digests (`Describer` trait, `LlmDescriber` using the LLM provider; images over 3.7 MB are skipped; gated by `meeting_vision_enabled` and the assistant opt-in `meeting_assistant_enabled`, which also gates summaries; digest capped at 1200 chars), background indexing thread (resumes `pending` sources at startup, survives indexer panics), `source-status-payload` event                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | `commands/project.rs`       | Project and source CRUD, `search_sources`, `pick_source_path`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `meeting/toggle.rs`         | `toggle_meeting`: the single entry point for shortcut, tray, CLI, and SIGUSR2                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | `meeting/segment.rs`        | Utterance segmentation over VAD frames                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | `meeting/capture.rs`        | `MeetingCapture`: microphone capture (speaker `me`), 16 kHz mono, `CaptureVad`, emits `Utterance`. `MeetingSink` is the per-source VAD sink and takes a speaker tag (`me` or `them`).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `meeting/session.rs`        | `MeetingManager` (Tauri state). `CombinedCapture` starts the mic capture and, when `meeting_system_audio_enabled` is on, `SystemCapture`; if system capture fails the meeting continues mic-only and a `meeting-capture-warning-payload` (source `system_audio`) is emitted. Session state machine `Idle -> Live <-> Paused -> Ended`, plus the transcriber thread that feeds utterances to `TranscriptionManager::transcribe()` and appends `TranscriptLine`. Emits `meeting-state-payload`, `transcript-line-payload`, and `meeting-capture-warning-payload`. Pause and end drain queued utterances before updating the database. After end, a summary job runs under `summary_lock` (jobs are serialised) and emits `session-summary-payload`.                                                                                                                                                                                                                            |
@@ -68,7 +70,7 @@ Both pipelines share `TranscriptionManager`, the model store, settings, the LLM 
 
 ### Settings added for the meeting subsystem
 
-`meeting_assistant_enabled`, `meeting_system_audio_enabled` (default on), and `meeting_vision_enabled` (default on), alongside the observer provider, model, sensitivity, interval, and beep keys.
+`meeting_assistant_enabled`, `meeting_system_audio_enabled` (default on), and `meeting_vision_enabled` (default on), alongside the observer sensitivity, interval, and beep keys. The provider and model come from the shared `llm_*` settings.
 
 ## Data model
 
@@ -119,18 +121,17 @@ Existing: `meeting-state-payload`, `transcript-line-payload`, and `meeting-captu
 
 ## Frontend (`src/`)
 
-### Existing (from Handy)
+### Inherited from Handy
 
 | Path                      | Role                                                                            |
 | ------------------------- | ------------------------------------------------------------------------------- |
 | `App.tsx`                 | Shell, onboarding, sidebar routing                                              |
-| `components/settings/`    | Dictation and provider settings                                                 |
+| `components/settings/`    | Audio, model, and general settings                                              |
 | `components/ui/`          | Shared primitives (buttons, inputs, selects). Meeting screens must reuse these. |
 | `stores/settingsStore.ts` | Zustand settings store                                                          |
-| `overlay/`                | Separate window entry for the recording overlay                                 |
 | `bindings.ts`             | Generated by tauri-specta, do not edit by hand                                  |
 
-### Existing (Meet Assist)
+### Meet Assist
 
 | Path                                            | Role                                                                                                                                                                                                                                                                                                      |
 | ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -141,10 +142,10 @@ Existing: `meeting-state-payload`, `transcript-line-payload`, and `meeting-captu
 | `stores/meetingStore.ts`                        | Zustand store for the meeting list, active meeting, and live transcript buffer; subscribes to `meeting-state-payload`, `transcript-line-payload`, `meeting-capture-warning-payload` (toast), `intervention-payload`, `observer-status-payload` (readiness and health banners), and `open-meeting-payload` |
 | `components/meetings/*`                         | Meetings section: list, detail with live transcript, controls                                                                                                                                                                                                                                             |
 | `components/meetings/SessionSummary.tsx`        | Session and rolling summary in the meeting detail                                                                                                                                                                                                                                                         |
-| `components/onboarding/AssistantOnboarding.tsx` | Skippable onboarding step after the model step: provider, base URL, API key, model, with a connection test                                                                                                                                                                                                |
+| `components/onboarding/AssistantOnboarding.tsx` | Onboarding step after the model step: provider, base URL, API key, model, with a connection test                                                                                                                                                                                                          |
 | `components/meetings/InterventionTimeline.tsx`  | Assistant nudges in the meeting detail timeline, with dismiss                                                                                                                                                                                                                                             |
 | `components/settings/meeting/`                  | `MeetingAssistantSettings`: opt-in toggle, observer provider, sensitivity, interval, beep, system audio toggle, vision digest toggle (Advanced settings)                                                                                                                                                  |
-| `intervention/`                                 | Separate window entry for the floating intervention card, same pattern as `overlay/`                                                                                                                                                                                                                      |
+| `intervention/`                                 | Separate window entry for the floating intervention card, a separate Tauri window                                                                                                                                                                                                                         |
 
 ## Failure handling
 
