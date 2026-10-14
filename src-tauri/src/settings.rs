@@ -861,6 +861,14 @@ pub fn get_settings(app: &AppHandle) -> AppSettings {
     settings
 }
 
+/// Stored key names renamed with a `serde(alias)`: (legacy, current).
+const LEGACY_KEY_ALIASES: [(&str, &str); 4] = [
+    ("post_process_provider_id", "llm_provider_id"),
+    ("post_process_providers", "llm_providers"),
+    ("post_process_api_keys", "llm_api_keys"),
+    ("post_process_models", "llm_models"),
+];
+
 /// Rebuilds settings from a store value that failed to deserialize as a whole.
 /// Every stored field that is individually valid is kept; only broken values
 /// (e.g. an enum variant written by a newer or older version) fall back to
@@ -876,6 +884,12 @@ fn salvage_settings(stored: &serde_json::Value) -> AppSettings {
         .expect("default settings serialize to a JSON object");
 
     for (key, value) in stored_map {
+        // The merged object already holds the canonical names, so an aliased
+        // legacy key would be a duplicate field. Store it under its new name.
+        let key = &LEGACY_KEY_ALIASES
+            .iter()
+            .find(|(legacy, _)| legacy == key)
+            .map_or_else(|| key.clone(), |(_, current)| current.to_string());
         let previous = merged
             .as_object_mut()
             .expect("merged settings stay an object")
