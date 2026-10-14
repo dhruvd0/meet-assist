@@ -978,23 +978,35 @@ fn apply_settings_migrations(
         updated = true;
     }
     if stored_schema_version < 3 {
-        // Meet Assist has one provider. A dedicated meeting provider, if the
-        // user picked one, was the one meetings actually used.
-        if let Some(id) = settings_value
-            .get("meeting_provider_id")
-            .and_then(|v| v.as_str())
-            .filter(|id| !id.is_empty())
-        {
-            settings.llm_provider_id = id.to_string();
-        }
         // The Apple Intelligence bridge is gone. Drop its built-in entry so
-        // it no longer shows as a choice; a store that selected it ends up
-        // with no matching provider and readiness says so.
+        // it no longer shows as a choice.
         settings
             .llm_providers
             .retain(|p| p.id != "apple_intelligence");
         settings.llm_api_keys.remove("apple_intelligence");
         settings.llm_models.remove("apple_intelligence");
+        // This runs before `ensure_llm_defaults` adds missing built-ins, so a
+        // built-in id counts as known even if the stored list lacks it.
+        let builtins = default_llm_providers();
+        let known = |settings: &AppSettings, id: &str| {
+            settings.llm_provider_by_id(id).is_some() || builtins.iter().any(|p| p.id == id)
+        };
+        // Meet Assist has one provider. A dedicated meeting provider, if the
+        // user picked one, was the one meetings actually used. An unknown id
+        // used to fall back to the active provider, so it does here too.
+        if let Some(id) = settings_value
+            .get("meeting_provider_id")
+            .and_then(|v| v.as_str())
+            .filter(|id| !id.is_empty() && known(settings, id))
+        {
+            settings.llm_provider_id = id.to_string();
+        }
+        // A provider id that no longer resolves (e.g. Apple Intelligence)
+        // would leave the Assistant page with nothing selected and every key
+        // or model edit failing, so start from the default provider instead.
+        if !known(settings, &settings.llm_provider_id) {
+            settings.llm_provider_id = default_llm_provider_id();
+        }
         // Dictation bindings are gone. Keep the user's dictation combo for the
         // meeting toggle so muscle memory carries over.
         let old_combo = settings
@@ -1118,5 +1130,35 @@ mod tests {
         let again = serde_json::to_value(&settings).unwrap();
         let mut reloaded: AppSettings = serde_json::from_value(again.clone()).unwrap();
         assert!(!apply_settings_migrations(&mut reloaded, &again));
+
+        let migrate = |stored: serde_json::Value| {
+            let mut settings: AppSettings = serde_json::from_value(stored.clone()).unwrap();
+            apply_settings_migrations(&mut settings, &stored);
+            ensure_llm_defaults(&mut settings);
+            settings
+        };
+
+        // A meeting provider that no longer exists keeps the old active one,
+        // as the old `meeting_provider()` fallback did. The stored list lacks
+        // `anthropic`, which must still count as a built-in.
+        let settings = migrate(serde_json::json!({
+            "settings_schema_version": 2,
+            "post_process_provider_id": "anthropic",
+            "post_process_providers": [],
+            "post_process_api_keys": { "anthropic": "sk-ant" },
+            "meeting_provider_id": "gone"
+        }));
+        assert_eq!(settings.llm_provider_id, "anthropic");
+        assert_eq!(settings.llm_api_key(), "sk-ant");
+
+        // A store that selected Apple Intelligence lands on the default
+        // provider, which resolves.
+        let settings = migrate(serde_json::json!({
+            "settings_schema_version": 2,
+            "post_process_provider_id": "apple_intelligence",
+            "meeting_provider_id": "apple_intelligence"
+        }));
+        assert_eq!(settings.llm_provider_id, default_llm_provider_id());
+        assert!(settings.llm_provider().is_some());
     }
 }
