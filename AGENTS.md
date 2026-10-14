@@ -133,7 +133,7 @@ Settings are stored using Tauri's store plugin with reactive updates:
 
 ### Single Instance Architecture
 
-The app enforces single instance behavior — launching when already running brings the settings window to front rather than creating a new process. Remote control flag (`--toggle-meeting`) work by launching a second instance that sends args to the running instance via `tauri_plugin_single_instance`, then exits.
+The app enforces single instance behavior — launching when already running brings the settings window to front rather than creating a new process. Remote control flag (`--toggle-meeting`) works by launching a second instance that sends args to the running instance via `tauri_plugin_single_instance`, then exits.
 
 ## Internationalization (i18n)
 

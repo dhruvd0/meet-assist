@@ -157,7 +157,7 @@ If you switch between a MacBook keyboard and an external one, pick a shortcut bu
 
   `pkill` here simply delivers the signal—it does not terminate the process.
 
-  > **Behavior change:** older releases also accepted `SIGUSR1` for toggling transcription with post-processing. WebKitGTK — the webview engine embedded in Handy on Linux — uses SIGUSR1 internally to coordinate JavaScript garbage collection, so listening for it caused phantom recordings and interrupted dictations every few minutes ([#1660](https://github.com/cjpais/Handy/issues/1660)). Handy no longer listens for SIGUSR1 on Linux; the post-processing toggle is still available via `handy --toggle-post-process`. **Remove any `pkill -USR1` bindings**: the signal is now delivered straight to WebKit's internal handler and can crash the app.
+  > **Note:** SIGUSR2 toggles a meeting. SIGUSR1 is unhandled: WebKitGTK uses it internally for JavaScript garbage collection, so **remove any `pkill -USR1` bindings**; the signal is delivered straight to WebKit and can crash the app.
 
 ## Verify Release Signatures
 
@@ -340,7 +340,7 @@ Adjust the executable path if needed. This override only applies to apps launche
 
 ### How to Contribute
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Bug reports and fixes against the inherited dictation pipeline are welcome; meeting-subsystem work follows the [design spec](docs/superpowers/specs/2026-10-13-meeting-assistant-design.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md). Bug reports and fixes for the transcription engine, audio capture, and models are welcome; meeting-subsystem work follows the [design spec](docs/superpowers/specs/2026-10-13-meeting-assistant-design.md).
 
 ## Related Projects
 
