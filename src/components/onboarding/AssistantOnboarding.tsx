@@ -56,7 +56,7 @@ export const AssistantOnboarding: React.FC<AssistantOnboardingProps> = ({
       <div className="max-w-xl w-full flex flex-col gap-3">
         <div className="flex flex-col gap-1 text-sm">
           <span id="assistant-provider-label">
-            {t("settings.llming.api.provider.title")}
+            {t("settings.assistant.provider.select.title")}
           </span>
           <div role="group" aria-labelledby="assistant-provider-label">
             <ProviderSelect
@@ -69,28 +69,30 @@ export const AssistantOnboarding: React.FC<AssistantOnboardingProps> = ({
         <>
           {state.isCustomProvider && (
             <label className="flex flex-col gap-1 text-sm">
-              {t("settings.llming.api.baseUrl.title")}
+              {t("settings.assistant.provider.baseUrl.title")}
               <BaseUrlField
                 value={state.baseUrl}
                 onBlur={state.handleBaseUrlChange}
                 disabled={state.isBaseUrlUpdating}
-                placeholder={t("settings.llming.api.baseUrl.placeholder")}
+                placeholder={t(
+                  "settings.assistant.provider.baseUrl.placeholder",
+                )}
                 className="min-w-0"
               />
             </label>
           )}
           <label className="flex flex-col gap-1 text-sm">
-            {t("settings.llming.api.apiKey.title")}
+            {t("settings.assistant.provider.apiKey.title")}
             <ApiKeyField
               value={state.apiKey}
               onBlur={state.handleApiKeyChange}
               disabled={state.isApiKeyUpdating}
-              placeholder={t("settings.llming.api.apiKey.placeholder")}
+              placeholder={t("settings.assistant.provider.apiKey.placeholder")}
               className="min-w-0"
             />
           </label>
           <label className="flex flex-col gap-1 text-sm">
-            {t("settings.llming.api.model.title")}
+            {t("settings.assistant.provider.model.title")}
             <ModelSelect
               value={state.model}
               options={state.modelOptions}
