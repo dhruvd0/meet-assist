@@ -1433,6 +1433,10 @@ export type ModelUnloadTimeout = "never" | "immediately" | "min_2" | "min_5" | "
 export type ObserverReadiness = { readiness: string; detail: string | null }
 export type ObserverStatusPayload = { meeting_id: number | null; tools_unavailable: boolean; consecutive_failures: number; 
 /**
+ * Most recent judge failure, if the last tick failed.
+ */
+last_error: string | null; 
+/**
  * One of `ready|disabled|no_provider|unsupported_provider|missing_api_key|no_model`.
  */
 readiness: string; 

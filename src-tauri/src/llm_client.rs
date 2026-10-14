@@ -689,11 +689,12 @@ pub fn is_tools_rejection(status: u16, body: &str) -> bool {
 }
 
 /// Whether a non-2xx answer to the first tooled request should trigger the
-/// no-tools fallback. Anything but an auth failure might be the endpoint
-/// choking on `tools`/`tool_choice`, and retrying plainly costs one request;
-/// auth failures would fail the same way without tools.
+/// no-tools fallback. Only client errors that could plausibly be the endpoint
+/// choking on `tools`/`tool_choice` qualify. Auth (401/403), missing route
+/// (404), quota or rate limits (429) and server errors (5xx) would fail the
+/// same way without tools, and must surface as the real error.
 pub fn should_fallback_without_tools(status: u16) -> bool {
-    !(200..300).contains(&status) && status != 401 && status != 403
+    (400..500).contains(&status) && !matches!(status, 401 | 403 | 404 | 429)
 }
 
 /// Build an OpenAI-format tool request. `tool_choice_none` keeps the tool
@@ -1611,11 +1612,11 @@ mod tool_tests {
     }
 
     #[test]
-    fn fallback_rule_covers_every_failure_but_auth() {
-        for s in [400, 404, 405, 422, 500, 502] {
+    fn fallback_rule_covers_client_errors_that_could_be_about_tools() {
+        for s in [400, 405, 415, 422] {
             assert!(should_fallback_without_tools(s), "{s}");
         }
-        for s in [200, 204, 401, 403] {
+        for s in [200, 204, 401, 403, 404, 429, 500, 502, 503] {
             assert!(!should_fallback_without_tools(s), "{s}");
         }
     }

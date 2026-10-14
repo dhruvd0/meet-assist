@@ -152,6 +152,7 @@
     "observer": {
       "toolsUnavailable": "This provider does not support tools; the assistant answers from the transcript only.",
       "failing": "The assistant has failed {{count}} times in a row. Check the provider settings.",
+      "lastError": "The assistant's last check failed:",
       "readiness": {
         "disabled": "The meeting assistant is off. Turn it on under Advanced settings.",
         "no_provider": "No provider is set for the meeting assistant. Choose one under Advanced settings.",

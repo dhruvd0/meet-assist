@@ -20,6 +20,7 @@ export type ObserverReadinessCode =
 interface ObserverView {
   tools_unavailable: boolean;
   consecutive_failures: number;
+  last_error: string | null;
   readiness: ObserverReadinessCode;
   detail: string | null;
 }
@@ -57,7 +58,11 @@ interface MeetingStore {
 }
 
 const t = (key: string) => i18n.t(key);
-const idleCounters = { tools_unavailable: false, consecutive_failures: 0 };
+const idleCounters = {
+  tools_unavailable: false,
+  consecutive_failures: 0,
+  last_error: null,
+};
 const idleObserver: ObserverView = {
   ...idleCounters,
   readiness: "ready",
@@ -290,13 +295,14 @@ export const useMeetingStore = create<MeetingStore>((set, get) => ({
         meeting_id,
         tools_unavailable,
         consecutive_failures,
+        last_error,
         readiness,
         detail,
       } = e.payload;
       // Readiness is global; the counters belong to one meeting.
       const counters =
         meeting_id === null || meeting_id === get().activeMeetingId
-          ? { tools_unavailable, consecutive_failures }
+          ? { tools_unavailable, consecutive_failures, last_error }
           : {};
       set((s) => ({
         observer: {

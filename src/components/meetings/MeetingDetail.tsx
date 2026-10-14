@@ -104,11 +104,14 @@ export const MeetingDetail: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       {observer.tools_unavailable && (
         <Alert variant="info">{t("meetings.observer.toolsUnavailable")}</Alert>
       )}
-      {observer.consecutive_failures >= 3 && (
+      {observer.last_error && (
         <Alert variant="warning">
-          {t("meetings.observer.failing", {
-            count: observer.consecutive_failures,
-          })}
+          {observer.consecutive_failures >= 3
+            ? t("meetings.observer.failing", {
+                count: observer.consecutive_failures,
+              })
+            : t("meetings.observer.lastError")}{" "}
+          {observer.last_error}
         </Alert>
       )}
       {m.rolling_summary && (

@@ -329,6 +329,20 @@ pub struct ObserverState {
     pub last_seen_line_id: i64,
     pub consecutive_failures: u32,
     pub tools_unavailable: bool,
+    /// Short description of the most recent judge failure, cleared on success.
+    pub last_error: Option<String>,
+}
+
+/// Trim a provider error to one short line for the status banner.
+pub fn short_error(e: &str) -> String {
+    let flat: String = e.split_whitespace().collect::<Vec<_>>().join(" ");
+    const MAX: usize = 200;
+    if flat.chars().count() > MAX {
+        let cut: String = flat.chars().take(MAX).collect();
+        format!("{cut}…")
+    } else {
+        flat
+    }
 }
 
 pub fn should_emit(
@@ -427,6 +441,7 @@ pub fn tick(
                 Ok(v) => v,
                 Err(e) => {
                     state.consecutive_failures += 1;
+                    state.last_error = Some(short_error(&format!("{e:?}")));
                     warn!("observer: judge failed after fallback: {e:?}");
                     return Ok(None);
                 }
@@ -434,11 +449,13 @@ pub fn tick(
         }
         Err(e) => {
             state.consecutive_failures += 1;
+            state.last_error = Some(short_error(&format!("{e:?}")));
             warn!("observer: judge failed: {e:?}");
             return Ok(None);
         }
     };
     state.consecutive_failures = 0;
+    state.last_error = None;
     state.last_seen_line_id = latest;
     if !should_emit(&verdict, now_ms, state, &recent) {
         info!("observer: no intervention ({})", verdict.reason);
@@ -463,6 +480,8 @@ pub struct ObserverStatusPayload {
     pub meeting_id: Option<i64>,
     pub tools_unavailable: bool,
     pub consecutive_failures: u32,
+    /// Most recent judge failure, if the last tick failed.
+    pub last_error: Option<String>,
     /// One of `ready|disabled|no_provider|unsupported_provider|missing_api_key|no_model`.
     pub readiness: String,
     /// Provider label for readiness states that name one.
@@ -509,6 +528,7 @@ pub fn spawn_observer(
                         meeting_id: st.meeting_id,
                         tools_unavailable: state.tools_unavailable,
                         consecutive_failures: state.consecutive_failures,
+                        last_error: state.last_error.clone(),
                         readiness: ready.code().to_string(),
                         detail: ready.detail(),
                     };
@@ -666,6 +686,7 @@ mod tests {
             last_seen_line_id: 0,
             consecutive_failures: 0,
             tools_unavailable: false,
+            last_error: None,
         };
         let recent = vec![Intervention {
             id: 1,
