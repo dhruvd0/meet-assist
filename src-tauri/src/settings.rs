@@ -1392,13 +1392,3 @@ pub fn get_stored_binding(settings: &AppSettings, id: &str) -> Result<ShortcutBi
         .cloned()
         .ok_or_else(|| format!("Binding with id '{}' not found", id))
 }
-
-pub fn get_history_limit(app: &AppHandle) -> usize {
-    let settings = get_settings(app);
-    settings.history_limit
-}
-
-pub fn get_recording_retention_period(app: &AppHandle) -> RecordingRetentionPeriod {
-    let settings = get_settings(app);
-    settings.recording_retention_period
-}

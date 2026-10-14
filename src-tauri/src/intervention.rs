@@ -99,13 +99,23 @@ pub fn create_intervention_window(app: &AppHandle) {
 
 /// Moves the window to the top-right of the monitor under the cursor.
 fn position_top_right(app: &AppHandle, window: &tauri::webview::WebviewWindow) {
-    let Some(monitor) = crate::overlay::get_monitor_with_cursor(app) else {
+    let Some(monitor) = get_monitor_with_cursor(app) else {
         return;
     };
     let scale = monitor.scale_factor();
     let x = (monitor.position().x as f64 + monitor.size().width as f64) / scale - WIDTH - MARGIN;
     let y = monitor.position().y as f64 / scale + MARGIN;
     let _ = window.set_position(tauri::Position::Logical(tauri::LogicalPosition { x, y }));
+}
+
+/// The monitor under the mouse cursor, falling back to the primary monitor.
+fn get_monitor_with_cursor(app: &AppHandle) -> Option<tauri::Monitor> {
+    if let Ok(cursor) = app.cursor_position() {
+        if let Ok(Some(monitor)) = app.monitor_from_point(cursor.x, cursor.y) {
+            return Some(monitor);
+        }
+    }
+    app.primary_monitor().ok().flatten()
 }
 
 /// Card payload: the intervention's fields plus `meeting_id`, so the card can

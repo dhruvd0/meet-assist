@@ -20,7 +20,6 @@
 //! a hidden tray relies on tray-icon recreating it from the last applied
 //! icon/menu/tooltip, so those must only ever be set through the applier.
 
-use crate::managers::history::{HistoryEntry, HistoryManager};
 use crate::managers::model::ModelManager;
 use crate::managers::transcription::TranscriptionManager;
 use crate::settings;
@@ -34,18 +33,16 @@ use tauri::image::Image;
 use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::tray::TrayIcon;
 use tauri::{AppHandle, Manager, Theme};
-use tauri_plugin_clipboard_manager::ClipboardExt;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TrayIconState {
     Idle,
     Recording,
-    Transcribing,
 }
 
 impl TrayIconState {
-    /// Recording and Transcribing share the same menu ("Cancel" instead of the
-    /// model submenu), so only the idle/busy distinction matters for the menu.
+    /// A meeting is running (live or paused): the menu offers "End Meeting"
+    /// instead of the model submenu.
     fn is_busy(self) -> bool {
         self != TrayIconState::Idle
     }
@@ -56,7 +53,6 @@ impl TrayIconState {
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct MenuInputs {
     busy: bool,
-    warning: bool,
     model_loaded: bool,
     selected_model: String,
     /// `(id, name)` of downloaded models, sorted by name.
@@ -184,43 +180,27 @@ fn windows_taskbar_theme() -> Option<AppTheme> {
 }
 
 /// Gets the appropriate icon path for the given theme and state.
-///
-/// `warning` overlays a badge on the idle icon while keyboard shortcuts are
-/// blocked (macOS Secure Input); recording/transcribing states keep their
-/// normal icons so in-flight activity stays recognizable.
-pub fn get_icon_path(theme: AppTheme, state: TrayIconState, warning: bool) -> &'static str {
-    if warning && state == TrayIconState::Idle {
-        return match theme {
-            AppTheme::Dark => "resources/tray_idle_warning.png",
-            AppTheme::Light => "resources/tray_idle_warning_dark.png",
-            // Linux never sets the warning flag (Secure Input is macOS-only),
-            // but fall back to the normal icon just in case.
-            AppTheme::Colored => "resources/handy.png",
-        };
-    }
+pub fn get_icon_path(theme: AppTheme, state: TrayIconState) -> &'static str {
     match (theme, state) {
         // Dark theme uses light icons
         (AppTheme::Dark, TrayIconState::Idle) => "resources/tray_idle.png",
         (AppTheme::Dark, TrayIconState::Recording) => "resources/tray_recording.png",
-        (AppTheme::Dark, TrayIconState::Transcribing) => "resources/tray_transcribing.png",
         // Light theme uses dark icons
         (AppTheme::Light, TrayIconState::Idle) => "resources/tray_idle_dark.png",
         (AppTheme::Light, TrayIconState::Recording) => "resources/tray_recording_dark.png",
-        (AppTheme::Light, TrayIconState::Transcribing) => "resources/tray_transcribing_dark.png",
         // Colored theme uses pink icons (for Linux)
         (AppTheme::Colored, TrayIconState::Idle) => "resources/handy.png",
         (AppTheme::Colored, TrayIconState::Recording) => "resources/recording.png",
-        (AppTheme::Colored, TrayIconState::Transcribing) => "resources/transcribing.png",
     }
 }
 
-/// Sets the recording state shown by the tray (icon + Cancel/model menu).
+/// Sets the meeting state shown by the tray (icon + End Meeting/model menu).
 pub fn set_tray_state(app: &AppHandle, state: TrayIconState) {
     sync_tray_with(app, |inner| inner.icon_state = state);
 }
 
-/// Re-syncs the tray after something other than the recording state changed
-/// (theme, Secure Input warning). The recording state itself is preserved.
+/// Re-syncs the tray after something other than the meeting state changed
+/// (theme). The meeting state itself is preserved.
 pub fn refresh_tray_icon(app: &AppHandle) {
     sync_tray(app);
 }
@@ -256,7 +236,7 @@ fn sync_tray_with(app: &AppHandle, update: impl FnOnce(&mut TrayInner)) {
         (inner.next_seq, inner.icon_state)
     };
 
-    // Tray not built yet (early secure-input monitor callbacks). The intent
+    // Tray not built yet (early startup callbacks). The intent
     // is kept and picked up by the first sync after the tray exists.
     if app.try_state::<TrayIcon>().is_none() {
         return;
@@ -312,7 +292,6 @@ fn sync_tray_with(app: &AppHandle, update: impl FnOnce(&mut TrayInner)) {
 fn compute_desired(app: &AppHandle, icon_state: TrayIconState) -> TrayDesired {
     let settings = settings::get_settings(app);
     let theme = get_current_theme(app);
-    let warning = crate::secure_input::tray_warning_active(app);
     let model_loaded = app.state::<Arc<TranscriptionManager>>().is_model_loaded();
 
     let mut downloaded_models: Vec<(String, String)> = app
@@ -325,10 +304,9 @@ fn compute_desired(app: &AppHandle, icon_state: TrayIconState) -> TrayDesired {
     downloaded_models.sort_by(|a, b| a.1.cmp(&b.1));
 
     TrayDesired {
-        icon_path: get_icon_path(theme, icon_state, warning),
+        icon_path: get_icon_path(theme, icon_state),
         menu: MenuInputs {
             busy: icon_state.is_busy(),
-            warning,
             model_loaded,
             selected_model: settings.selected_model,
             downloaded_models,
@@ -458,27 +436,6 @@ fn version_label() -> String {
 fn build_menu(app: &AppHandle, inputs: &MenuInputs) -> tauri::Result<(Menu<tauri::Wry>, String)> {
     let strings = get_tray_translations(Some(inputs.locale.clone()));
 
-    // Secure Input warning entry (macOS): clicking opens the settings window
-    // where the full warning banner explains the situation. Locales that
-    // haven't translated the key yet get the English string rather than a
-    // blank menu item (build.rs emits "" for missing keys).
-    let secure_input_warning = if inputs.warning {
-        let label = if strings.secure_input_warning.is_empty() {
-            get_tray_translations(Some("en".to_string())).secure_input_warning
-        } else {
-            strings.secure_input_warning.clone()
-        };
-        Some(MenuItem::with_id(
-            app,
-            "secure_input_warning",
-            &label,
-            true,
-            None::<&str>,
-        )?)
-    } else {
-        None
-    };
-
     // Platform-specific accelerators
     #[cfg(target_os = "macos")]
     let (settings_accelerator, quit_accelerator) = (Some("Cmd+,"), Some("Cmd+Q"));
@@ -502,13 +459,6 @@ fn build_menu(app: &AppHandle, inputs: &MenuInputs) -> tauri::Result<(Menu<tauri
         inputs.update_checks_enabled,
         None::<&str>,
     )?;
-    let copy_last_transcript_i = MenuItem::with_id(
-        app,
-        "copy_last_transcript",
-        &strings.copy_last_transcript,
-        true,
-        None::<&str>,
-    )?;
     let quit_i = MenuItem::with_id(app, "quit", &strings.quit, true, quit_accelerator)?;
     let separator = || PredefinedMenuItem::separator(app);
 
@@ -525,17 +475,12 @@ fn build_menu(app: &AppHandle, inputs: &MenuInputs) -> tauri::Result<(Menu<tauri
     };
 
     let menu = if inputs.busy {
-        let cancel_i = MenuItem::with_id(app, "cancel", &strings.cancel, true, None::<&str>)?;
         Menu::with_items(
             app,
             &[
                 &version_i,
                 &separator()?,
                 &meeting_i,
-                &separator()?,
-                &cancel_i,
-                &separator()?,
-                &copy_last_transcript_i,
                 &separator()?,
                 &settings_i,
                 &check_updates_i,
@@ -575,8 +520,6 @@ fn build_menu(app: &AppHandle, inputs: &MenuInputs) -> tauri::Result<(Menu<tauri
                 &separator()?,
                 &meeting_i,
                 &separator()?,
-                &copy_last_transcript_i,
-                &separator()?,
                 &model_submenu,
                 &unload_model_i,
                 &separator()?,
@@ -598,23 +541,7 @@ fn build_menu(app: &AppHandle, inputs: &MenuInputs) -> tauri::Result<(Menu<tauri
         menu.remove(&check_updates_i)?;
     }
 
-    // Both layouts start with [version, separator, ...]; slot the warning in
-    // right below the version line so it's the first actionable thing seen.
-    let mut tooltip = version_label;
-    if let Some(warning_item) = secure_input_warning {
-        menu.insert(&warning_item, 2)?;
-        menu.insert(&separator()?, 3)?;
-        tooltip = format!("{} — {}", tooltip, warning_item.text().unwrap_or_default());
-    }
-
-    Ok((menu, tooltip))
-}
-
-fn last_transcript_text(entry: &HistoryEntry) -> &str {
-    entry
-        .post_processed_text
-        .as_deref()
-        .unwrap_or(&entry.transcription_text)
+    Ok((menu, version_label))
 }
 
 pub fn set_tray_visibility(app: &AppHandle, visible: bool) {
@@ -649,35 +576,4 @@ pub fn recreate_tray_icon(app: &AppHandle) {
     if let Err(e) = tray.set_visible(false).and_then(|_| tray.set_visible(true)) {
         error!("Failed to recreate tray icon: {}", e);
     }
-}
-
-pub fn copy_last_transcript(app: &AppHandle) {
-    let history_manager = app.state::<Arc<HistoryManager>>();
-    let entry = match history_manager.get_latest_completed_entry() {
-        Ok(Some(entry)) => entry,
-        Ok(None) => {
-            warn!("No completed transcription history entries available for tray copy.");
-            return;
-        }
-        Err(err) => {
-            error!(
-                "Failed to fetch last completed transcription entry: {}",
-                err
-            );
-            return;
-        }
-    };
-
-    let text = last_transcript_text(&entry);
-    if text.trim().is_empty() {
-        warn!("Last completed transcription is empty; skipping tray copy.");
-        return;
-    }
-
-    if let Err(err) = app.clipboard().write_text(text) {
-        error!("Failed to copy last transcript to clipboard: {}", err);
-        return;
-    }
-
-    info!("Copied last transcript to clipboard via tray.");
 }

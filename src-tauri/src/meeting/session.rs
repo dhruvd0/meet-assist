@@ -1,7 +1,6 @@
 //! Meeting session manager: Idle -> Live <-> Paused -> Ended. Owns capture
 //! lifetime and the transcriber thread; emits state and transcript events.
 
-use crate::managers::audio::AudioRecordingManager;
 use crate::managers::transcription::TranscriptionManager;
 use crate::meeting::capture::{MeetingCapture, Utterance};
 use crate::meeting::store::{Meeting, MeetingStatus, ProjectStore, TranscriptLine};
@@ -164,7 +163,6 @@ pub struct MeetingManager {
     store: Arc<ProjectStore>,
     transcriber: Arc<dyn Transcriber>,
     capture: Arc<dyn CaptureSource>,
-    dictation_recording: Arc<dyn Fn() -> bool + Send + Sync>,
     /// Brief-access state read by `state()`; never held across a drain.
     active: Mutex<Option<Active>>,
     /// Serializes start/pause/resume/end so a slow drain cannot interleave
@@ -220,17 +218,11 @@ fn stop_and_drain(
 }
 
 impl MeetingManager {
-    pub fn new(
-        app: &AppHandle,
-        store: Arc<ProjectStore>,
-        tm: Arc<TranscriptionManager>,
-        rm: Arc<AudioRecordingManager>,
-    ) -> Self {
+    pub fn new(app: &AppHandle, store: Arc<ProjectStore>, tm: Arc<TranscriptionManager>) -> Self {
         Self {
             store,
             transcriber: Arc::new(ModelTranscriber(tm)),
             capture: Arc::new(CombinedCapture { app: app.clone() }),
-            dictation_recording: Arc::new(move || rm.is_recording()),
             active: Mutex::new(None),
             transition: Mutex::new(()),
             live: AtomicBool::new(false),
@@ -499,11 +491,6 @@ impl MeetingManager {
     }
 
     pub fn start(&self, project_id: Option<i64>, meeting_id: Option<i64>) -> Result<Meeting> {
-        if (self.dictation_recording)() {
-            return Err(anyhow!(
-                "Dictation is recording; stop it before starting a meeting"
-            ));
-        }
         let _t = lock(&self.transition);
         if self.lock_active().is_some() {
             return Err(anyhow!("A meeting is already running"));
@@ -586,9 +573,6 @@ impl MeetingManager {
     }
 
     pub fn resume(&self) -> Result<()> {
-        if (self.dictation_recording)() {
-            return Err(anyhow!("Dictation is recording; stop it before resuming"));
-        }
         let _t = lock(&self.transition);
         let (meeting_id, session_id) = {
             let guard = self.lock_active();

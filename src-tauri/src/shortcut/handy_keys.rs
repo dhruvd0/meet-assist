@@ -428,16 +428,7 @@ pub fn init_shortcuts(app: &AppHandle) -> Result<(), String> {
     let default_bindings = settings::get_default_settings().bindings;
     let user_settings = settings::load_or_create_app_settings(app);
 
-    // Register all bindings except cancel (which is dynamic)
     for (id, default_binding) in default_bindings {
-        if id == "cancel" {
-            continue;
-        }
-        // Skip post-processing shortcut when the feature is disabled
-        if id == "transcribe_with_post_process" && !user_settings.post_process_enabled {
-            continue;
-        }
-
         let binding = user_settings
             .bindings
             .get(&id)
@@ -480,16 +471,6 @@ pub fn start_handy_keys_recording(app: AppHandle, binding_id: String) -> Result<
     let settings = get_settings(&app);
     if settings.keyboard_implementation != settings::KeyboardImplementation::HandyKeys {
         return Err("handy-keys is not the active keyboard implementation".into());
-    }
-
-    // While Secure Input is active the tap receives no KeyDown/KeyUp, so the
-    // recorder would silently capture just the modifier and overwrite the
-    // binding with it (issue #1578). Refuse instead; the frontend maps this
-    // marker to a localized explanation, and the noted impact makes the
-    // warning banner appear with the full story.
-    if crate::secure_input::is_enabled_now() {
-        crate::secure_input::note_recorder_blocked(&app);
-        return Err("secure-input-active".into());
     }
 
     let state = app

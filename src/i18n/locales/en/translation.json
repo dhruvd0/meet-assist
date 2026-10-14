@@ -2,14 +2,11 @@
   "tray": {
     "settings": "Settings...",
     "checkUpdates": "Check for Updates...",
-    "copyLastTranscript": "Copy Last Transcript",
     "unloadModel": "Unload Model",
     "model": "Model",
     "quit": "Quit",
-    "cancel": "Cancel",
     "startMeeting": "Start Meeting",
-    "endMeeting": "End Meeting",
-    "secureInputWarning": "⚠ Shortcuts blocked by Secure Input"
+    "endMeeting": "End Meeting"
   },
   "sidebar": {
     "projects": "Projects",
