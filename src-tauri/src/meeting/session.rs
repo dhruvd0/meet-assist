@@ -545,6 +545,7 @@ impl MeetingManager {
         });
         self.live.store(true, Ordering::SeqCst);
         self.emit_state();
+        self.play_feedback(crate::audio_feedback::SoundType::Start);
         Ok(meeting)
     }
 
@@ -619,9 +620,18 @@ impl MeetingManager {
         *self.lock_active() = None;
         self.emit_state();
         if result.is_ok() {
+            self.play_feedback(crate::audio_feedback::SoundType::Stop);
             self.spawn_summaries(vec![session_id], leftover);
         }
         result
+    }
+
+    /// Start/end cue for every trigger (UI, shortcut, tray, CLI). No-op
+    /// without an app handle or with audio feedback off.
+    fn play_feedback(&self, sound: crate::audio_feedback::SoundType) {
+        if let Some(app) = &self.app {
+            crate::audio_feedback::play_feedback_sound(app, sound);
+        }
     }
 
     /// End a meeting that is not running here (e.g. paused before a restart):

@@ -415,7 +415,7 @@
       },
       "audioFeedback": {
         "label": "Audio Feedback",
-        "description": "Play sound when recording starts and stops"
+        "description": "Play a sound when a meeting starts and ends"
       },
       "outputDevice": {
         "title": "Output Device",

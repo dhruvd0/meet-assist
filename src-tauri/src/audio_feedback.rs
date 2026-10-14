@@ -53,6 +53,19 @@ pub fn play_test_sound(app: &AppHandle, sound_type: SoundType) {
     }
 }
 
+/// Meeting start/end cue, gated by the `audio_feedback` setting. Plays on a
+/// background thread so meeting transitions never wait on the audio device.
+pub fn play_feedback_sound(app: &AppHandle, sound_type: SoundType) {
+    let settings = settings::get_settings(app);
+    if !settings.audio_feedback {
+        return;
+    }
+    if let Some(path) = resolve_sound_path(app, &settings, sound_type) {
+        let app = app.clone();
+        thread::spawn(move || play_sound_blocking(&app, &path));
+    }
+}
+
 fn play_sound_blocking(app: &AppHandle, path: &Path) {
     if let Err(e) = play_sound_at_path(app, path) {
         error!("Failed to play sound '{}': {}", path.display(), e);
