@@ -2,21 +2,20 @@
   "tray": {
     "settings": "Paramètres...",
     "checkUpdates": "Rechercher des mises à jour...",
-    "copyLastTranscript": "Copier la dernière transcription",
     "unloadModel": "Décharger le modèle",
     "model": "Modèle",
     "quit": "Quitter",
-    "cancel": "Annuler",
-    "secureInputWarning": "⚠ Raccourcis bloqués par Secure Input"
+    "startMeeting": "Start Meeting",
+    "endMeeting": "End Meeting"
   },
   "sidebar": {
     "projects": "Projects",
     "meetings": "Meetings",
+    "assistant": "Assistant",
+    "audio": "Audio",
     "general": "Général",
     "models": "Modèles",
     "advanced": "Avancé",
-    "postProcessing": "Post-traitement",
-    "history": "Historique",
     "debug": "Débogage",
     "about": "À propos"
   },
@@ -154,11 +153,11 @@
       "failing": "The assistant has failed {{count}} times in a row. Check the provider settings.",
       "lastError": "The assistant's last check failed:",
       "readiness": {
-        "disabled": "The meeting assistant is off. Turn it on under Advanced settings.",
-        "no_provider": "No provider is set for the meeting assistant. Choose one under Advanced settings.",
-        "unsupported_provider": "{{detail}} cannot run the meeting assistant. Choose another provider under Advanced settings.",
-        "missing_api_key": "No API key for {{detail}}. Add one under Post Processing settings.",
-        "no_model": "No model is selected for {{detail}}. Pick one under Post Processing settings."
+        "disabled": "The meeting assistant is off. Turn it on in Assistant.",
+        "no_provider": "No AI provider is set. Choose one in Assistant.",
+        "unsupported_provider": "{{detail}} cannot run the meeting assistant. Choose another provider in Assistant.",
+        "missing_api_key": "No API key for {{detail}}. Add one in Assistant.",
+        "no_model": "No model is selected for {{detail}}. Pick one in Assistant."
       }
     },
     "summary": {
@@ -259,26 +258,6 @@
     "errors": {
       "selectModel": "Échec de la sélection du modèle"
     },
-    "permissions": {
-      "title": "Autorisations requises",
-      "description": "Handy a besoin de quelques autorisations pour fonctionner correctement.",
-      "microphone": {
-        "title": "Accès au microphone",
-        "description": "Nécessaire pour entendre votre voix pour la transcription."
-      },
-      "accessibility": {
-        "title": "Accès à l'accessibilité",
-        "description": "Nécessaire pour taper le texte transcrit dans vos applications."
-      },
-      "grant": "Accorder l'autorisation",
-      "granted": "Accordé",
-      "waiting": "En attente...",
-      "allGranted": "Tout est prêt !",
-      "errors": {
-        "checkFailed": "Échec de la vérification des autorisations. Veuillez réessayer.",
-        "requestFailed": "Échec de la demande d'autorisation. Veuillez réessayer."
-      }
-    },
     "assistant": {
       "title": "Set up your assistant",
       "description": "The meeting assistant and summaries use an LLM provider. Pick one, add your API key if needed, and test the connection.",
@@ -289,12 +268,12 @@
       "failure": "Connection failed: {{error}}",
       "continue": "Continue",
       "skip": "Skip for now",
-      "hint": "You can change this later under Post Processing settings.",
-      "unsupported": "Apple Intelligence cannot be used for meetings. Pick another provider."
+      "hint": "You can change this later in Assistant."
     }
   },
   "modelSelector": {
     "custom": "Personnalisé",
+    "legacy": "Hérité",
     "streaming": "Streaming",
     "active": "Actif",
     "switching": "Changement...",
@@ -314,64 +293,35 @@
     "noModelDownloadRequired": "Aucun Modèle - Téléchargement Requis",
     "deleteModel": "Supprimer {{modelName}}",
     "downloadSpeed": "{{speed}} Mo/s",
-    "capabilities": {
-      "languageSelection": "Prend en charge plusieurs langues d'entrée",
-      "languageCount": "{{total}} langues",
-      "translation": "Peut traduire en anglais",
-      "translate": "Traduire en anglais",
-      "singleLanguage": "Prend en charge uniquement cette langue",
-      "languageOnly": "{{language}} uniquement",
-      "streaming": "Affiche la transcription en direct pendant que vous parlez"
-    },
     "cancel": "Annuler",
     "cancelDownload": "Annuler le téléchargement",
-    "legacy": "Hérité"
+    "capabilities": {
+      "languageSelection": "Prend en charge plusieurs langues d'entrée",
+      "singleLanguage": "Prend en charge uniquement cette langue",
+      "languageCount": "{{total}} langues",
+      "languageOnly": "{{language}} uniquement",
+      "translation": "Peut traduire en anglais",
+      "translate": "Traduire en anglais",
+      "streaming": "Affiche la transcription en direct pendant que vous parlez"
+    }
   },
   "settings": {
     "modelSettings": {
       "title": "Paramètres de {{model}}"
     },
-    "models": {
-      "title": "Modèles de Transcription",
-      "description": "Sélectionnez un modèle de transcription ou téléchargez des modèles supplémentaires. Différents modèles offrent différents niveaux de précision et de vitesse.",
-      "deleteConfirm": "Êtes-vous sûr de vouloir supprimer {{modelName}} ? Vous devrez le télécharger à nouveau pour l'utiliser.",
-      "deleteActiveConfirm": "{{modelName}} est votre modèle actif. Le supprimer arrêtera les transcriptions jusqu'à ce que vous sélectionniez un nouveau modèle. Êtes-vous sûr ?",
-      "deleteTitle": "Supprimer le modèle",
-      "filters": {
-        "allLanguages": "Toutes les langues",
-        "streaming": "Filtrer les modèles prenant en charge la transcription en direct",
-        "translation": "Filtrer les modèles prenant en charge la traduction vers l'anglais"
-      },
-      "noModelsMatch": "Aucun modèle ne correspond à ce filtre.",
-      "yourModels": "Modèles téléchargés",
-      "availableModels": "Disponibles au téléchargement",
-      "searchPlaceholder": "Rechercher des modèles par nom…",
-      "rescan": {
-        "label": "Réanalyser",
-        "tooltip": "Réanalyser pour détecter les modèles ajoutés au dossier des modèles ou au cache Hugging Face en dehors de Handy"
-      }
-    },
     "general": {
       "title": "Général",
       "shortcut": {
-        "title": "Raccourcis Handy",
-        "description": "Configurer les raccourcis clavier pour déclencher l'enregistrement de la reconnaissance vocale",
+        "title": "Shortcut",
+        "description": "Start or end a meeting from anywhere.",
         "loading": "Chargement des raccourcis...",
         "none": "Aucun raccourci configuré",
         "notFound": "Raccourci non trouvé",
         "pressKeys": "Appuyez sur les touches...",
         "bindings": {
-          "transcribe": {
-            "name": "Raccourci de Transcription",
-            "description": "Le raccourci clavier pour enregistrer et transcrire votre voix."
-          },
-          "cancel": {
-            "name": "Raccourci d'Annulation",
-            "description": "Le raccourci clavier pour annuler l'enregistrement en cours."
-          },
-          "transcribe_with_post_process": {
-            "name": "Raccourci de post-traitement",
-            "description": "Facultatif : Un raccourci dédié qui applique toujours le post-traitement IA à votre transcription."
+          "toggle_meeting": {
+            "name": "Meeting shortcut",
+            "description": "Starts a meeting in your most recent project, or ends the running one."
           }
         },
         "errors": {
@@ -386,21 +336,68 @@
         "searchPlaceholder": "Rechercher des langues...",
         "noResults": "Aucune langue trouvée",
         "auto": "Automatique"
-      },
-      "shortcutActivation": {
-        "title": "Comportement du raccourci",
-        "description": "Choisissez comment le raccourci de transcription démarre et arrête l’enregistrement.",
-        "options": {
-          "holdOrToggle": "Auto",
-          "pushToTalk": "Maintenir",
-          "toggle": "Basculer"
+      }
+    },
+    "assistant": {
+      "provider": {
+        "title": "AI provider",
+        "description": "The model Meet Assist uses for nudges, summaries, and image digests.",
+        "test": {
+          "button": "Test connection",
+          "ok": "Connected. {{count}} models available."
         },
-        "descriptions": {
-          "hold_or_toggle": "Maintenez pour enregistrer ou appuyez brièvement pour basculer",
-          "push_to_talk": "Enregistre tant que le raccourci est maintenu",
-          "toggle": "Appuyez sur le raccourci pour démarrer l'enregistrement, appuyez à nouveau pour arrêter"
+        "select": {
+          "title": "Fournisseur",
+          "description": "Sélectionnez un fournisseur compatible OpenAI ou Anthropic."
+        },
+        "apiFormat": {
+          "title": "Format d'API",
+          "description": "Format de requête attendu par votre point de terminaison personnalisé.",
+          "options": {
+            "openai": "Compatible OpenAI (Chat Completions)",
+            "anthropic": "Anthropic Messages"
+          }
+        },
+        "baseUrl": {
+          "title": "URL de base",
+          "description": "URL de base de l'API pour le fournisseur sélectionné. Seul le fournisseur personnalisé peut être modifié.",
+          "placeholder": "https://api.openai.com/v1",
+          "placeholderAnthropic": "https://api.anthropic.com/v1"
+        },
+        "apiKey": {
+          "title": "Clé API",
+          "description": "Clé API pour le fournisseur sélectionné.",
+          "placeholder": "sk-..."
+        },
+        "model": {
+          "title": "Modèle",
+          "descriptionCustom": "Fournissez l'identifiant du modèle attendu par votre point de terminaison personnalisé.",
+          "descriptionDefault": "Choisissez un modèle exposé par le fournisseur sélectionné.",
+          "placeholderWithOptions": "Rechercher ou sélectionner un modèle",
+          "placeholderNoOptions": "Tapez un nom de modèle",
+          "refreshModels": "Actualiser les modèles"
         }
       }
+    },
+    "models": {
+      "title": "Modèles de Transcription",
+      "description": "Sélectionnez un modèle de transcription ou téléchargez des modèles supplémentaires. Différents modèles offrent différents niveaux de précision et de vitesse.",
+      "searchPlaceholder": "Rechercher des modèles par nom…",
+      "yourModels": "Modèles téléchargés",
+      "availableModels": "Disponibles au téléchargement",
+      "deleteConfirm": "Êtes-vous sûr de vouloir supprimer {{modelName}} ? Vous devrez le télécharger à nouveau pour l'utiliser.",
+      "deleteActiveConfirm": "{{modelName}} est votre modèle actif. Le supprimer arrêtera les transcriptions jusqu'à ce que vous sélectionniez un nouveau modèle. Êtes-vous sûr ?",
+      "deleteTitle": "Supprimer le modèle",
+      "filters": {
+        "allLanguages": "Toutes les langues",
+        "streaming": "Filtrer les modèles prenant en charge la transcription en direct",
+        "translation": "Filtrer les modèles prenant en charge la traduction vers l'anglais"
+      },
+      "rescan": {
+        "label": "Réanalyser",
+        "tooltip": "Réanalyser pour détecter les modèles ajoutés au dossier des modèles ou au cache Hugging Face en dehors de Handy"
+      },
+      "noModelsMatch": "Aucun modèle ne correspond à ce filtre."
     },
     "sound": {
       "title": "Son",
@@ -434,18 +431,12 @@
     "advanced": {
       "groups": {
         "app": "Application",
-        "output": "Sortie",
         "transcription": "Transcription",
-        "history": "Historique",
         "experimental": "Expérimental"
       },
       "experimentalToggle": {
         "label": "Fonctionnalités Expérimentales",
         "description": "Activer les fonctionnalités expérimentales encore en développement."
-      },
-      "lazyStreamClose": {
-        "label": "Garder le micro ouvert entre les transcriptions",
-        "description": "Maintient le flux du microphone ouvert pendant 30 secondes après l'arrêt de l'enregistrement, réduisant la latence pour les transcriptions consécutives. Peut dégrader la qualité audio Bluetooth."
       },
       "acceleration": {
         "transcribe": {
@@ -471,64 +462,6 @@
       "showTrayIcon": {
         "label": "Afficher l'icône de la barre",
         "description": "Afficher l'icône de Handy dans la barre système."
-      },
-      "overlay": {
-        "style": {
-          "title": "Overlay",
-          "description": "Choisissez l'overlay d'enregistrement : « Aucun » le masque, « Minimal » affiche une pilule compacte, « Live » affiche la transcription en temps réel pendant que vous parlez (uniquement pour les modèles compatibles avec le streaming — recherchez le badge Streaming dans le sélecteur de modèle). Sur Linux, « Aucun » est recommandé.",
-          "options": {
-            "none": "Aucune",
-            "minimal": "Minimal",
-            "live": "Live"
-          }
-        },
-        "position": {
-          "title": "Position de la fenêtre d'enregistrement",
-          "description": "Afficher un retour visuel pendant l'enregistrement et la transcription. Sur Linux, 'Aucune' est recommandé.",
-          "options": {
-            "bottom": "Bas",
-            "top": "Haut"
-          }
-        }
-      },
-      "pasteMethod": {
-        "title": "Méthode de collage",
-        "description": "Choisissez comment le texte est inséré. Direct : simule la frappe via l'entrée système. Aucun : ignore le collage, met uniquement à jour l'historique/presse-papiers.",
-        "options": {
-          "clipboard": "Presse-papiers ({{modifier}}+V)",
-          "clipboardCtrlShiftV": "Presse-papiers (Ctrl+Shift+V)",
-          "clipboardShiftInsert": "Presse-papiers (Shift+Insert)",
-          "direct": "Direct",
-          "none": "Aucun",
-          "externalScript": "Script externe"
-        },
-        "externalScriptPlaceholder": "/chemin/vers/votre/script.sh"
-      },
-      "typingTool": {
-        "title": "Outil de frappe",
-        "description": "Choisissez quel outil de frappe Linux utiliser pour la méthode de collage direct. Auto détectera et utilisera automatiquement le meilleur outil disponible pour votre système.",
-        "options": {
-          "auto": "Auto (Recommandé)"
-        }
-      },
-      "clipboardHandling": {
-        "title": "Gestion du presse-papiers",
-        "description": "Ne pas modifier le presse-papiers préserve le contenu actuel de votre presse-papiers après la transcription. Copier dans le presse-papiers laisse le résultat de la transcription dans votre presse-papiers après le collage.",
-        "options": {
-          "dontModify": "Ne pas modifier le presse-papiers",
-          "copyToClipboard": "Copier dans le presse-papiers"
-        }
-      },
-      "autoSubmit": {
-        "title": "Envoi automatique",
-        "description": "Envoie automatiquement la combinaison de touches sélectionnée après l'insertion du texte. Cmd+Enter s'applique sur macOS, tandis que Windows/Linux utilisent Super+Enter.",
-        "options": {
-          "off": "Désactivé",
-          "enter": "Entrée",
-          "cmdEnter": "Cmd+Entrée",
-          "superEnter": "Super+Entrée",
-          "ctrlEnter": "Ctrl+Entrée"
-        }
       },
       "translateToEnglish": {
         "label": "Traduire en anglais",
@@ -582,85 +515,6 @@
         }
       }
     },
-    "postProcessing": {
-      "hotkey": {
-        "title": "Raccourci clavier"
-      },
-      "api": {
-        "title": "API",
-        "provider": {
-          "title": "Fournisseur",
-          "description": "Sélectionnez un fournisseur compatible OpenAI ou Anthropic."
-        },
-        "apiFormat": {
-          "title": "Format d'API",
-          "description": "Format de requête attendu par votre point de terminaison personnalisé.",
-          "options": {
-            "openai": "Compatible OpenAI (Chat Completions)",
-            "anthropic": "Anthropic Messages"
-          }
-        },
-        "appleIntelligence": {
-          "unavailable": "Apple Intelligence n'est pas disponible sur cet appareil. Nécessite un Mac Apple Silicon exécutant macOS Tahoe (26.0) ou une version ultérieure avec Apple Intelligence activé dans les Préférences Système."
-        },
-        "baseUrl": {
-          "title": "URL de base",
-          "description": "URL de base de l'API pour le fournisseur sélectionné. Seul le fournisseur personnalisé peut être modifié.",
-          "placeholder": "https://api.openai.com/v1",
-          "placeholderAnthropic": "https://api.anthropic.com/v1"
-        },
-        "apiKey": {
-          "title": "Clé API",
-          "description": "Clé API pour le fournisseur sélectionné.",
-          "placeholder": "sk-..."
-        },
-        "model": {
-          "title": "Modèle",
-          "descriptionCustom": "Fournissez l'identifiant du modèle attendu par votre point de terminaison personnalisé.",
-          "descriptionDefault": "Choisissez un modèle exposé par le fournisseur sélectionné.",
-          "placeholderWithOptions": "Rechercher ou sélectionner un modèle",
-          "placeholderNoOptions": "Tapez un nom de modèle",
-          "refreshModels": "Actualiser les modèles"
-        }
-      },
-      "prompts": {
-        "title": "Prompt",
-        "selectedPrompt": {
-          "title": "Prompt sélectionné",
-          "description": "Sélectionnez un modèle pour affiner les transcriptions ou créez-en un nouveau. Utilisez ${output} dans le texte du prompt pour référencer la transcription capturée."
-        },
-        "noPrompts": "Aucun prompt disponible",
-        "selectPrompt": "Sélectionner un prompt",
-        "createNew": "Créer un nouveau prompt",
-        "promptLabel": "Libellé du prompt",
-        "promptLabelPlaceholder": "Entrez le nom du prompt",
-        "promptInstructions": "Instructions du prompt",
-        "promptInstructionsPlaceholder": "Écrivez les instructions à exécuter après la transcription. Exemple : Améliorer la grammaire et la clarté du texte suivant : ${output}",
-        "promptTip": "Astuce : Utilisez <code>${output}</code> pour insérer le texte transcrit dans votre prompt.",
-        "updatePrompt": "Mettre à jour le prompt",
-        "deletePrompt": "Supprimer le prompt",
-        "createPrompt": "Créer le prompt",
-        "cancel": "Annuler",
-        "selectToEdit": "Sélectionnez un prompt ci-dessus pour voir et modifier ses détails.",
-        "createFirst": "Cliquez sur 'Créer un nouveau prompt' ci-dessus pour créer votre premier prompt de post-traitement."
-      }
-    },
-    "history": {
-      "title": "Historique",
-      "openFolder": "Ouvrir le dossier des enregistrements",
-      "loading": "Chargement de l'historique...",
-      "empty": "Pas encore de transcriptions. Commencez à enregistrer pour créer votre historique !",
-      "copyToClipboard": "Copier la transcription dans le presse-papiers",
-      "copyError": "Impossible de copier la transcription dans le presse-papiers.",
-      "save": "Enregistrer la transcription",
-      "unsave": "Retirer des favoris",
-      "delete": "Supprimer l'entrée",
-      "deleteError": "Échec de la suppression de l'entrée. Veuillez réessayer.",
-      "retranscribe": "Re-transcrire",
-      "retranscribeError": "Impossible de re-transcrire. Veuillez réessayer.",
-      "transcribing": "Transcription en cours...",
-      "transcriptionFailed": "La transcription a échoué. Vous pouvez re-transcrire en utilisant l'icône de réessai."
-    },
     "debug": {
       "title": "Débogage",
       "logDirectory": {
@@ -687,99 +541,6 @@
         "description": "Vérifier automatiquement les nouvelles versions de Handy",
         "lockedDescription": "Désactivé par la configuration système (HANDY_DISABLE_UPDATER)"
       },
-      "soundTheme": {
-        "label": "Thème sonore",
-        "description": "Choisir un thème sonore pour les retours de début et de fin d'enregistrement"
-      },
-      "wordCorrectionThreshold": {
-        "title": "Seuil de correction des mots",
-        "description": "Sensibilité pour les corrections de mots personnalisés"
-      },
-      "historyLimit": {
-        "title": "Limite d'historique",
-        "description": "Nombre maximum d'entrées d'historique à conserver",
-        "entries": "entrées"
-      },
-      "recordingRetention": {
-        "title": "Suppression automatique des enregistrements",
-        "description": "Supprimer automatiquement les anciens enregistrements pour économiser de l'espace",
-        "never": "Jamais",
-        "preserveLimit": "Conserver les {{count}} plus récents",
-        "days3": "Après 3 jours",
-        "weeks2": "Après 2 semaines",
-        "months3": "Après 3 mois",
-        "placeholder": "Sélectionner la période de conservation..."
-      },
-      "alwaysOnMicrophone": {
-        "label": "Microphone toujours actif",
-        "description": "Garder le microphone actif pour une réponse plus rapide"
-      },
-      "clamshellMicrophone": {
-        "title": "Microphone en mode fermé",
-        "description": "Microphone à utiliser lorsque le couvercle du portable est fermé"
-      },
-      "postProcessingToggle": {
-        "label": "Post-traitement",
-        "description": "Activer l'affinage du texte par IA après la transcription"
-      },
-      "muteWhileRecording": {
-        "label": "Muet pendant l'enregistrement",
-        "description": "Couper le son du système pendant l'enregistrement"
-      },
-      "appendTrailingSpace": {
-        "label": "Ajouter une espace final",
-        "description": "Ajouter une espace après la transcription collée"
-      },
-      "keyboardImplementation": {
-        "title": "Gestion du clavier",
-        "description": "Choisissez le système des raccourcis clavier.",
-        "bindingsReset": "Raccourcis clavier étaient incompatibles et ont été réinitialisés aux valeurs par défaut"
-      },
-      "paths": {
-        "appData": "Données de l'application :",
-        "models": "Modèles :",
-        "settings": "Paramètres :"
-      },
-      "pasteDelay": {
-        "title": "Délai de collage (avant)",
-        "description": "Délai (en millisecondes) après la copie du texte, avant l'envoi de la touche de collage. Augmentez si rien n'est collé."
-      },
-      "pasteDelayAfter": {
-        "title": "Délai de collage (après)",
-        "description": "Délai (en millisecondes) après la touche de collage, avant la restauration de votre presse-papiers précédent. Augmentez si l'ancien contenu du presse-papiers est collé à la place de la transcription."
-      },
-      "holdThreshold": {
-        "title": "Seuil de maintien",
-        "description": "Mode Auto uniquement : durée (en millisecondes) pendant laquelle le raccourci doit rester enfoncé pour compter comme un maintien plutôt qu'une pression brève. Diminuez si l'enregistrement reste actif après un maintien court ; augmentez si des pressions brèves volontaires sont traitées comme un maintien."
-      },
-      "reliablePaste": {
-        "title": "Collage fiable (Beta)",
-        "description": "Restaure le presse-papiers uniquement après que l'application cible a réellement lu la transcription, au lieu d'attendre un délai fixe. Vise à corriger le collage de l'ancien contenu du presse-papiers lorsque le système est chargé. Nécessite une méthode de collage par presse-papiers ; macOS et Windows uniquement."
-      },
-      "recordingBuffer": {
-        "title": "Tampon d'enregistrement supplémentaire",
-        "description": "Temps supplémentaire (en millisecondes) pour continuer l'enregistrement après avoir relâché la touche, pour capturer l'audio restant. 0 = pas de tampon supplémentaire."
-      },
-      "keyboardDiagnostic": {
-        "title": "Diagnostic du clavier",
-        "description": "Vérifie si les événements clavier atteignent Handy. Seul le nombre d'événements est enregistré, jamais les touches sur lesquelles vous appuyez.",
-        "run": "Lancer un diagnostic de 10 s",
-        "running": "Écoute en cours… appuyez plusieurs fois sur votre raccourci (par ex. Option+Space)",
-        "secureInputLabel": "Secure Input",
-        "enabled": "activé",
-        "disabled": "désactivé",
-        "holder": "détenu par {{name}} (pid {{pid}})",
-        "holderUnknown": "aucun détenteur visible",
-        "keyDown": "Touche enfoncée",
-        "keyUp": "Touche relâchée",
-        "flagsChanged": "Modificateurs",
-        "mouse": "Souris",
-        "verdictBlocked": "Secure Input bloque les événements clavier : les raccourcis contenant une touche normale ne peuvent pas fonctionner tant que ce n'est pas résolu.",
-        "verdictSuspicious": "Des événements de modificateurs sont arrivés, mais aucun événement de touche : quelque chose supprime les touches alors que Secure Input est signalé comme désactivé. Merci de le signaler sur GitHub.",
-        "verdictOk": "Les événements clavier atteignent Handy normalement.",
-        "verdictNoEvents": "Aucun événement capturé : avez-vous appuyé sur des touches pendant le test ?",
-        "failed": "Échec du diagnostic : {{error}}"
-      },
       "whatsNewPreview": {
         "title": "Aperçu des nouveautés",
         "description": "Ouvrir la dernière note de version intégrée sans la marquer comme vue",
@@ -790,9 +551,26 @@
       "onboardingPreview": {
         "title": "Aperçu de la configuration initiale",
         "description": "Prévisualisez les écrans de configuration sans modifier les autorisations, les modèles ou l’état d’achèvement",
-        "permissionsButton": "Autorisations",
         "modelsButton": "Sélection du modèle",
         "exitButton": "Quitter l’aperçu"
+      },
+      "soundTheme": {
+        "label": "Thème sonore",
+        "description": "Choisir un thème sonore pour les retours de début et de fin d'enregistrement"
+      },
+      "wordCorrectionThreshold": {
+        "title": "Seuil de correction des mots",
+        "description": "Sensibilité pour les corrections de mots personnalisés"
+      },
+      "keyboardImplementation": {
+        "title": "Gestion du clavier",
+        "description": "Choisissez le système des raccourcis clavier.",
+        "bindingsReset": "Raccourcis clavier étaient incompatibles et ont été réinitialisés aux valeurs par défaut"
+      },
+      "paths": {
+        "appData": "Données de l'application :",
+        "models": "Modèles :",
+        "settings": "Paramètres :"
       }
     },
     "about": {
@@ -800,6 +578,10 @@
       "version": {
         "title": "Version",
         "description": "Version actuelle de Handy"
+      },
+      "whatsNewUpdates": {
+        "label": "Afficher les nouveautés",
+        "description": "Afficher les notes de version après les mises à jour de Handy"
       },
       "appDataDirectory": {
         "title": "Emplacement des données de l'application",
@@ -822,10 +604,6 @@
           "description": "Inférence haute performance du modèle de reconnaissance vocale automatique Whisper d'OpenAI",
           "details": "Handy utilise ggml pour un traitement rapide et local de la parole en texte. Merci au travail incroyable de Georgi Gerganov et des contributeurs."
         }
-      },
-      "whatsNewUpdates": {
-        "label": "Afficher les nouveautés",
-        "description": "Afficher les notes de version après les mises à jour de Handy"
       }
     },
     "meeting": {
@@ -834,11 +612,6 @@
       "enabled": {
         "label": "Meeting assistant",
         "description": "When on, every {{interval}} seconds the recent transcript, your project brief and meeting context are sent to the chosen provider so the assistant can decide whether to speak up."
-      },
-      "provider": {
-        "label": "Provider",
-        "description": "Which post-processing provider answers during meetings. Empty uses the post-processing default.",
-        "default": "Same as post-processing"
       },
       "sensitivity": {
         "label": "Sensitivity",
@@ -876,6 +649,9 @@
     "portableUpdateBrowseMessage": "Les installations portables ne peuvent pas être mises à jour automatiquement. Téléchargez la dernière version correspondant à votre système depuis GitHub Releases et installez-la dans le même dossier : votre dossier Data/ (paramètres, modèles, enregistrements) est conservé.",
     "portableUpdateBrowseButton": "Ouvrir GitHub Releases"
   },
+  "whatsNew": {
+    "title": "Nouveautés de Handy v{{version}}"
+  },
   "common": {
     "loading": "Chargement...",
     "delete": "Supprimer",
@@ -885,27 +661,14 @@
     "clear": "Effacer",
     "noOptionsFound": "Aucune option trouvée"
   },
-  "accessibility": {
-    "permissionsDescription": "Handy a besoin des autorisations d'accessibilité pour taper le texte transcrit.",
-    "openSettings": "Ouvrir les Préférences Système"
-  },
   "errors": {
     "loadDirectory": "Erreur lors du chargement du répertoire : {{error}}",
     "micPermissionDeniedTitle": "Accès au microphone refusé",
     "micPermissionDenied": {
-      "generic": "L'accès au microphone a été refusé par le système d'exploitation. Veuillez accorder l'autorisation du microphone dans les paramètres système.",
-      "windows": "Activez l'accès au microphone dans Paramètres → Confidentialité et sécurité → Microphone (y compris l'accès des applications de bureau).",
-      "macos": "Accordez l'accès au microphone dans Réglages du système → Confidentialité et sécurité → Microphone.",
-      "linux": "Accordez l'accès au microphone dans les paramètres de son ou de confidentialité de votre système."
+      "windows": "Activez l'accès au microphone dans Paramètres → Confidentialité et sécurité → Microphone (y compris l'accès des applications de bureau)."
     },
-    "noInputDeviceTitle": "Aucun microphone trouvé",
-    "noInputDevice": "Aucun périphérique d'entrée audio n'a été détecté. Veuillez connecter un microphone ou un casque et réessayer.",
-    "recordingFailed": "Échec du démarrage de l'enregistrement : {{error}}",
     "modelLoadFailed": "Échec du chargement du modèle : {{model}}",
-    "modelLoadFailedUnknown": "modèle inconnu",
-    "pasteFailedTitle": "Échec du collage du texte",
-    "pasteFailed": "Le texte n'a pas pu être collé dans l'application active.",
-    "transcriptionFailedTitle": "Échec de la transcription"
+    "modelLoadFailedUnknown": "modèle inconnu"
   },
   "appLanguage": {
     "title": "Langue de l'application",
@@ -920,23 +683,8 @@
       "dark": "Sombre"
     }
   },
-  "overlay": {
-    "transcribing": "Transcription...",
-    "processing": "Traitement...",
-    "loadingModel": "Chargement du modèle..."
-  },
-  "whatsNew": {
-    "title": "Nouveautés de Handy v{{version}}"
-  },
   "secureInput": {
-    "blockedWithCulprit_one": "{{name}} bloque peut-être 1 raccourci",
-    "blockedWithCulprit_other": "{{name}} bloque peut-être {{count}} raccourcis",
-    "blockedNoCulprit_one": "macOS bloque temporairement 1 raccourci",
-    "blockedNoCulprit_other": "macOS bloque temporairement {{count}} raccourcis",
-    "recorderBlockedWithCulprit": "{{name}} bloque peut-être la modification des raccourcis",
-    "recorderBlockedNoCulprit": "macOS bloque temporairement la modification des raccourcis",
     "learnMore": "Comment résoudre ce problème",
-    "recorderBlocked": "Impossible d'enregistrer un raccourci pour le moment : Secure Input de macOS bloque les événements clavier. Résolvez d'abord l'avertissement Secure Input.",
-    "dismiss": "Ignorer"
+    "recorderBlocked": "Impossible d'enregistrer un raccourci pour le moment : Secure Input de macOS bloque les événements clavier. Résolvez d'abord l'avertissement Secure Input."
   }
 }

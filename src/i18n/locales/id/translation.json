@@ -2,21 +2,20 @@
   "tray": {
     "settings": "Pengaturan...",
     "checkUpdates": "Periksa Pembaruan...",
-    "copyLastTranscript": "Salin Transkripsi Terakhir",
     "unloadModel": "Keluarkan Model dari Memori",
     "model": "Model",
     "quit": "Keluar",
-    "cancel": "Batal",
-    "secureInputWarning": "⚠ Pintasan diblokir oleh Secure Input"
+    "startMeeting": "Start Meeting",
+    "endMeeting": "End Meeting"
   },
   "sidebar": {
     "projects": "Projects",
     "meetings": "Meetings",
+    "assistant": "Assistant",
+    "audio": "Audio",
     "general": "Umum",
     "models": "Model",
     "advanced": "Lanjutan",
-    "postProcessing": "Pascaproses",
-    "history": "Riwayat",
     "debug": "Debug",
     "about": "Tentang"
   },
@@ -154,11 +153,11 @@
       "failing": "The assistant has failed {{count}} times in a row. Check the provider settings.",
       "lastError": "The assistant's last check failed:",
       "readiness": {
-        "disabled": "The meeting assistant is off. Turn it on under Advanced settings.",
-        "no_provider": "No provider is set for the meeting assistant. Choose one under Advanced settings.",
-        "unsupported_provider": "{{detail}} cannot run the meeting assistant. Choose another provider under Advanced settings.",
-        "missing_api_key": "No API key for {{detail}}. Add one under Post Processing settings.",
-        "no_model": "No model is selected for {{detail}}. Pick one under Post Processing settings."
+        "disabled": "The meeting assistant is off. Turn it on in Assistant.",
+        "no_provider": "No AI provider is set. Choose one in Assistant.",
+        "unsupported_provider": "{{detail}} cannot run the meeting assistant. Choose another provider in Assistant.",
+        "missing_api_key": "No API key for {{detail}}. Add one in Assistant.",
+        "no_model": "No model is selected for {{detail}}. Pick one in Assistant."
       }
     },
     "summary": {
@@ -259,26 +258,6 @@
     "errors": {
       "selectModel": "Gagal memilih model"
     },
-    "permissions": {
-      "title": "Izin Diperlukan",
-      "description": "Handy memerlukan beberapa izin agar dapat berfungsi dengan baik.",
-      "microphone": {
-        "title": "Akses Mikrofon",
-        "description": "Diperlukan untuk menangkap suara Anda agar dapat ditranskripsikan."
-      },
-      "accessibility": {
-        "title": "Izin Aksesibilitas",
-        "description": "Diperlukan untuk mengetik teks hasil transkripsi ke aplikasi Anda."
-      },
-      "grant": "Berikan Izin",
-      "granted": "Diizinkan",
-      "waiting": "Menunggu...",
-      "allGranted": "Semua siap!",
-      "errors": {
-        "checkFailed": "Gagal memeriksa izin. Silakan coba lagi.",
-        "requestFailed": "Gagal meminta izin. Silakan coba lagi."
-      }
-    },
     "assistant": {
       "title": "Set up your assistant",
       "description": "The meeting assistant and summaries use an LLM provider. Pick one, add your API key if needed, and test the connection.",
@@ -289,8 +268,7 @@
       "failure": "Connection failed: {{error}}",
       "continue": "Continue",
       "skip": "Skip for now",
-      "hint": "You can change this later under Post Processing settings.",
-      "unsupported": "Apple Intelligence cannot be used for meetings. Pick another provider."
+      "hint": "You can change this later in Assistant."
     }
   },
   "modelSelector": {
@@ -334,24 +312,16 @@
     "general": {
       "title": "Umum",
       "shortcut": {
-        "title": "Pintasan Handy",
-        "description": "Atur pintasan keyboard untuk memulai perekaman ucapan-ke-teks",
+        "title": "Shortcut",
+        "description": "Start or end a meeting from anywhere.",
         "loading": "Memuat pintasan...",
         "none": "Belum ada pintasan yang diatur",
         "notFound": "Pintasan tidak ditemukan",
         "pressKeys": "Tekan tombol...",
         "bindings": {
-          "transcribe": {
-            "name": "Pintasan Transkripsi",
-            "description": "Pintasan keyboard untuk merekam dan mentranskripsikan suara Anda."
-          },
-          "cancel": {
-            "name": "Pintasan Batal",
-            "description": "Pintasan keyboard untuk membatalkan perekaman saat ini."
-          },
-          "transcribe_with_post_process": {
-            "name": "Pintasan Pascaproses",
-            "description": "Opsional: pintasan khusus yang selalu menerapkan pascaproses AI pada transkripsi Anda."
+          "toggle_meeting": {
+            "name": "Meeting shortcut",
+            "description": "Starts a meeting in your most recent project, or ends the running one."
           }
         },
         "errors": {
@@ -366,19 +336,46 @@
         "searchPlaceholder": "Cari bahasa...",
         "noResults": "Bahasa tidak ditemukan",
         "auto": "Otomatis"
-      },
-      "shortcutActivation": {
-        "title": "Perilaku Pintasan",
-        "description": "Pilih cara pintasan transkripsi memulai dan menghentikan perekaman.",
-        "options": {
-          "holdOrToggle": "Otomatis",
-          "pushToTalk": "Tahan",
-          "toggle": "Tekan"
+      }
+    },
+    "assistant": {
+      "provider": {
+        "title": "AI provider",
+        "description": "The model Meet Assist uses for nudges, summaries, and image digests.",
+        "test": {
+          "button": "Test connection",
+          "ok": "Connected. {{count}} models available."
         },
-        "descriptions": {
-          "hold_or_toggle": "Tahan untuk merekam atau tekan untuk mulai/berhenti",
-          "push_to_talk": "Merekam selama Anda menahan pintasan",
-          "toggle": "Ketuk pintasan untuk mulai merekam, lalu ketuk lagi untuk berhenti"
+        "select": {
+          "title": "Penyedia",
+          "description": "Pilih penyedia yang kompatibel dengan OpenAI atau Anthropic."
+        },
+        "apiFormat": {
+          "title": "Format API",
+          "description": "Format permintaan yang diharapkan oleh endpoint kustom Anda.",
+          "options": {
+            "openai": "Kompatibel dengan OpenAI (Chat Completions)",
+            "anthropic": "Anthropic Messages"
+          }
+        },
+        "baseUrl": {
+          "title": "URL Dasar",
+          "description": "URL dasar API untuk penyedia yang dipilih. Hanya penyedia kustom yang dapat diedit.",
+          "placeholder": "https://api.openai.com/v1",
+          "placeholderAnthropic": "https://api.anthropic.com/v1"
+        },
+        "apiKey": {
+          "title": "Kunci API",
+          "description": "Kunci API untuk penyedia yang dipilih.",
+          "placeholder": "sk-..."
+        },
+        "model": {
+          "title": "Model",
+          "descriptionCustom": "Masukkan pengenal model yang diharapkan oleh endpoint kustom Anda.",
+          "descriptionDefault": "Pilih model yang disediakan oleh penyedia yang dipilih.",
+          "placeholderWithOptions": "Cari atau pilih model",
+          "placeholderNoOptions": "Ketik nama model",
+          "refreshModels": "Segarkan model"
         }
       }
     },
@@ -434,18 +431,12 @@
     "advanced": {
       "groups": {
         "app": "Aplikasi",
-        "output": "Keluaran",
         "transcription": "Transkripsi",
-        "history": "Riwayat",
         "experimental": "Eksperimental"
       },
       "experimentalToggle": {
         "label": "Fitur Eksperimental",
         "description": "Aktifkan fitur eksperimental yang masih dalam pengembangan."
-      },
-      "lazyStreamClose": {
-        "label": "Biarkan Mikrofon Tetap Aktif di Antara Transkripsi",
-        "description": "Membiarkan aliran mikrofon tetap terbuka selama 30 detik setelah perekaman berhenti untuk mengurangi latensi pada transkripsi beruntun. Dapat menurunkan kualitas audio Bluetooth saat aktif."
       },
       "acceleration": {
         "transcribe": {
@@ -471,64 +462,6 @@
       "showTrayIcon": {
         "label": "Tampilkan Ikon Baki Sistem",
         "description": "Tampilkan ikon Handy di baki sistem."
-      },
-      "overlay": {
-        "style": {
-          "title": "Overlay",
-          "description": "Pilih overlay perekaman: Tidak Ada menyembunyikannya, Minimal menampilkan indikator ringkas, dan Langsung menampilkan transkripsi secara waktu nyata saat Anda berbicara (hanya model yang mendukung streaming — cari lencana Streaming di pemilih model). Di Linux, 'Tidak Ada' direkomendasikan.",
-          "options": {
-            "none": "Tidak Ada",
-            "minimal": "Minimal",
-            "live": "Waktu Nyata"
-          }
-        },
-        "position": {
-          "title": "Posisi Overlay",
-          "description": "Lokasi overlay muncul di layar selama perekaman dan transkripsi.",
-          "options": {
-            "bottom": "Bawah",
-            "top": "Atas"
-          }
-        }
-      },
-      "pasteMethod": {
-        "title": "Metode Tempel",
-        "description": "Pilih cara teks dimasukkan. Langsung: mensimulasikan pengetikan melalui masukan sistem. Tidak Ada: melewati proses tempel dan hanya memperbarui riwayat/papan klip.",
-        "options": {
-          "clipboard": "Papan klip ({{modifier}}+V)",
-          "clipboardCtrlShiftV": "Papan klip (Ctrl+Shift+V)",
-          "clipboardShiftInsert": "Papan klip (Shift+Insert)",
-          "direct": "Langsung",
-          "none": "Tidak Ada",
-          "externalScript": "Skrip Eksternal"
-        },
-        "externalScriptPlaceholder": "/path/to/your/script.sh"
-      },
-      "typingTool": {
-        "title": "Alat Pengetikan",
-        "description": "Pilih alat pengetikan Linux yang digunakan untuk metode tempel Langsung. Otomatis akan mendeteksi dan menggunakan alat terbaik yang tersedia untuk sistem Anda.",
-        "options": {
-          "auto": "Otomatis (Direkomendasikan)"
-        }
-      },
-      "clipboardHandling": {
-        "title": "Penanganan Papan Klip",
-        "description": "Jangan Ubah Papan Klip akan mempertahankan isi papan klip saat ini setelah transkripsi. Salin ke Papan Klip akan membiarkan hasil transkripsi tetap berada di papan klip setelah ditempel.",
-        "options": {
-          "dontModify": "Jangan Ubah Papan Klip",
-          "copyToClipboard": "Salin ke Papan Klip"
-        }
-      },
-      "autoSubmit": {
-        "title": "Kirim Otomatis",
-        "description": "Kirim kombinasi tombol yang dipilih secara otomatis setelah teks dimasukkan. Cmd+Enter berlaku di macOS, sedangkan Windows/Linux menggunakan Super+Enter.",
-        "options": {
-          "off": "Nonaktif",
-          "enter": "Enter",
-          "cmdEnter": "Cmd+Enter",
-          "superEnter": "Super+Enter",
-          "ctrlEnter": "Ctrl+Enter"
-        }
       },
       "translateToEnglish": {
         "label": "Terjemahkan ke Bahasa Inggris",
@@ -582,85 +515,6 @@
         }
       }
     },
-    "postProcessing": {
-      "hotkey": {
-        "title": "Pintasan"
-      },
-      "api": {
-        "title": "API",
-        "provider": {
-          "title": "Penyedia",
-          "description": "Pilih penyedia yang kompatibel dengan OpenAI atau Anthropic."
-        },
-        "apiFormat": {
-          "title": "Format API",
-          "description": "Format permintaan yang diharapkan oleh endpoint kustom Anda.",
-          "options": {
-            "openai": "Kompatibel dengan OpenAI (Chat Completions)",
-            "anthropic": "Anthropic Messages"
-          }
-        },
-        "appleIntelligence": {
-          "unavailable": "Apple Intelligence tidak tersedia di perangkat ini. Memerlukan Mac Apple Silicon yang menjalankan macOS Tahoe (26.0) atau yang lebih baru dengan Apple Intelligence diaktifkan di Pengaturan Sistem."
-        },
-        "baseUrl": {
-          "title": "URL Dasar",
-          "description": "URL dasar API untuk penyedia yang dipilih. Hanya penyedia kustom yang dapat diedit.",
-          "placeholder": "https://api.openai.com/v1",
-          "placeholderAnthropic": "https://api.anthropic.com/v1"
-        },
-        "apiKey": {
-          "title": "Kunci API",
-          "description": "Kunci API untuk penyedia yang dipilih.",
-          "placeholder": "sk-..."
-        },
-        "model": {
-          "title": "Model",
-          "descriptionCustom": "Masukkan pengenal model yang diharapkan oleh endpoint kustom Anda.",
-          "descriptionDefault": "Pilih model yang disediakan oleh penyedia yang dipilih.",
-          "placeholderWithOptions": "Cari atau pilih model",
-          "placeholderNoOptions": "Ketik nama model",
-          "refreshModels": "Segarkan model"
-        }
-      },
-      "prompts": {
-        "title": "Prompt",
-        "selectedPrompt": {
-          "title": "Prompt Terpilih",
-          "description": "Pilih templat untuk menyempurnakan transkripsi atau buat yang baru. Gunakan ${output} dalam teks prompt untuk merujuk ke hasil transkripsi."
-        },
-        "noPrompts": "Tidak ada prompt yang tersedia",
-        "selectPrompt": "Pilih prompt",
-        "createNew": "Buat Prompt Baru",
-        "promptLabel": "Label Prompt",
-        "promptLabelPlaceholder": "Masukkan nama prompt",
-        "promptInstructions": "Instruksi Prompt",
-        "promptInstructionsPlaceholder": "Tulis instruksi yang dijalankan setelah transkripsi. Contoh: Perbaiki tata bahasa dan kejelasan teks berikut: ${output}",
-        "promptTip": "Tips: Gunakan <code>${output}</code> untuk menyisipkan teks hasil transkripsi ke prompt Anda.",
-        "updatePrompt": "Perbarui Prompt",
-        "deletePrompt": "Hapus Prompt",
-        "createPrompt": "Buat Prompt",
-        "cancel": "Batal",
-        "selectToEdit": "Pilih prompt di atas untuk melihat dan mengedit detailnya.",
-        "createFirst": "Klik 'Buat Prompt Baru' di atas untuk membuat prompt pascaproses pertama Anda."
-      }
-    },
-    "history": {
-      "title": "Riwayat",
-      "openFolder": "Buka Folder Rekaman",
-      "loading": "Memuat riwayat...",
-      "empty": "Belum ada transkripsi. Mulai merekam untuk mengisi riwayat Anda!",
-      "copyToClipboard": "Salin transkripsi ke papan klip",
-      "copyError": "Gagal menyalin transkripsi ke papan klip.",
-      "save": "Simpan transkripsi",
-      "unsave": "Hapus dari daftar tersimpan",
-      "delete": "Hapus entri",
-      "deleteError": "Gagal menghapus entri. Silakan coba lagi.",
-      "retranscribe": "Transkripsikan ulang",
-      "retranscribeError": "Gagal mentranskripsikan ulang. Silakan coba lagi.",
-      "transcribing": "Mentranskripsikan...",
-      "transcriptionFailed": "Transkripsi gagal. Anda dapat mentranskripsikan ulang menggunakan ikon coba lagi."
-    },
     "debug": {
       "title": "Debug",
       "logDirectory": {
@@ -697,7 +551,6 @@
       "onboardingPreview": {
         "title": "Pratinjau Penyiapan Awal",
         "description": "Pratinjau layar penyiapan awal tanpa mengubah izin, model, atau status penyelesaian",
-        "permissionsButton": "Izin",
         "modelsButton": "Pemilihan Model",
         "exitButton": "Keluar dari Pratinjau"
       },
@@ -709,41 +562,6 @@
         "title": "Ambang Koreksi Kata",
         "description": "Sensitivitas untuk koreksi kata khusus"
       },
-      "historyLimit": {
-        "title": "Batas Riwayat",
-        "description": "Jumlah maksimum entri riwayat yang disimpan",
-        "entries": "entri"
-      },
-      "recordingRetention": {
-        "title": "Hapus Rekaman Secara Otomatis",
-        "description": "Hapus rekaman lama secara otomatis untuk menghemat ruang",
-        "never": "Tidak Pernah",
-        "preserveLimit": "Simpan {{count}} terbaru",
-        "days3": "Setelah 3 hari",
-        "weeks2": "Setelah 2 minggu",
-        "months3": "Setelah 3 bulan",
-        "placeholder": "Pilih masa penyimpanan..."
-      },
-      "alwaysOnMicrophone": {
-        "label": "Mikrofon Selalu Aktif",
-        "description": "Biarkan mikrofon aktif agar respons lebih cepat"
-      },
-      "clamshellMicrophone": {
-        "title": "Mikrofon Saat Laptop Ditutup",
-        "description": "Mikrofon yang digunakan saat laptop ditutup"
-      },
-      "postProcessingToggle": {
-        "label": "Pascaproses",
-        "description": "Aktifkan penyempurnaan teks berbasis AI setelah transkripsi"
-      },
-      "muteWhileRecording": {
-        "label": "Bisukan Saat Merekam",
-        "description": "Bisukan audio sistem selama perekaman"
-      },
-      "appendTrailingSpace": {
-        "label": "Tambahkan Spasi di Akhir",
-        "description": "Tambahkan spasi setelah transkripsi ditempel"
-      },
       "keyboardImplementation": {
         "title": "Implementasi Keyboard",
         "description": "Pilih backend pintasan keyboard.",
@@ -753,46 +571,6 @@
         "appData": "Data Aplikasi:",
         "models": "Model:",
         "settings": "Pengaturan:"
-      },
-      "pasteDelay": {
-        "title": "Jeda Tempel (Sebelum)",
-        "description": "Jeda (dalam milidetik) setelah menyalin teks sebelum mengirim perintah tempel. Tingkatkan jika tidak ada yang ditempel."
-      },
-      "pasteDelayAfter": {
-        "title": "Jeda Tempel (Sesudah)",
-        "description": "Jeda (dalam milidetik) setelah perintah tempel dikirim sebelum mengembalikan isi papan klip sebelumnya. Tingkatkan jika isi papan klip lama yang ditempel alih-alih transkripsi."
-      },
-      "holdThreshold": {
-        "title": "Ambang Waktu Tahan",
-        "description": "Hanya mode Otomatis: berapa lama (dalam milidetik) pintasan harus ditahan agar dianggap ditahan, bukan ditekan singkat. Turunkan jika penahanan singkat membuat perekaman tetap aktif; naikkan jika ketukan yang disengaja dianggap sebagai penahanan."
-      },
-      "reliablePaste": {
-        "title": "Tempel Lebih Andal (Beta)",
-        "description": "Kembalikan papan klip hanya setelah aplikasi target benar-benar membaca transkripsi, bukan setelah jeda tetap. Ditujukan untuk memperbaiki kasus isi papan klip lama yang tertempel saat sistem sedang terbebani. Memerlukan metode tempel papan klip; hanya macOS dan Windows."
-      },
-      "recordingBuffer": {
-        "title": "Buffer Perekaman Tambahan",
-        "description": "Waktu tambahan (dalam milidetik) untuk terus merekam setelah Anda melepas tombol agar audio di bagian akhir tetap tertangkap. 0 = tanpa buffer tambahan."
-      },
-      "keyboardDiagnostic": {
-        "title": "Diagnostik Keyboard",
-        "description": "Memeriksa apakah peristiwa keyboard mencapai Handy. Hanya jumlah peristiwa yang dicatat — bukan tombol yang Anda tekan.",
-        "run": "Jalankan diagnostik 10 dtk",
-        "running": "Mendengarkan… tekan pintasan Anda beberapa kali (mis. Option+Space)",
-        "secureInputLabel": "Secure Input",
-        "enabled": "aktif",
-        "disabled": "nonaktif",
-        "holder": "ditahan oleh {{name}} (pid {{pid}})",
-        "holderUnknown": "tidak ada aplikasi penahan yang terdeteksi",
-        "keyDown": "Tombol ditekan",
-        "keyUp": "Tombol dilepas",
-        "flagsChanged": "Tombol pengubah",
-        "mouse": "Mouse",
-        "verdictBlocked": "Secure Input memblokir peristiwa tombol — pintasan keyboard tidak dapat berfungsi sampai masalah ini diselesaikan.",
-        "verdictSuspicious": "Peristiwa tombol pengubah diterima, tetapi tidak ada peristiwa tombol — sesuatu memblokir input tombol meskipun Secure Input dilaporkan nonaktif. Harap laporkan ini di GitHub.",
-        "verdictOk": "Peristiwa tombol mencapai Handy secara normal.",
-        "verdictNoEvents": "Tidak ada peristiwa yang tertangkap — apakah Anda menekan tombol selama pengujian?",
-        "failed": "Diagnostik gagal: {{error}}"
       }
     },
     "about": {
@@ -834,11 +612,6 @@
       "enabled": {
         "label": "Meeting assistant",
         "description": "When on, every {{interval}} seconds the recent transcript, your project brief and meeting context are sent to the chosen provider so the assistant can decide whether to speak up."
-      },
-      "provider": {
-        "label": "Provider",
-        "description": "Which post-processing provider answers during meetings. Empty uses the post-processing default.",
-        "default": "Same as post-processing"
       },
       "sensitivity": {
         "label": "Sensitivity",
@@ -888,27 +661,14 @@
     "clear": "Bersihkan",
     "noOptionsFound": "Tidak ada opsi yang ditemukan"
   },
-  "accessibility": {
-    "permissionsDescription": "Handy memerlukan izin aksesibilitas untuk mengetik teks hasil transkripsi.",
-    "openSettings": "Buka Pengaturan Sistem"
-  },
   "errors": {
     "loadDirectory": "Kesalahan saat memuat direktori: {{error}}",
     "micPermissionDeniedTitle": "Akses Mikrofon Ditolak",
     "micPermissionDenied": {
-      "generic": "Akses mikrofon ditolak oleh sistem operasi. Berikan izin mikrofon di pengaturan sistem Anda.",
-      "windows": "Aktifkan akses mikrofon di Settings → Privacy & security → Microphone (termasuk akses aplikasi desktop).",
-      "macos": "Berikan akses mikrofon di System Settings → Privacy & Security → Microphone.",
-      "linux": "Berikan akses mikrofon di pengaturan suara atau privasi sistem Anda."
+      "windows": "Aktifkan akses mikrofon di Settings → Privacy & security → Microphone (termasuk akses aplikasi desktop)."
     },
-    "noInputDeviceTitle": "Mikrofon Tidak Ditemukan",
-    "noInputDevice": "Tidak ada perangkat masukan audio yang terdeteksi. Hubungkan mikrofon atau headset lalu coba lagi.",
-    "recordingFailed": "Gagal memulai perekaman: {{error}}",
     "modelLoadFailed": "Gagal memuat model: {{model}}",
-    "modelLoadFailedUnknown": "model tidak dikenal",
-    "pasteFailedTitle": "Gagal Menempelkan Teks",
-    "pasteFailed": "Teks tidak dapat ditempelkan ke aplikasi aktif.",
-    "transcriptionFailedTitle": "Transkripsi Gagal"
+    "modelLoadFailedUnknown": "model tidak dikenal"
   },
   "appLanguage": {
     "title": "Bahasa Aplikasi",
@@ -923,20 +683,8 @@
       "dark": "Gelap"
     }
   },
-  "overlay": {
-    "transcribing": "Mentranskripsikan...",
-    "processing": "Memproses...",
-    "loadingModel": "Memuat model..."
-  },
   "secureInput": {
-    "blockedWithCulprit_one": "{{name}} mungkin memblokir 1 pintasan",
-    "blockedWithCulprit_other": "{{name}} mungkin memblokir {{count}} pintasan",
-    "blockedNoCulprit_one": "macOS untuk sementara memblokir 1 pintasan",
-    "blockedNoCulprit_other": "macOS untuk sementara memblokir {{count}} pintasan",
-    "recorderBlockedWithCulprit": "{{name}} mungkin memblokir perubahan pintasan",
-    "recorderBlockedNoCulprit": "macOS untuk sementara memblokir perubahan pintasan",
     "learnMore": "Cara memperbaiki",
-    "recorderBlocked": "Pintasan tidak dapat direkam saat ini — macOS Secure Input memblokir peristiwa tombol. Selesaikan peringatan Secure Input terlebih dahulu.",
-    "dismiss": "Tutup"
+    "recorderBlocked": "Pintasan tidak dapat direkam saat ini — macOS Secure Input memblokir peristiwa tombol. Selesaikan peringatan Secure Input terlebih dahulu."
   }
 }

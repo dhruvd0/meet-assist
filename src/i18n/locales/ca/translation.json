@@ -2,21 +2,20 @@
   "tray": {
     "settings": "Configuració...",
     "checkUpdates": "Comprova si hi ha actualitzacions...",
-    "copyLastTranscript": "Copia l'última transcripció",
     "unloadModel": "Allibera el model de la memòria",
     "model": "Model",
     "quit": "Surt",
-    "cancel": "Cancel·la",
-    "secureInputWarning": "⚠ Dreceres blocades per l'entrada segura"
+    "startMeeting": "Start Meeting",
+    "endMeeting": "End Meeting"
   },
   "sidebar": {
     "projects": "Projects",
     "meetings": "Meetings",
+    "assistant": "Assistant",
+    "audio": "Audio",
     "general": "General",
     "models": "Models",
     "advanced": "Avançat",
-    "postProcessing": "Postprocessament",
-    "history": "Historial",
     "debug": "Depuració",
     "about": "Quant a"
   },
@@ -154,11 +153,11 @@
       "failing": "The assistant has failed {{count}} times in a row. Check the provider settings.",
       "lastError": "The assistant's last check failed:",
       "readiness": {
-        "disabled": "The meeting assistant is off. Turn it on under Advanced settings.",
-        "no_provider": "No provider is set for the meeting assistant. Choose one under Advanced settings.",
-        "unsupported_provider": "{{detail}} cannot run the meeting assistant. Choose another provider under Advanced settings.",
-        "missing_api_key": "No API key for {{detail}}. Add one under Post Processing settings.",
-        "no_model": "No model is selected for {{detail}}. Pick one under Post Processing settings."
+        "disabled": "The meeting assistant is off. Turn it on in Assistant.",
+        "no_provider": "No AI provider is set. Choose one in Assistant.",
+        "unsupported_provider": "{{detail}} cannot run the meeting assistant. Choose another provider in Assistant.",
+        "missing_api_key": "No API key for {{detail}}. Add one in Assistant.",
+        "no_model": "No model is selected for {{detail}}. Pick one in Assistant."
       }
     },
     "summary": {
@@ -259,26 +258,6 @@
     "errors": {
       "selectModel": "No s'ha pogut seleccionar el model"
     },
-    "permissions": {
-      "title": "Permisos necessaris",
-      "description": "El Handy demana alguns permisos per funcionar correctament.",
-      "microphone": {
-        "title": "Accés al micròfon",
-        "description": "Necessari per escoltar la vostra veu i transcriure-la."
-      },
-      "accessibility": {
-        "title": "Accés a l'accessibilitat",
-        "description": "Necessari per escriure el text transcrit a les aplicacions."
-      },
-      "grant": "Concediu el permís",
-      "granted": "Concedit",
-      "waiting": "S'està esperant...",
-      "allGranted": "Tot a punt!",
-      "errors": {
-        "checkFailed": "No s'han pogut comprovar els permisos. Torneu-ho a provar.",
-        "requestFailed": "No s'ha pogut sol·licitar el permís. Torneu-ho a provar."
-      }
-    },
     "assistant": {
       "title": "Set up your assistant",
       "description": "The meeting assistant and summaries use an LLM provider. Pick one, add your API key if needed, and test the connection.",
@@ -289,8 +268,7 @@
       "failure": "Connection failed: {{error}}",
       "continue": "Continue",
       "skip": "Skip for now",
-      "hint": "You can change this later under Post Processing settings.",
-      "unsupported": "Apple Intelligence cannot be used for meetings. Pick another provider."
+      "hint": "You can change this later in Assistant."
     }
   },
   "modelSelector": {
@@ -334,24 +312,16 @@
     "general": {
       "title": "General",
       "shortcut": {
-        "title": "Dreceres del Handy",
-        "description": "Configura les dreceres de teclat per iniciar l'enregistrament de veu per a la transcripció",
+        "title": "Shortcut",
+        "description": "Start or end a meeting from anywhere.",
         "loading": "S'estan carregant les dreceres...",
         "none": "No hi ha cap drecera configurada",
         "notFound": "No s'ha trobat la drecera",
         "pressKeys": "Premeu les tecles...",
         "bindings": {
-          "transcribe": {
-            "name": "Drecera de transcripció",
-            "description": "La drecera de teclat per enregistrar i transcriure la vostra veu."
-          },
-          "cancel": {
-            "name": "Drecera de cancel·lació",
-            "description": "La drecera de teclat per cancel·lar l'enregistrament actual."
-          },
-          "transcribe_with_post_process": {
-            "name": "Drecera de postprocessament",
-            "description": "Opcional: una drecera específica que sempre aplica postprocessament amb IA a la transcripció."
+          "toggle_meeting": {
+            "name": "Meeting shortcut",
+            "description": "Starts a meeting in your most recent project, or ends the running one."
           }
         },
         "errors": {
@@ -366,19 +336,46 @@
         "searchPlaceholder": "Cerca llengües...",
         "noResults": "No s'ha trobat cap llengua",
         "auto": "Automàtica"
-      },
-      "shortcutActivation": {
-        "title": "Comportament de la drecera",
-        "description": "Trieu com la drecera de transcripció inicia i atura l'enregistrament.",
-        "options": {
-          "holdOrToggle": "Automàtic",
-          "pushToTalk": "Mantén premuda",
-          "toggle": "Commuta"
+      }
+    },
+    "assistant": {
+      "provider": {
+        "title": "AI provider",
+        "description": "The model Meet Assist uses for nudges, summaries, and image digests.",
+        "test": {
+          "button": "Test connection",
+          "ok": "Connected. {{count}} models available."
         },
-        "descriptions": {
-          "hold_or_toggle": "Manteniu-la premuda per enregistrar o feu una pulsació breu per iniciar o aturar l'enregistrament",
-          "push_to_talk": "Enregistreu mentre manteniu premuda la drecera",
-          "toggle": "Premeu la drecera per iniciar l'enregistrament i torneu-la a prémer per aturar-lo"
+        "select": {
+          "title": "Proveïdor",
+          "description": "Seleccioneu un proveïdor compatible amb OpenAI o Anthropic."
+        },
+        "apiFormat": {
+          "title": "Format de l'API",
+          "description": "Format de sol·licitud que espera el punt de connexió personalitzat.",
+          "options": {
+            "openai": "Compatible amb OpenAI (Chat Completions)",
+            "anthropic": "Anthropic Messages"
+          }
+        },
+        "baseUrl": {
+          "title": "URL de base",
+          "description": "URL de base de l'API del proveïdor seleccionat. Només es pot editar la del proveïdor personalitzat.",
+          "placeholder": "https://api.openai.com/v1",
+          "placeholderAnthropic": "https://api.anthropic.com/v1"
+        },
+        "apiKey": {
+          "title": "Clau de l'API",
+          "description": "Clau de l'API del proveïdor seleccionat.",
+          "placeholder": "sk-..."
+        },
+        "model": {
+          "title": "Model",
+          "descriptionCustom": "Introduïu l'identificador de model que espera el punt de connexió personalitzat.",
+          "descriptionDefault": "Trieu un model ofert pel proveïdor seleccionat.",
+          "placeholderWithOptions": "Cerqueu o seleccioneu un model",
+          "placeholderNoOptions": "Escriviu el nom d'un model",
+          "refreshModels": "Actualitzeu els models"
         }
       }
     },
@@ -434,18 +431,12 @@
     "advanced": {
       "groups": {
         "app": "Aplicació",
-        "output": "Sortida",
         "transcription": "Transcripció",
-        "history": "Historial",
         "experimental": "Experimental"
       },
       "experimentalToggle": {
         "label": "Funcions experimentals",
         "description": "Activa les funcions experimentals que encara estan en desenvolupament."
-      },
-      "lazyStreamClose": {
-        "label": "Mantén el micròfon obert entre transcripcions",
-        "description": "Manté el flux d'àudio del micròfon obert durant 30 segons després d'aturar l'enregistrament per reduir la latència entre transcripcions consecutives. Mentre és actiu, pot reduir la qualitat de l'àudio Bluetooth."
       },
       "acceleration": {
         "transcribe": {
@@ -471,64 +462,6 @@
       "showTrayIcon": {
         "label": "Mostra la icona a la safata",
         "description": "Mostra la icona del Handy a la safata del sistema."
-      },
-      "overlay": {
-        "style": {
-          "title": "Finestra superposada",
-          "description": "Tria la finestra superposada d'enregistrament: Cap l'amaga, Mínima mostra un indicador compacte i En directe mostra la transcripció en temps real mentre parleu (només amb models compatibles; cerqueu el distintiu En temps real al selector de models). Al Linux es recomana Cap.",
-          "options": {
-            "none": "Cap",
-            "minimal": "Mínima",
-            "live": "En directe"
-          }
-        },
-        "position": {
-          "title": "Posició de la finestra superposada",
-          "description": "On apareix la finestra superposada a la pantalla durant l'enregistrament i la transcripció.",
-          "options": {
-            "bottom": "A baix",
-            "top": "A dalt"
-          }
-        }
-      },
-      "pasteMethod": {
-        "title": "Mètode d'enganxament",
-        "description": "Trieu com s'insereix el text. Directe: simula l'escriptura mitjançant l'entrada del sistema. Cap: no enganxa el text, només actualitza l'historial i el porta-retalls.",
-        "options": {
-          "clipboard": "Porta-retalls ({{modifier}}+V)",
-          "clipboardCtrlShiftV": "Porta-retalls (Ctrl+Maj+V)",
-          "clipboardShiftInsert": "Porta-retalls (Maj+Insert)",
-          "direct": "Directe",
-          "none": "Cap",
-          "externalScript": "Script extern"
-        },
-        "externalScriptPlaceholder": "/camí/al/vostre/script.sh"
-      },
-      "typingTool": {
-        "title": "Eina d'escriptura",
-        "description": "Trieu l'eina d'escriptura del Linux que s'utilitzarà amb el mètode d'enganxament directe. L'opció automàtica detecta i utilitza la millor eina disponible per al sistema.",
-        "options": {
-          "auto": "Automàtica (recomanada)"
-        }
-      },
-      "clipboardHandling": {
-        "title": "Gestió del porta-retalls",
-        "description": "«No modifiqueu el porta-retalls» conserva el contingut actual del porta-retalls després de la transcripció. «Copieu al porta-retalls» hi deixa el resultat de la transcripció després d'enganxar-lo.",
-        "options": {
-          "dontModify": "No modifiqueu el porta-retalls",
-          "copyToClipboard": "Copia al porta-retalls"
-        }
-      },
-      "autoSubmit": {
-        "title": "Enviament automàtic",
-        "description": "Envia automàticament la combinació de tecles seleccionada després d'inserir el text. S'utilitza Cmd+Enter al macOS i Super+Enter al Windows i al Linux.",
-        "options": {
-          "off": "Desactivat",
-          "enter": "Enter",
-          "cmdEnter": "Cmd+Enter",
-          "superEnter": "Super+Enter",
-          "ctrlEnter": "Ctrl+Enter"
-        }
       },
       "translateToEnglish": {
         "label": "Traduïu a l'anglès",
@@ -582,85 +515,6 @@
         }
       }
     },
-    "postProcessing": {
-      "hotkey": {
-        "title": "Drecera de teclat"
-      },
-      "api": {
-        "title": "API",
-        "provider": {
-          "title": "Proveïdor",
-          "description": "Seleccioneu un proveïdor compatible amb OpenAI o Anthropic."
-        },
-        "apiFormat": {
-          "title": "Format de l'API",
-          "description": "Format de sol·licitud que espera el punt de connexió personalitzat.",
-          "options": {
-            "openai": "Compatible amb OpenAI (Chat Completions)",
-            "anthropic": "Anthropic Messages"
-          }
-        },
-        "appleIntelligence": {
-          "unavailable": "L'Apple Intelligence no està disponible en aquest dispositiu. Cal un Mac amb Apple Silicon i macOS Tahoe (26.0) o posterior, amb l'Apple Intelligence activada a la configuració del sistema."
-        },
-        "baseUrl": {
-          "title": "URL de base",
-          "description": "URL de base de l'API del proveïdor seleccionat. Només es pot editar la del proveïdor personalitzat.",
-          "placeholder": "https://api.openai.com/v1",
-          "placeholderAnthropic": "https://api.anthropic.com/v1"
-        },
-        "apiKey": {
-          "title": "Clau de l'API",
-          "description": "Clau de l'API del proveïdor seleccionat.",
-          "placeholder": "sk-..."
-        },
-        "model": {
-          "title": "Model",
-          "descriptionCustom": "Introduïu l'identificador de model que espera el punt de connexió personalitzat.",
-          "descriptionDefault": "Trieu un model ofert pel proveïdor seleccionat.",
-          "placeholderWithOptions": "Cerqueu o seleccioneu un model",
-          "placeholderNoOptions": "Escriviu el nom d'un model",
-          "refreshModels": "Actualitzeu els models"
-        }
-      },
-      "prompts": {
-        "title": "Indicació",
-        "selectedPrompt": {
-          "title": "Indicació seleccionada",
-          "description": "Seleccioneu una plantilla per millorar les transcripcions o creeu-ne una de nova. Utilitzeu ${output} dins del text de la indicació per fer referència a la transcripció enregistrada."
-        },
-        "noPrompts": "No hi ha indicacions disponibles",
-        "selectPrompt": "Seleccioneu una indicació",
-        "createNew": "Creeu una indicació nova",
-        "promptLabel": "Nom de la indicació",
-        "promptLabelPlaceholder": "Introduïu el nom de la indicació",
-        "promptInstructions": "Instruccions de la indicació",
-        "promptInstructionsPlaceholder": "Escriviu les instruccions que s'executaran després de la transcripció. Exemple: Millora la gramàtica i la claredat del text següol: ${output}",
-        "promptTip": "Consell: utilitzeu <code>${output}</code> per inserir el text transcrit a la indicació.",
-        "updatePrompt": "Actualitzeu la indicació",
-        "deletePrompt": "Suprimiu la indicació",
-        "createPrompt": "Creeu la indicació",
-        "cancel": "Cancel·leu",
-        "selectToEdit": "Seleccioneu una indicació more amunt per veure'n i editar-ne els detalls.",
-        "createFirst": "Feu clic a «Creeu una indicació nova» més amunt per crear la primera indicació de postprocessament."
-      }
-    },
-    "history": {
-      "title": "Historial",
-      "openFolder": "Obriu la carpeta d'enregistraments",
-      "loading": "S'està carregant l'historial...",
-      "empty": "Encara no hi ha transcripcions. Comenceu a enregistrar per crear l'historial!",
-      "copyToClipboard": "Copia la transcripció al porta-retalls",
-      "copyError": "No s'ha pogut copiar la transcripció al porta-retalls.",
-      "save": "Desa la transcripció",
-      "unsave": "Treu de les desades",
-      "delete": "Suprimeix l'entrada",
-      "deleteError": "No s'ha pogut suprimir l'entrada. Torneu-ho a provar.",
-      "retranscribe": "Torneu a transcriure",
-      "retranscribeError": "No s'ha pogut tornar a transcriure. Torneu-ho a provar.",
-      "transcribing": "S'està transcrivint...",
-      "transcriptionFailed": "La transcripció ha fallat. Podeu tornar a transcriure amb la icona de reintent."
-    },
     "debug": {
       "title": "Depuració",
       "logDirectory": {
@@ -697,7 +551,6 @@
       "onboardingPreview": {
         "title": "Previsualització de la configuració inicial",
         "description": "Previsualitza les pantalles de configuració inicial sense canviar els permisos, os models ni l'estat de compleció",
-        "permissionsButton": "Permisos",
         "modelsButton": "Selecció del model",
         "exitButton": "Sortiu de la previsualització"
       },
@@ -709,41 +562,6 @@
         "title": "Llindar de correcció de paraules",
         "description": "Sensibilitat de les correccions de paraules personalitzades"
       },
-      "historyLimit": {
-        "title": "Límit de l'historial",
-        "description": "Nombre màxim d'entrades de l'historial que es conservaran",
-        "entries": "entrades"
-      },
-      "recordingRetention": {
-        "title": "Supressió automàtica d'enregistraments",
-        "description": "Suprimeix automàticament els enregistraments antics per estalviar espai",
-        "never": "Mai",
-        "preserveLimit": "Conserva els últims {{count}}",
-        "days3": "Al cap de 3 dies",
-        "weeks2": "Al cap de 2 setmanes",
-        "months3": "Al cap de 3 mesos",
-        "placeholder": "Selecciona el període de conservació..."
-      },
-      "alwaysOnMicrophone": {
-        "label": "Micròfon sempre actiu",
-        "description": "Mantén el micròfon actiu per respondre més de pressa"
-      },
-      "clamshellMicrophone": {
-        "title": "Micròfon amb la tapa tancada",
-        "description": "Micròfon que s'utilitzarà quan la tapa del portàtil estigui tancada"
-      },
-      "postProcessingToggle": {
-        "label": "Postprocessament",
-        "description": "Activa la millora del text amb IA després de la transcripció"
-      },
-      "muteWhileRecording": {
-        "label": "Silencia durant l'enregistrament",
-        "description": "Silencia l'àudio del sistema durant l'enregistrament"
-      },
-      "appendTrailingSpace": {
-        "label": "Afegiu un espai al final",
-        "description": "Afegeix un espai après de la transcripció enganxada"
-      },
       "keyboardImplementation": {
         "title": "Implementació del teclat",
         "description": "Tria el motor de dreceres de teclat.",
@@ -753,46 +571,6 @@
         "appData": "Dades de l'aplicació:",
         "models": "Models:",
         "settings": "Configuració:"
-      },
-      "pasteDelay": {
-        "title": "Retard abans d'enganxar",
-        "description": "Retard (en mil·lisegons) després de copiar el text i abans d'enviar la combinació de tecles per enganxar-lo. Augmenteu-lo si no s'enganxa res."
-      },
-      "pasteDelayAfter": {
-        "title": "Retard après d'enganxar",
-        "description": "Retard (en mil·lisegons) després d'enviar la combinació de tecles per enganxar i abans de restaurar el porta-retalls anterior. Augmenteu-lo si s'enganxa el contingut antic del porta-retalls en lloc de la transcripció."
-      },
-      "holdThreshold": {
-        "title": "Llindar de pulsació llarga",
-        "description": "Només en mode automàtic: temps (en mil·lisegons) que cal mantenir premuda la drecera perquè es consideri una pulsació llarga en lloc d'una de breu. Reduïu-lo si les pulsacions llargues curtes deixen l'enregistrament actiu; augmenteu-lo si les pulsacions breus intencionades es tracten com a llargues."
-      },
-      "reliablePaste": {
-        "title": "Enganxament fiable (beta)",
-        "description": "Restaura el porta-retalls només quan l'aplicació de destinació ha llegit la transcripció, en lloc de fer-ho després d'un retard fix. Pensat per evitar que s'enganxi el contingut antic del porta-retalls quan el sistema està carregat. Requereix un mètode d'enganxament amb el porta-retalls; només al macOS i al Windows."
-      },
-      "recordingBuffer": {
-        "title": "Marge addicional d'enregistrament",
-        "description": "Temps addicional (en mil·lisegons) durant el qual es continua enregistrant després de deixar anar la tecla per capturar l'àudio final. 0 = sense marge addicional."
-      },
-      "keyboardDiagnostic": {
-        "title": "Diagnòstic del teclat",
-        "description": "Comprova si els esdeveniments del teclat arriben al Handy. Només se'n registra el recompte, mai les tecles que premeu.",
-        "run": "Executa un diagnòstic de 10 s",
-        "running": "S'està escoltant… prema la drecera unes quantes vegades (p. ex., Option+Space)",
-        "secureInputLabel": "Entrada segura",
-        "enabled": "activada",
-        "disabled": "desactivada",
-        "holder": "en ús per {{name}} (pid {{pid}})",
-        "holderUnknown": "cap procés responsable visible",
-        "keyDown": "Tecla premuda",
-        "keyUp": "Tecla alliberada",
-        "flagsChanged": "Modificadors",
-        "mouse": "Ratolí",
-        "verdictBlocked": "L'entrada segura bloca els esdeveniments de tecla. Les dreceres amb tecles no poden funcionar fins que es resolgui.",
-        "verdictSuspicious": "Han arribat esdeveniments de modificadors, però no de tecles. Alguna cosa suprimeix les tecles tot i que l'entrada segura consta com a desactivada. Informeu-ne al GitHub.",
-        "verdictOk": "Els esdeveniments de tecla arriben al Handy amb normalitat.",
-        "verdictNoEvents": "No s'ha capturat cap esdeveniment. Heu premut alguna tecla durant la prova?",
-        "failed": "El diagnòstic ha fallat: {{error}}"
       }
     },
     "about": {
@@ -834,11 +612,6 @@
       "enabled": {
         "label": "Meeting assistant",
         "description": "When on, every {{interval}} seconds the recent transcript, your project brief and meeting context are sent to the chosen provider so the assistant can decide whether to speak up."
-      },
-      "provider": {
-        "label": "Provider",
-        "description": "Which post-processing provider answers during meetings. Empty uses the post-processing default.",
-        "default": "Same as post-processing"
       },
       "sensitivity": {
         "label": "Sensitivity",
@@ -888,27 +661,14 @@
     "clear": "Neteja",
     "noOptionsFound": "No s'ha trobat cap opció"
   },
-  "accessibility": {
-    "permissionsDescription": "El Handy necessita permisos d'accessibilitat per escriure el text transcrit.",
-    "openSettings": "Obriu la configuració del sistema"
-  },
   "errors": {
     "loadDirectory": "Error en carregar el directori: {{error}}",
     "micPermissionDeniedTitle": "Accés al micròfon denegat",
     "micPermissionDenied": {
-      "generic": "El sistema operatiu ha denegat l'accés al micròfon. Concediu el permís del micròfon a la configuració del sistema.",
-      "windows": "Activa l'accés al micròfon a Configuració → Privadesa i seguretat → Micròfon (inclòs l'accés de les aplicacions d'escriptori).",
-      "macos": "Concediu l'accés al micròfon a Configuració del sistema → Privadesa i seguretat → Micròfon.",
-      "linux": "Concediu l'accés al micròfon a la configuració de so o de privadesa del sistema."
+      "windows": "Activa l'accés al micròfon a Configuració → Privadesa i seguretat → Micròfon (inclòs l'accés de les aplicacions d'escriptori)."
     },
-    "noInputDeviceTitle": "No s'ha trobat cap micròfon",
-    "noInputDevice": "No s'ha detectat cap dispositiu d'entrada d'àudio. Connecteu un micròfon o uns auriculars amb micròfon i torneu-ho a provar.",
-    "recordingFailed": "No s'ha pogut iniciar l'enregistrament: {{error}}",
     "modelLoadFailed": "No s'ha pogut carregar el model: {{model}}",
-    "modelLoadFailedUnknown": "model desconegut",
-    "pasteFailedTitle": "No s'ha pogut enganxar el text",
-    "pasteFailed": "No s'ha pogut enganxar el text a l'aplicació activa.",
-    "transcriptionFailedTitle": "La transcripció ha fallat"
+    "modelLoadFailedUnknown": "model desconegut"
   },
   "appLanguage": {
     "title": "Llengua de l'aplicació",
@@ -923,20 +683,8 @@
       "dark": "Fosc"
     }
   },
-  "overlay": {
-    "transcribing": "S'està transcrivint...",
-    "processing": "S'està processant...",
-    "loadingModel": "S'està carregant el model..."
-  },
   "secureInput": {
-    "blockedWithCulprit_one": "{{name}} pot estar blocant 1 drecera",
-    "blockedWithCulprit_other": "{{name}} pot estar blocant {{count}} dreceres",
-    "blockedNoCulprit_one": "El macOS està blocant temporalment 1 drecera",
-    "blockedNoCulprit_other": "El macOS està blocant temporalment {{count}} dreceres",
-    "recorderBlockedWithCulprit": "{{name}} pot estar blocant els canvis de dreceres",
-    "recorderBlockedNoCulprit": "El macOS està blocant temporalment els canvis de dreceres",
     "learnMore": "Com es resol",
-    "recorderBlocked": "Ara no se'n poden enregistrar dreceres: l'entrada segura del macOS bloca els esdeveniments de tecla. Resol primer l'avís d'entrada segura.",
-    "dismiss": "Descarta"
+    "recorderBlocked": "Ara no se'n poden enregistrar dreceres: l'entrada segura del macOS bloca els esdeveniments de tecla. Resol primer l'avís d'entrada segura."
   }
 }

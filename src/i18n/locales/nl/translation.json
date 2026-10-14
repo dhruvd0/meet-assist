@@ -2,21 +2,20 @@
   "tray": {
     "settings": "Instellingen...",
     "checkUpdates": "Controleren op updates...",
-    "copyLastTranscript": "Laatste transcriptie kopiëren",
     "unloadModel": "Model ontladen",
     "model": "Model",
     "quit": "Afsluiten",
-    "cancel": "Annuleren",
-    "secureInputWarning": "⚠ Sneltoetsen geblokkeerd door Secure Input"
+    "startMeeting": "Start Meeting",
+    "endMeeting": "End Meeting"
   },
   "sidebar": {
     "projects": "Projects",
     "meetings": "Meetings",
+    "assistant": "Assistant",
+    "audio": "Audio",
     "general": "Algemeen",
     "models": "Modellen",
     "advanced": "Geavanceerd",
-    "postProcessing": "Naverwerking",
-    "history": "Geschiedenis",
     "debug": "Probleemoplossing",
     "about": "Over Handy"
   },
@@ -154,11 +153,11 @@
       "failing": "The assistant has failed {{count}} times in a row. Check the provider settings.",
       "lastError": "The assistant's last check failed:",
       "readiness": {
-        "disabled": "The meeting assistant is off. Turn it on under Advanced settings.",
-        "no_provider": "No provider is set for the meeting assistant. Choose one under Advanced settings.",
-        "unsupported_provider": "{{detail}} cannot run the meeting assistant. Choose another provider under Advanced settings.",
-        "missing_api_key": "No API key for {{detail}}. Add one under Post Processing settings.",
-        "no_model": "No model is selected for {{detail}}. Pick one under Post Processing settings."
+        "disabled": "The meeting assistant is off. Turn it on in Assistant.",
+        "no_provider": "No AI provider is set. Choose one in Assistant.",
+        "unsupported_provider": "{{detail}} cannot run the meeting assistant. Choose another provider in Assistant.",
+        "missing_api_key": "No API key for {{detail}}. Add one in Assistant.",
+        "no_model": "No model is selected for {{detail}}. Pick one in Assistant."
       }
     },
     "summary": {
@@ -259,26 +258,6 @@
     "errors": {
       "selectModel": "Model selecteren mislukt"
     },
-    "permissions": {
-      "title": "Machtigingen vereist",
-      "description": "Handy heeft een aantal machtigingen nodig om goed te kunnen werken.",
-      "microphone": {
-        "title": "Microfoontoegang",
-        "description": "Vereist om je stem op te nemen voor transcriptie."
-      },
-      "accessibility": {
-        "title": "Toegankelijkheid",
-        "description": "Vereist om getranscribeerde tekst in je applicaties te kunnen typen."
-      },
-      "grant": "Machtiging verlenen",
-      "granted": "Verleend",
-      "waiting": "Wachten...",
-      "allGranted": "Alles ingesteld!",
-      "errors": {
-        "checkFailed": "Machtigingen controleren mislukt. Probeer het opnieuw.",
-        "requestFailed": "Machtiging aanvragen mislukt. Probeer het opnieuw."
-      }
-    },
     "assistant": {
       "title": "Set up your assistant",
       "description": "The meeting assistant and summaries use an LLM provider. Pick one, add your API key if needed, and test the connection.",
@@ -289,8 +268,7 @@
       "failure": "Connection failed: {{error}}",
       "continue": "Continue",
       "skip": "Skip for now",
-      "hint": "You can change this later under Post Processing settings.",
-      "unsupported": "Apple Intelligence cannot be used for meetings. Pick another provider."
+      "hint": "You can change this later in Assistant."
     }
   },
   "modelSelector": {
@@ -334,24 +312,16 @@
     "general": {
       "title": "Algemeen",
       "shortcut": {
-        "title": "Sneltoetsen",
-        "description": "Configureer sneltoetsen om spraak-naar-tekst-opnames te starten",
+        "title": "Shortcut",
+        "description": "Start or end a meeting from anywhere.",
         "loading": "Sneltoetsen laden...",
         "none": "Geen sneltoetsen geconfigureerd",
         "notFound": "Sneltoets niet gevonden",
         "pressKeys": "Druk op toetsen...",
         "bindings": {
-          "transcribe": {
-            "name": "Sneltoets voor dicteren",
-            "description": "De sneltoets om je stem op te nemen en te transcriberen."
-          },
-          "cancel": {
-            "name": "Sneltoets voor annuleren",
-            "description": "De sneltoets om de huidige opname te annuleren."
-          },
-          "transcribe_with_post_process": {
-            "name": "Sneltoets voor naverwerking",
-            "description": "Optioneel: Een specifieke sneltoets die altijd AI-naverwerking toepast op je transcriptie."
+          "toggle_meeting": {
+            "name": "Meeting shortcut",
+            "description": "Starts a meeting in your most recent project, or ends the running one."
           }
         },
         "errors": {
@@ -366,19 +336,46 @@
         "searchPlaceholder": "Talen zoeken...",
         "noResults": "Geen talen gevonden",
         "auto": "Automatisch"
-      },
-      "shortcutActivation": {
-        "title": "Gedrag van sneltoets",
-        "description": "Kies hoe de sneltoets voor dicteren de opname start en stopt.",
-        "options": {
-          "holdOrToggle": "Automatisch",
-          "pushToTalk": "Vasthouden",
-          "toggle": "Schakelen"
+      }
+    },
+    "assistant": {
+      "provider": {
+        "title": "AI provider",
+        "description": "The model Meet Assist uses for nudges, summaries, and image digests.",
+        "test": {
+          "button": "Test connection",
+          "ok": "Connected. {{count}} models available."
         },
-        "descriptions": {
-          "hold_or_toggle": "Houd ingedrukt om op te nemen of tik om te schakelen",
-          "push_to_talk": "Neemt op zolang je de sneltoets ingedrukt houdt",
-          "toggle": "Tik op de sneltoets om de opname te starten, tik opnieuw om te stoppen"
+        "select": {
+          "title": "Provider",
+          "description": "Selecteer een OpenAI- of Anthropic-compatibele provider."
+        },
+        "apiFormat": {
+          "title": "API-indeling",
+          "description": "Verzoekindeling die door je aangepaste eindpunt wordt verwacht.",
+          "options": {
+            "openai": "OpenAI-compatibel (Chat Completions)",
+            "anthropic": "Anthropic Messages"
+          }
+        },
+        "baseUrl": {
+          "title": "Basis-URL",
+          "description": "API-basis-URL voor de geselecteerde provider. Alleen de aangepaste provider kan worden bewerkt.",
+          "placeholder": "https://api.openai.com/v1",
+          "placeholderAnthropic": "https://api.anthropic.com/v1"
+        },
+        "apiKey": {
+          "title": "API-sleutel",
+          "description": "API-sleutel voor de geselecteerde provider.",
+          "placeholder": "sk-..."
+        },
+        "model": {
+          "title": "Model",
+          "descriptionCustom": "Geef de model-ID op die door je aangepaste eindpunt wordt verwacht.",
+          "descriptionDefault": "Kies een model dat door de geselecteerde provider wordt aangeboden.",
+          "placeholderWithOptions": "Zoek of selecteer een model",
+          "placeholderNoOptions": "Typ een modelnaam",
+          "refreshModels": "Modellen verversen"
         }
       }
     },
@@ -434,18 +431,12 @@
     "advanced": {
       "groups": {
         "app": "App",
-        "output": "Uitvoer",
         "transcription": "Transcriptie",
-        "history": "Geschiedenis",
         "experimental": "Experimenteel"
       },
       "experimentalToggle": {
         "label": "Experimentele functies",
         "description": "Schakel experimentele functies in die nog in ontwikkeling zijn."
-      },
-      "lazyStreamClose": {
-        "label": "Microfoon openhouden tussen transcripties",
-        "description": "Houdt de microfoonstream tot 30 seconden open nadat een opname stopt. Dit vermindert de vertraging bij opeenvolgende opnames, maar kan de Bluetooth-audiokwaliteit tijdelijk verminderen."
       },
       "acceleration": {
         "transcribe": {
@@ -471,64 +462,6 @@
       "showTrayIcon": {
         "label": "Pictogram in systeemvak tonen",
         "description": "Toon het Handy-pictogram in het systeemvak."
-      },
-      "overlay": {
-        "style": {
-          "title": "Overlay",
-          "description": "Kies de opname-overlay: 'Geen' verbergt deze, 'Minimaal' toont een compacte balk, 'Live' toont de tekst in realtime tijdens het spreken (alleen voor streaming-modellen). Op Linux wordt 'Geen' aanbevolen.",
-          "options": {
-            "none": "Geen",
-            "minimal": "Minimaal",
-            "live": "Live"
-          }
-        },
-        "position": {
-          "title": "Overlay-positie",
-          "description": "Waar de overlay op het scherm verschijnt tijdens het opnemen en transcriberen.",
-          "options": {
-            "bottom": "Onderkant",
-            "top": "Bovenkant"
-          }
-        }
-      },
-      "pasteMethod": {
-        "title": "Plakmethode",
-        "description": "Kies hoe tekst wordt ingevoegd. 'Direct' simuleert typen via het systeem. 'Geen' slaat het plakken over en werkt alleen de geschiedenis en het klembord bij.",
-        "options": {
-          "clipboard": "Klembord ({{modifier}}+V)",
-          "clipboardCtrlShiftV": "Klembord (Ctrl+Shift+V)",
-          "clipboardShiftInsert": "Klembord (Shift+Insert)",
-          "direct": "Direct",
-          "none": "Geen",
-          "externalScript": "Extern script"
-        },
-        "externalScriptPlaceholder": "/pad/naar/je/script.sh"
-      },
-      "typingTool": {
-        "title": "Typgereedschap",
-        "description": "Kies welke Linux-typtool gebruikt moet worden voor de 'Directe' plakmethode. 'Automatisch' detecteert zelf de beste optie voor jouw systeem.",
-        "options": {
-          "auto": "Automatisch (Aanbevolen)"
-        }
-      },
-      "clipboardHandling": {
-        "title": "Klembordbeheer",
-        "description": "'Klembord niet aanpassen' behoudt je huidige klembordinhoud na een transcriptie. 'Kopiëren naar klembord' laat de getranscribeerde tekst achter op je klembord.",
-        "options": {
-          "dontModify": "Klembord niet aanpassen",
-          "copyToClipboard": "Kopiëren naar klembord"
-        }
-      },
-      "autoSubmit": {
-        "title": "Automatisch verzenden",
-        "description": "Verzend automatisch de geselecteerde toetsencombinatie na het invoegen van de tekst. Cmd+Enter geldt voor macOS, Windows/Linux gebruiken Super+Enter.",
-        "options": {
-          "off": "Uit",
-          "enter": "Enter",
-          "cmdEnter": "Cmd+Enter",
-          "superEnter": "Super+Enter",
-          "ctrlEnter": "Ctrl+Enter"
-        }
       },
       "translateToEnglish": {
         "label": "Vertalen naar het Engels",
@@ -582,85 +515,6 @@
         }
       }
     },
-    "postProcessing": {
-      "hotkey": {
-        "title": "Sneltoets"
-      },
-      "api": {
-        "title": "API",
-        "provider": {
-          "title": "Provider",
-          "description": "Selecteer een OpenAI- of Anthropic-compatibele provider."
-        },
-        "apiFormat": {
-          "title": "API-indeling",
-          "description": "Verzoekindeling die door je aangepaste eindpunt wordt verwacht.",
-          "options": {
-            "openai": "OpenAI-compatibel (Chat Completions)",
-            "anthropic": "Anthropic Messages"
-          }
-        },
-        "appleIntelligence": {
-          "unavailable": "Apple Intelligence is niet beschikbaar op dit apparaat. Vereist een Apple Silicon Mac met macOS Tahoe (26.0) of nieuwer waarop Apple Intelligence is ingeschakeld via de Systeeminstellingen."
-        },
-        "baseUrl": {
-          "title": "Basis-URL",
-          "description": "API-basis-URL voor de geselecteerde provider. Alleen de aangepaste provider kan worden bewerkt.",
-          "placeholder": "https://api.openai.com/v1",
-          "placeholderAnthropic": "https://api.anthropic.com/v1"
-        },
-        "apiKey": {
-          "title": "API-sleutel",
-          "description": "API-sleutel voor de geselecteerde provider.",
-          "placeholder": "sk-..."
-        },
-        "model": {
-          "title": "Model",
-          "descriptionCustom": "Geef de model-ID op die door je aangepaste eindpunt wordt verwacht.",
-          "descriptionDefault": "Kies een model dat door de geselecteerde provider wordt aangeboden.",
-          "placeholderWithOptions": "Zoek of selecteer een model",
-          "placeholderNoOptions": "Typ een modelnaam",
-          "refreshModels": "Modellen verversen"
-        }
-      },
-      "prompts": {
-        "title": "Prompt",
-        "selectedPrompt": {
-          "title": "Geselecteerde prompt",
-          "description": "Selecteer een sjabloon voor het verfijnen van transcripties of maak een nieuwe aan. Gebruik ${output} in de prompttekst om naar de gemaakte transcriptie te verwijzen."
-        },
-        "noPrompts": "Geen prompts beschikbaar",
-        "selectPrompt": "Selecteer een prompt",
-        "createNew": "Nieuwe prompt maken",
-        "promptLabel": "Promptnaam",
-        "promptLabelPlaceholder": "Voer promptnaam in",
-        "promptInstructions": "Prompt-instructies",
-        "promptInstructionsPlaceholder": "Schrijf de instructies die na de transcriptie moeten worden uitgevoerd. Voorbeeld: Verbeter de grammatica en helderheid van de volgende tekst: ${output}",
-        "promptTip": "Tip: Gebruik <code>${output}</code> om de getranscribeerde tekst in je prompt in te voegen.",
-        "updatePrompt": "Prompt bijwerken",
-        "deletePrompt": "Prompt verwijderen",
-        "createPrompt": "Prompt maken",
-        "cancel": "Annuleren",
-        "selectToEdit": "Selecteer hierboven een prompt om de details te bekijken en te bewerken.",
-        "createFirst": "Klik hierboven op 'Nieuwe prompt maken' om je eerste naverwerkingsprompt aan te maken."
-      }
-    },
-    "history": {
-      "title": "Geschiedenis",
-      "openFolder": "Opnamemap openen",
-      "loading": "Geschiedenis laden...",
-      "empty": "Nog geen transcripties. Start met opnemen om je geschiedenis op te bouwen!",
-      "copyToClipboard": "Transcriptie naar klembord kopiëren",
-      "copyError": "Transcriptie naar het klembord kopiëren mislukt.",
-      "save": "Transcriptie opslaan",
-      "unsave": "Verwijderen uit opgeslagen",
-      "delete": "Item verwijderen",
-      "deleteError": "Item verwijderen mislukt. Probeer het opnieuw.",
-      "retranscribe": "Opnieuw transcriberen",
-      "retranscribeError": "Opnieuw transcriberen mislukt. Probeer het opnieuw.",
-      "transcribing": "Transcriberen...",
-      "transcriptionFailed": "Transcriptie mislukt. Je kunt het opnieuw proberen via het herlaad-pictogram."
-    },
     "debug": {
       "title": "Probleemoplossing",
       "logDirectory": {
@@ -697,7 +551,6 @@
       "onboardingPreview": {
         "title": "Voorbeeld van onboarding",
         "description": "Bekijk de onboardingschermen zonder machtigingen, modellen of de voltooiingsstatus te wijzigen",
-        "permissionsButton": "Machtigingen",
         "modelsButton": "Modelselectie",
         "exitButton": "Voorbeeld sluiten"
       },
@@ -709,41 +562,6 @@
         "title": "Drempelwaarde woordcorrectie",
         "description": "Gevoeligheid voor eigen woordcorrecties"
       },
-      "historyLimit": {
-        "title": "Geschiedenislimiet",
-        "description": "Maximum aantal te bewaren geschiedenisitems",
-        "entries": "items"
-      },
-      "recordingRetention": {
-        "title": "Opnames automatisch verwijderen",
-        "description": "Oude opnames automatisch verwijderen om ruimte te besparen",
-        "never": "Nooit",
-        "preserveLimit": "Bewaar de nieuwste {{count}}",
-        "days3": "Na 3 dagen",
-        "weeks2": "Na 2 weken",
-        "months3": "Na 3 maanden",
-        "placeholder": "Selecteer bewaarperiode..."
-      },
-      "alwaysOnMicrophone": {
-        "label": "Microfoon altijd aan",
-        "description": "Houd de microfoon actief voor een snellere reactietijd"
-      },
-      "clamshellMicrophone": {
-        "title": "Clamshell-microfoon",
-        "description": "Microfoon die gebruikt moet worden wanneer het laptopscherm gesloten is"
-      },
-      "postProcessingToggle": {
-        "label": "Naverwerking",
-        "description": "Schakel AI-gestuurde tekstverfijning in na transcriptie"
-      },
-      "muteWhileRecording": {
-        "label": "Dempen tijdens opname",
-        "description": "Systeemgeluid dempen tijdens het opnemen"
-      },
-      "appendTrailingSpace": {
-        "label": "Spatie achteraan toevoegen",
-        "description": "Voeg een spatie toe na de geplakte transcriptie"
-      },
       "keyboardImplementation": {
         "title": "Toetsenbord-implementatie",
         "description": "Kies de backend voor sneltoetsen.",
@@ -753,46 +571,6 @@
         "appData": "App-data:",
         "models": "Modellen:",
         "settings": "Instellingen:"
-      },
-      "pasteDelay": {
-        "title": "Plakvertraging (voor)",
-        "description": "Vertraging (in milliseconden) na het kopiëren van de tekst, voordat de plak-toetsaanslag wordt verzonden. Verhoog dit als er niets wordt geplakt."
-      },
-      "pasteDelayAfter": {
-        "title": "Plakvertraging (na)",
-        "description": "Vertraging (in milliseconden) na de plak-toetsaanslag, voordat je vorige klembord wordt hersteld. Verhoog dit als de oude klembordinhoud wordt geplakt in plaats van de transcriptie."
-      },
-      "holdThreshold": {
-        "title": "Vasthouddrempel",
-        "description": "Alleen in de modus Automatisch: hoe lang (in milliseconden) de sneltoets ingedrukt moet blijven om als vasthouden te tellen in plaats van als tik. Verlaag dit als de opname na kort vasthouden blijft doorlopen; verhoog het als bewuste tikken als vasthouden worden gezien."
-      },
-      "reliablePaste": {
-        "title": "Betrouwbaar plakken (Beta)",
-        "description": "Herstel het klembord pas nadat de doelapp de transcriptie daadwerkelijk heeft gelezen, in plaats van na een vaste vertraging. Bedoeld om te verhelpen dat bij systeembelasting de oude klembordinhoud wordt geplakt. Vereist een plakmethode via het klembord; alleen macOS en Windows."
-      },
-      "recordingBuffer": {
-        "title": "Extra opnamebuffer",
-        "description": "Extra tijd (in milliseconden) om te blijven opnemen nadat je de toets loslaat, om naloopaudio op te vangen. 0 = geen extra buffer."
-      },
-      "keyboardDiagnostic": {
-        "title": "Toetsenborddiagnose",
-        "description": "Controleert of toetsenbordgebeurtenissen Handy bereiken. Alleen het aantal gebeurtenissen wordt vastgelegd — nooit welke toetsen je indrukt.",
-        "run": "Diagnose van 10 s uitvoeren",
-        "running": "Luisteren… druk je sneltoets een paar keer in (bijv. Option+Space)",
-        "secureInputLabel": "Secure Input",
-        "enabled": "ingeschakeld",
-        "disabled": "uitgeschakeld",
-        "holder": "vastgehouden door {{name}} (pid {{pid}})",
-        "holderUnknown": "geen zichtbare veroorzaker",
-        "keyDown": "Toets ingedrukt",
-        "keyUp": "Toets losgelaten",
-        "flagsChanged": "Modificatietoetsen",
-        "mouse": "Muis",
-        "verdictBlocked": "Secure Input blokkeert toetsgebeurtenissen — sneltoetsen met een gewone toets kunnen pas weer werken als dit is opgelost.",
-        "verdictSuspicious": "Er kwamen wel modificatiegebeurtenissen binnen, maar geen toetsgebeurtenissen — iets onderdrukt toetsen terwijl Secure Input als uitgeschakeld wordt gemeld. Meld dit op GitHub.",
-        "verdictOk": "Toetsgebeurtenissen bereiken Handy normaal.",
-        "verdictNoEvents": "Geen gebeurtenissen vastgelegd — heb je tijdens de test toetsen ingedrukt?",
-        "failed": "Diagnose mislukt: {{error}}"
       }
     },
     "about": {
@@ -834,11 +612,6 @@
       "enabled": {
         "label": "Meeting assistant",
         "description": "When on, every {{interval}} seconds the recent transcript, your project brief and meeting context are sent to the chosen provider so the assistant can decide whether to speak up."
-      },
-      "provider": {
-        "label": "Provider",
-        "description": "Which post-processing provider answers during meetings. Empty uses the post-processing default.",
-        "default": "Same as post-processing"
       },
       "sensitivity": {
         "label": "Sensitivity",
@@ -888,27 +661,14 @@
     "clear": "Wissen",
     "noOptionsFound": "Geen opties gevonden"
   },
-  "accessibility": {
-    "permissionsDescription": "Handy heeft toegankelijkheidsmachtigingen nodig om getranscribeerde tekst te kunnen typen.",
-    "openSettings": "Systeeminstellingen openen"
-  },
   "errors": {
     "loadDirectory": "Fout bij laden van map: {{error}}",
     "micPermissionDeniedTitle": "Microfoontoegang geweigerd",
     "micPermissionDenied": {
-      "generic": "Microfoontoegang is geweigerd door het besturingssysteem. Verleen microfoonmachtiging in je systeeminstellingen.",
-      "windows": "Schakel microfoontoegang in via Instellingen → Privacy & beveiliging → Microfoon (inclusief toegang voor desktop-apps).",
-      "macos": "Verleen microfoontoegang via Systeeminstellingen → Privacy & Beveiliging → Microfoon.",
-      "linux": "Verleen microfoontoegang in de geluids- of privacyinstellingen van je systeem."
+      "windows": "Schakel microfoontoegang in via Instellingen → Privacy & beveiliging → Microfoon (inclusief toegang voor desktop-apps)."
     },
-    "noInputDeviceTitle": "Geen microfoon gevonden",
-    "noInputDevice": "Er is geen audio-invoerapparaat gedetecteerd. Sluit een microfoon of headset aan en probeer het opnieuw.",
-    "recordingFailed": "Opname starten mislukt: {{error}}",
     "modelLoadFailed": "Model laden mislukt: {{model}}",
-    "modelLoadFailedUnknown": "onbekend model",
-    "pasteFailedTitle": "Tekst plakken mislukt",
-    "pasteFailed": "Tekst kon niet worden geplakt in de actieve applicatie.",
-    "transcriptionFailedTitle": "Transcriptie mislukt"
+    "modelLoadFailedUnknown": "onbekend model"
   },
   "appLanguage": {
     "title": "Interfacetaal",
@@ -923,20 +683,8 @@
       "dark": "Donker"
     }
   },
-  "overlay": {
-    "transcribing": "Transcriberen...",
-    "processing": "Verwerken...",
-    "loadingModel": "Model laden..."
-  },
   "secureInput": {
-    "blockedWithCulprit_one": "{{name}} blokkeert mogelijk 1 sneltoets",
-    "blockedWithCulprit_other": "{{name}} blokkeert mogelijk {{count}} sneltoetsen",
-    "blockedNoCulprit_one": "macOS blokkeert tijdelijk 1 sneltoets",
-    "blockedNoCulprit_other": "macOS blokkeert tijdelijk {{count}} sneltoetsen",
-    "recorderBlockedWithCulprit": "{{name}} blokkeert mogelijk wijzigingen aan sneltoetsen",
-    "recorderBlockedNoCulprit": "macOS blokkeert tijdelijk wijzigingen aan sneltoetsen",
     "learnMore": "Hoe je dit oplost",
-    "recorderBlocked": "Sneltoetsen kunnen nu niet worden opgenomen — Secure Input van macOS blokkeert toetsgebeurtenissen. Los eerst de Secure Input-waarschuwing op.",
-    "dismiss": "Sluiten"
+    "recorderBlocked": "Sneltoetsen kunnen nu niet worden opgenomen — Secure Input van macOS blokkeert toetsgebeurtenissen. Los eerst de Secure Input-waarschuwing op."
   }
 }

@@ -2,21 +2,20 @@
   "tray": {
     "settings": "Настройки...",
     "checkUpdates": "Проверка за актуализации...",
-    "copyLastTranscript": "Копиране на последния транскрипт",
     "unloadModel": "Разтоварване на модела",
     "model": "Модел",
     "quit": "Изход",
-    "cancel": "Отказ",
-    "secureInputWarning": "⚠ Бързите клавиши са блокирани от Secure Input"
+    "startMeeting": "Start Meeting",
+    "endMeeting": "End Meeting"
   },
   "sidebar": {
     "projects": "Projects",
     "meetings": "Meetings",
+    "assistant": "Assistant",
+    "audio": "Audio",
     "general": "Общи",
     "models": "Модели",
     "advanced": "Разширени",
-    "postProcessing": "Постобработка",
-    "history": "История",
     "debug": "Отстраняване",
     "about": "За приложението"
   },
@@ -154,11 +153,11 @@
       "failing": "The assistant has failed {{count}} times in a row. Check the provider settings.",
       "lastError": "The assistant's last check failed:",
       "readiness": {
-        "disabled": "The meeting assistant is off. Turn it on under Advanced settings.",
-        "no_provider": "No provider is set for the meeting assistant. Choose one under Advanced settings.",
-        "unsupported_provider": "{{detail}} cannot run the meeting assistant. Choose another provider under Advanced settings.",
-        "missing_api_key": "No API key for {{detail}}. Add one under Post Processing settings.",
-        "no_model": "No model is selected for {{detail}}. Pick one under Post Processing settings."
+        "disabled": "The meeting assistant is off. Turn it on in Assistant.",
+        "no_provider": "No AI provider is set. Choose one in Assistant.",
+        "unsupported_provider": "{{detail}} cannot run the meeting assistant. Choose another provider in Assistant.",
+        "missing_api_key": "No API key for {{detail}}. Add one in Assistant.",
+        "no_model": "No model is selected for {{detail}}. Pick one in Assistant."
       }
     },
     "summary": {
@@ -259,26 +258,6 @@
     "errors": {
       "selectModel": "Неуспешно избиране на модел"
     },
-    "permissions": {
-      "title": "Необходими разрешения",
-      "description": "Handy се нуждае от няколко разрешения, за да работи правилно.",
-      "microphone": {
-        "title": "Достъп до микрофон",
-        "description": "Необходим е, за да чуе гласа ви при транскрипция."
-      },
-      "accessibility": {
-        "title": "Достъп за достъпност",
-        "description": "Необходим е, за да въвежда транскрибирания текст във вашите приложения."
-      },
-      "grant": "Даване на разрешение",
-      "granted": "Разрешено",
-      "waiting": "Изчакване...",
-      "allGranted": "Готово!",
-      "errors": {
-        "checkFailed": "Проверката на разрешенията не бе успешна. Опитайте отново.",
-        "requestFailed": "Заявката за разрешение не бе успешна. Опитайте отново."
-      }
-    },
     "assistant": {
       "title": "Set up your assistant",
       "description": "The meeting assistant and summaries use an LLM provider. Pick one, add your API key if needed, and test the connection.",
@@ -289,12 +268,12 @@
       "failure": "Connection failed: {{error}}",
       "continue": "Continue",
       "skip": "Skip for now",
-      "hint": "You can change this later under Post Processing settings.",
-      "unsupported": "Apple Intelligence cannot be used for meetings. Pick another provider."
+      "hint": "You can change this later in Assistant."
     }
   },
   "modelSelector": {
     "custom": "Персонализиран",
+    "legacy": "Наследен",
     "streaming": "Стрийминг",
     "active": "Активен",
     "switching": "Превключване...",
@@ -324,8 +303,7 @@
       "translation": "Може да превежда на английски",
       "translate": "Превод на английски",
       "streaming": "Показва транскрипция на живо, докато говорите"
-    },
-    "legacy": "Наследен"
+    }
   },
   "settings": {
     "modelSettings": {
@@ -334,24 +312,16 @@
     "general": {
       "title": "Общи",
       "shortcut": {
-        "title": "Бързи клавиши на Handy",
-        "description": "Настройте клавишни комбинации за стартиране на запис за реч към текст",
+        "title": "Shortcut",
+        "description": "Start or end a meeting from anywhere.",
         "loading": "Зареждане на бързите клавиши...",
         "none": "Няма настроени бързи клавиши",
         "notFound": "Бързият клавиш не е намерен",
         "pressKeys": "Натиснете клавишите...",
         "bindings": {
-          "transcribe": {
-            "name": "Бърз клавиш за транскрипция",
-            "description": "Клавишната комбинация за запис и транскрибиране на гласа ви."
-          },
-          "cancel": {
-            "name": "Бърз клавиш за отказ",
-            "description": "Клавишната комбинация за отмяна на текущия запис."
-          },
-          "transcribe_with_post_process": {
-            "name": "Бърз клавиш за постобработка",
-            "description": "По избор: отделна комбинация, която винаги прилага ИИ постобработка върху транскрипцията."
+          "toggle_meeting": {
+            "name": "Meeting shortcut",
+            "description": "Starts a meeting in your most recent project, or ends the running one."
           }
         },
         "errors": {
@@ -366,25 +336,53 @@
         "searchPlaceholder": "Търсене на езици...",
         "noResults": "Няма намерени езици",
         "auto": "Автоматично"
-      },
-      "shortcutActivation": {
-        "title": "Поведение на клавишната комбинация",
-        "description": "Изберете как бързият клавиш за транскрипция стартира и спира записа.",
-        "options": {
-          "holdOrToggle": "Автоматично",
-          "pushToTalk": "Задържане",
-          "toggle": "Превключване"
+      }
+    },
+    "assistant": {
+      "provider": {
+        "title": "AI provider",
+        "description": "The model Meet Assist uses for nudges, summaries, and image digests.",
+        "test": {
+          "button": "Test connection",
+          "ok": "Connected. {{count}} models available."
         },
-        "descriptions": {
-          "hold_or_toggle": "Задръжте за запис или натиснете кратко за превключване",
-          "push_to_talk": "Записва, докато държите комбинацията натисната",
-          "toggle": "Натиснете кратко комбинацията, за да започне записът, и отново, за да спре"
+        "select": {
+          "title": "Доставчик",
+          "description": "Изберете доставчик, съвместим с OpenAI или Anthropic."
+        },
+        "apiFormat": {
+          "title": "Формат на API",
+          "description": "Формат на заявката, очакван от вашия персонализиран краен адрес.",
+          "options": {
+            "openai": "Съвместим с OpenAI (Chat Completions)",
+            "anthropic": "Anthropic Messages"
+          }
+        },
+        "baseUrl": {
+          "title": "Базов URL",
+          "description": "Базов API URL за избрания доставчик. Редактируем е само при персонализиран доставчик.",
+          "placeholder": "https://api.openai.com/v1",
+          "placeholderAnthropic": "https://api.anthropic.com/v1"
+        },
+        "apiKey": {
+          "title": "API ключ",
+          "description": "API ключ за избрания доставчик.",
+          "placeholder": "sk-..."
+        },
+        "model": {
+          "title": "Модел",
+          "descriptionCustom": "Въведете идентификатора на модела, очакван от вашия персонализиран краен адрес.",
+          "descriptionDefault": "Изберете модел, предлаган от избрания доставчик.",
+          "placeholderWithOptions": "Търсене или избор на модел",
+          "placeholderNoOptions": "Въведете име на модел",
+          "refreshModels": "Опресняване на моделите"
         }
       }
     },
     "models": {
       "title": "Модели за транскрипция",
       "description": "Изберете модел за транскрипция или изтеглете допълнителни. Различните модели предлагат различна точност и скорост.",
+      "searchPlaceholder": "Търсене на модели по име…",
       "yourModels": "Изтеглени модели",
       "availableModels": "Налични за изтегляне",
       "deleteConfirm": "Сигурни ли сте, че искате да изтриете {{modelName}}? Ще трябва да го изтеглите отново, за да го използвате.",
@@ -395,12 +393,11 @@
         "streaming": "Филтриране на моделите, които поддържат транскрипция на живо",
         "translation": "Филтриране на моделите, които поддържат превод на английски"
       },
-      "noModelsMatch": "Няма модели, отговарящи на този филтър.",
-      "searchPlaceholder": "Търсене на модели по име…",
       "rescan": {
         "label": "Сканиране отново",
         "tooltip": "Сканиране отново за модели, добавени в папката с модели или кеша на Hugging Face извън Handy"
-      }
+      },
+      "noModelsMatch": "Няма модели, отговарящи на този филтър."
     },
     "sound": {
       "title": "Звук",
@@ -434,18 +431,12 @@
     "advanced": {
       "groups": {
         "app": "Приложение",
-        "output": "Изход",
         "transcription": "Транскрипция",
-        "history": "История",
         "experimental": "Експериментални"
       },
       "experimentalToggle": {
         "label": "Експериментални функции",
         "description": "Включване на експериментални функции, които са още в разработка."
-      },
-      "lazyStreamClose": {
-        "label": "Държане на микрофона отворен между транскрипции",
-        "description": "Държи потокът от микрофона отворен 30 секунди след спиране на записа, което намалява забавянето при поредни транскрипции. Може да влоши качеството на Bluetooth аудио, докато е активно."
       },
       "acceleration": {
         "transcribe": {
@@ -471,64 +462,6 @@
       "showTrayIcon": {
         "label": "Икона в системната област",
         "description": "Показване на иконата на Handy в системната област."
-      },
-      "overlay": {
-        "style": {
-          "title": "Наслагване",
-          "description": "Изберете наслагването при запис: «Няма» го скрива, «Минимално» показва компактен индикатор, «На живо» показва транскрипцията в реално време, докато говорите (само модели с поддръжка на стрийминг — потърсете етикета «Стрийминг» в избора на модел). На Linux се препоръчва «Няма».",
-          "options": {
-            "none": "Няма",
-            "minimal": "Минимално",
-            "live": "На живо"
-          }
-        },
-        "position": {
-          "title": "Позиция на наслагването",
-          "description": "Показване на визуална обратна връзка при запис и транскрипция. На Linux се препоръчва „Няма“.",
-          "options": {
-            "bottom": "Долу",
-            "top": "Горе"
-          }
-        }
-      },
-      "pasteMethod": {
-        "title": "Начин на поставяне",
-        "description": "Изберете как се вмъква текстът. Директно: симулира писане чрез системния вход. Няма: пропуска поставянето, актуализира само историята/клипборда.",
-        "options": {
-          "clipboard": "Клипборд ({{modifier}}+V)",
-          "clipboardCtrlShiftV": "Клипборд (Ctrl+Shift+V)",
-          "clipboardShiftInsert": "Клипборд (Shift+Insert)",
-          "direct": "Директно",
-          "none": "Няма",
-          "externalScript": "Външен скрипт"
-        },
-        "externalScriptPlaceholder": "/път/към/вашия/script.sh"
-      },
-      "typingTool": {
-        "title": "Инструмент за писане",
-        "description": "Изберете кой Linux инструмент за писане да се използва при директно поставяне. „Автоматично“ открива и използва най-подходящия за вашата система.",
-        "options": {
-          "auto": "Автоматично (препоръчително)"
-        }
-      },
-      "clipboardHandling": {
-        "title": "Работа с клипборда",
-        "description": "„Без промяна на клипборда“ запазва съдържанието на клипборда след транскрипция. „Копиране в клипборда“ оставя резултата в клипборда след поставяне.",
-        "options": {
-          "dontModify": "Без промяна на клипборда",
-          "copyToClipboard": "Копиране в клипборда"
-        }
-      },
-      "autoSubmit": {
-        "title": "Автоматично изпращане",
-        "description": "Автоматично изпращане на избраната клавишна комбинация след вмъкване на текста. Cmd+Enter важи за macOS, а Windows/Linux използват Super+Enter.",
-        "options": {
-          "off": "Изкл.",
-          "enter": "Enter",
-          "cmdEnter": "Cmd+Enter",
-          "superEnter": "Super+Enter",
-          "ctrlEnter": "Ctrl+Enter"
-        }
       },
       "translateToEnglish": {
         "label": "Превод на английски",
@@ -582,85 +515,6 @@
         }
       }
     },
-    "postProcessing": {
-      "hotkey": {
-        "title": "Бърз клавиш"
-      },
-      "api": {
-        "title": "API",
-        "provider": {
-          "title": "Доставчик",
-          "description": "Изберете доставчик, съвместим с OpenAI или Anthropic."
-        },
-        "apiFormat": {
-          "title": "Формат на API",
-          "description": "Формат на заявката, очакван от вашия персонализиран краен адрес.",
-          "options": {
-            "openai": "Съвместим с OpenAI (Chat Completions)",
-            "anthropic": "Anthropic Messages"
-          }
-        },
-        "appleIntelligence": {
-          "unavailable": "Apple Intelligence не е налична на това устройство. Необходим е Mac с Apple Silicon и macOS Tahoe (26.0) или по-нова с включена Apple Intelligence в Системните настройки."
-        },
-        "baseUrl": {
-          "title": "Базов URL",
-          "description": "Базов API URL за избрания доставчик. Редактируем е само при персонализиран доставчик.",
-          "placeholder": "https://api.openai.com/v1",
-          "placeholderAnthropic": "https://api.anthropic.com/v1"
-        },
-        "apiKey": {
-          "title": "API ключ",
-          "description": "API ключ за избрания доставчик.",
-          "placeholder": "sk-..."
-        },
-        "model": {
-          "title": "Модел",
-          "descriptionCustom": "Въведете идентификатора на модела, очакван от вашия персонализиран краен адрес.",
-          "descriptionDefault": "Изберете модел, предлаган от избрания доставчик.",
-          "placeholderWithOptions": "Търсене или избор на модел",
-          "placeholderNoOptions": "Въведете име на модел",
-          "refreshModels": "Опресняване на моделите"
-        }
-      },
-      "prompts": {
-        "title": "Подкана",
-        "selectedPrompt": {
-          "title": "Избрана подкана",
-          "description": "Изберете шаблон за подобряване на транскрипции или създайте нов. Използвайте ${output} в текста на подканата, за да препратите към уловения транскрипт."
-        },
-        "noPrompts": "Няма налични подкани",
-        "selectPrompt": "Изберете подкана",
-        "createNew": "Нова подкана",
-        "promptLabel": "Етикет на подканата",
-        "promptLabelPlaceholder": "Въведете име на подканата",
-        "promptInstructions": "Инструкции за подканата",
-        "promptInstructionsPlaceholder": "Напишете инструкциите за изпълнение след транскрипция. Пример: Подобрете граматиката и яснотата на следния текст: ${output}",
-        "promptTip": "Съвет: Използвайте <code>${output}</code>, за да вмъкнете транскрибирания текст в подканата.",
-        "updatePrompt": "Обновяване на подканата",
-        "deletePrompt": "Изтриване на подканата",
-        "createPrompt": "Създаване на подкана",
-        "cancel": "Отказ",
-        "selectToEdit": "Изберете подкана по-горе, за да видите и редактирате подробностите ѝ.",
-        "createFirst": "Натиснете „Нова подкана“ по-горе, за да създадете първата си подкана за постобработка."
-      }
-    },
-    "history": {
-      "title": "История",
-      "openFolder": "Отваряне на папката с записи",
-      "loading": "Зареждане на историята...",
-      "empty": "Все още няма транскрипции. Започнете запис, за да изградите история!",
-      "copyToClipboard": "Копиране на транскрипцията в клипборда",
-      "copyError": "Транскрипцията не бе копирана в клипборда.",
-      "save": "Запазване на транскрипцията",
-      "unsave": "Премахване от запазените",
-      "delete": "Изтриване на записа",
-      "deleteError": "Изтриването на записа не бе успешно. Опитайте отново.",
-      "retranscribe": "Повторна транскрипция",
-      "retranscribeError": "Повторната транскрипция не бе успешна. Опитайте отново.",
-      "transcribing": "Транскрибиране...",
-      "transcriptionFailed": "Транскрипцията не бе успешна. Можете да опитате отново с иконата за повторен опит."
-    },
     "debug": {
       "title": "Отстраняване",
       "logDirectory": {
@@ -687,99 +541,6 @@
         "description": "Автоматична проверка за нови версии на Handy",
         "lockedDescription": "Деактивирано от системната конфигурация (HANDY_DISABLE_UPDATER)"
       },
-      "soundTheme": {
-        "label": "Звукова тема",
-        "description": "Избор на звукова тема за сигнал при старт и край на записа"
-      },
-      "wordCorrectionThreshold": {
-        "title": "Праг за корекция на думи",
-        "description": "Чувствителност при корекция на персонализирани думи"
-      },
-      "historyLimit": {
-        "title": "Лимит на историята",
-        "description": "Максимален брой записи в историята за пазене",
-        "entries": "записа"
-      },
-      "recordingRetention": {
-        "title": "Автоматично изтриване на записи",
-        "description": "Автоматично изтриване на стари записи за пестене на място",
-        "never": "Никога",
-        "preserveLimit": "Запазване на последните {{count}}",
-        "days3": "След 3 дни",
-        "weeks2": "След 2 седмици",
-        "months3": "След 3 месеца",
-        "placeholder": "Изберете период на съхранение..."
-      },
-      "alwaysOnMicrophone": {
-        "label": "Постоянно активен микрофон",
-        "description": "Държане на микрофона активен за по-бърз отговор"
-      },
-      "clamshellMicrophone": {
-        "title": "Микрофон при затворен капак",
-        "description": "Микрофон за използване, когато капакът на лаптопа е затворен"
-      },
-      "postProcessingToggle": {
-        "label": "Постобработка",
-        "description": "Включване на подобряване на текста с ИИ след транскрипция"
-      },
-      "muteWhileRecording": {
-        "label": "Заглушаване при запис",
-        "description": "Заглушаване на системния звук по време на запис"
-      },
-      "appendTrailingSpace": {
-        "label": "Интервал в края",
-        "description": "Добавяне на интервал след поставената транскрипция"
-      },
-      "keyboardImplementation": {
-        "title": "Реализация на клавиатурата",
-        "description": "Избор на бекенд за глобалните бързи клавиши.",
-        "bindingsReset": "Бързите клавиши бяха несъвместими и са нулирани към подразбираните"
-      },
-      "paths": {
-        "appData": "Данни на приложението:",
-        "models": "Модели:",
-        "settings": "Настройки:"
-      },
-      "pasteDelay": {
-        "title": "Забавяне при поставяне (преди)",
-        "description": "Забавяне (в милисекунди) след копиране на текста, преди изпращане на клавиша за поставяне. Увеличете, ако нищо не се поставя."
-      },
-      "pasteDelayAfter": {
-        "title": "Забавяне при поставяне (след)",
-        "description": "Забавяне (в милисекунди) след клавиша за поставяне, преди възстановяване на предишния клипборд. Увеличете, ако вместо транскрипцията се поставя старото съдържание на клипборда."
-      },
-      "holdThreshold": {
-        "title": "Праг на задържане",
-        "description": "Само в автоматичен режим: колко дълго (в милисекунди) трябва да се задържи комбинацията, за да се брои за задържане вместо за кратко натискане. Намалете, ако след кратки задържания записът продължава; увеличете, ако умишлените кратки натискания се приемат за задържане."
-      },
-      "reliablePaste": {
-        "title": "Надеждно поставяне (Beta)",
-        "description": "Възстановява клипборда само след като целевото приложение действително прочете транскрипцията, вместо след фиксирано забавяне. Предназначено да отстрани поставянето на старото съдържание на клипборда при натоварване на системата. Изисква начин на поставяне през клипборда; само за macOS и Windows."
-      },
-      "recordingBuffer": {
-        "title": "Допълнителен буфер на записа",
-        "description": "Допълнително време (в милисекунди) за запис след пускане на клавиша, за да се улови краят на аудиото. 0 = без допълнителен буфер."
-      },
-      "keyboardDiagnostic": {
-        "title": "Диагностика на клавиатурата",
-        "description": "Проверява дали клавиатурните събития достигат до Handy. Записва се само броят на събитията — никога кои клавиши натискате.",
-        "run": "Стартиране на 10-секундна диагностика",
-        "running": "Слушане… натиснете бързия си клавиш няколко пъти (напр. Option+Space)",
-        "secureInputLabel": "Secure Input",
-        "enabled": "включен",
-        "disabled": "изключен",
-        "holder": "задържан от {{name}} (pid {{pid}})",
-        "holderUnknown": "няма видим държател",
-        "keyDown": "Натиснат клавиш",
-        "keyUp": "Отпуснат клавиш",
-        "flagsChanged": "Модификатори",
-        "mouse": "Мишка",
-        "verdictBlocked": "Secure Input блокира клавишните събития — бързите клавиши с обикновен клавиш не могат да работят, докато това не бъде решено.",
-        "verdictSuspicious": "Пристигнаха събития от модификатори, но нито едно клавишно събитие — нещо потиска клавишите, въпреки че Secure Input се отчита като изключен. Моля, съобщете за това в GitHub.",
-        "verdictOk": "Клавишните събития достигат до Handy нормално.",
-        "verdictNoEvents": "Не са уловени събития — натиснахте ли някакви клавиши по време на теста?",
-        "failed": "Диагностиката е неуспешна: {{error}}"
-      },
       "whatsNewPreview": {
         "title": "Преглед на новостите",
         "description": "Отваря последните включени бележки към изданието, без да ги маркира като видени",
@@ -790,9 +551,26 @@
       "onboardingPreview": {
         "title": "Преглед на първоначалната настройка",
         "description": "Прегледайте екраните за първоначална настройка, без да променяте разрешенията, моделите или състоянието на завършване",
-        "permissionsButton": "Разрешения",
         "modelsButton": "Избор на модел",
         "exitButton": "Изход от прегледа"
+      },
+      "soundTheme": {
+        "label": "Звукова тема",
+        "description": "Избор на звукова тема за сигнал при старт и край на записа"
+      },
+      "wordCorrectionThreshold": {
+        "title": "Праг за корекция на думи",
+        "description": "Чувствителност при корекция на персонализирани думи"
+      },
+      "keyboardImplementation": {
+        "title": "Реализация на клавиатурата",
+        "description": "Избор на бекенд за глобалните бързи клавиши.",
+        "bindingsReset": "Бързите клавиши бяха несъвместими и са нулирани към подразбираните"
+      },
+      "paths": {
+        "appData": "Данни на приложението:",
+        "models": "Модели:",
+        "settings": "Настройки:"
       }
     },
     "about": {
@@ -800,6 +578,10 @@
       "version": {
         "title": "Версия",
         "description": "Текуща версия на Handy"
+      },
+      "whatsNewUpdates": {
+        "label": "Показвай новостите",
+        "description": "Показвай бележки към изданието след актуализации на Handy"
       },
       "appDataDirectory": {
         "title": "Папка с данни на приложението",
@@ -822,10 +604,6 @@
           "description": "Високопроизводително изпълнение на автоматичния модел за разпознаване на реч Whisper на OpenAI",
           "details": "Handy използва ggml за бързо локално реч-към-текст. Благодарности на Georgi Gerganov и сътрудниците за отличната работа."
         }
-      },
-      "whatsNewUpdates": {
-        "label": "Показвай новостите",
-        "description": "Показвай бележки към изданието след актуализации на Handy"
       }
     },
     "meeting": {
@@ -834,11 +612,6 @@
       "enabled": {
         "label": "Meeting assistant",
         "description": "When on, every {{interval}} seconds the recent transcript, your project brief and meeting context are sent to the chosen provider so the assistant can decide whether to speak up."
-      },
-      "provider": {
-        "label": "Provider",
-        "description": "Which post-processing provider answers during meetings. Empty uses the post-processing default.",
-        "default": "Same as post-processing"
       },
       "sensitivity": {
         "label": "Sensitivity",
@@ -876,6 +649,9 @@
     "portableUpdateBrowseMessage": "Преносимите инсталации не могат да бъдат актуализирани автоматично. Изтеглете най-новата версия за вашата система от GitHub Releases и я инсталирайте в същата папка — папката Data/ (настройки, модели, записи) остава на мястото си.",
     "portableUpdateBrowseButton": "Отвори GitHub Releases"
   },
+  "whatsNew": {
+    "title": "Ново в Handy v{{version}}"
+  },
   "common": {
     "loading": "Зареждане...",
     "delete": "Изтриване",
@@ -885,27 +661,14 @@
     "clear": "Изчистване",
     "noOptionsFound": "Няма намерени опции"
   },
-  "accessibility": {
-    "permissionsDescription": "Handy се нуждае от разрешения за достъпност, за да въвежда транскрибирания текст.",
-    "openSettings": "Отваряне на системните настройки"
-  },
   "errors": {
     "loadDirectory": "Грешка при зареждане на папката: {{error}}",
     "micPermissionDeniedTitle": "Достъпът до микрофона е отказан",
     "micPermissionDenied": {
-      "generic": "Операционната система отказа достъп до микрофона. Моля, дайте разрешение за микрофон в системните настройки.",
-      "windows": "Включете достъп до микрофона в Настройки → Поверителност и сигурност → Микрофон (включително за настолни приложения).",
-      "macos": "Дайте достъп до микрофона в Системни настройки → Поверителност и сигурност → Микрофон.",
-      "linux": "Дайте достъп до микрофона в настройките за звук или поверителност на системата."
+      "windows": "Включете достъп до микрофона в Настройки → Поверителност и сигурност → Микрофон (включително за настолни приложения)."
     },
-    "noInputDeviceTitle": "Не е намерен микрофон",
-    "noInputDevice": "Не е открито аудио входно устройство. Свържете микрофон или слушалки и опитайте отново.",
-    "recordingFailed": "Стартирането на записа не бе успешно: {{error}}",
     "modelLoadFailed": "Зареждането на модела не бе успешно: {{model}}",
-    "modelLoadFailedUnknown": "неизвестен модел",
-    "pasteFailedTitle": "Неуспешно поставяне на текст",
-    "pasteFailed": "Текстът не можа да бъде поставен в активното приложение.",
-    "transcriptionFailedTitle": "Неуспешна транскрипция"
+    "modelLoadFailedUnknown": "неизвестен модел"
   },
   "appLanguage": {
     "title": "Език на приложението",
@@ -920,23 +683,8 @@
       "dark": "Тъмна"
     }
   },
-  "overlay": {
-    "transcribing": "Транскрибиране...",
-    "processing": "Обработка...",
-    "loadingModel": "Зареждане на модела..."
-  },
-  "whatsNew": {
-    "title": "Ново в Handy v{{version}}"
-  },
   "secureInput": {
-    "blockedWithCulprit_one": "{{name}} може да блокира 1 бърз клавиш",
-    "blockedWithCulprit_other": "{{name}} може да блокира {{count}} бързи клавиша",
-    "blockedNoCulprit_one": "macOS временно блокира 1 бърз клавиш",
-    "blockedNoCulprit_other": "macOS временно блокира {{count}} бързи клавиша",
-    "recorderBlockedWithCulprit": "{{name}} може да блокира промените на бързите клавиши",
-    "recorderBlockedNoCulprit": "macOS временно блокира промените на бързите клавиши",
     "learnMore": "Как да поправите това",
-    "recorderBlocked": "В момента не могат да се записват бързи клавиши — Secure Input на macOS блокира клавишните събития. Първо отстранете предупреждението за Secure Input.",
-    "dismiss": "Отхвърляне"
+    "recorderBlocked": "В момента не могат да се записват бързи клавиши — Secure Input на macOS блокира клавишните събития. Първо отстранете предупреждението за Secure Input."
   }
 }

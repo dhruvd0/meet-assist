@@ -2,21 +2,20 @@
   "tray": {
     "settings": "सेटिंग...",
     "checkUpdates": "अपडेट जांचें...",
-    "copyLastTranscript": "पिछला ट्रांसक्रिप्ट कॉपी करें",
     "unloadModel": "मॉडल अनलोड करें",
     "model": "मॉडल",
     "quit": "बाहर निकलें",
-    "cancel": "रद्द करें",
-    "secureInputWarning": "⚠ Secure Input ने शॉर्टकट ब्लॉक किए हैं"
+    "startMeeting": "Start Meeting",
+    "endMeeting": "End Meeting"
   },
   "sidebar": {
     "projects": "Projects",
     "meetings": "Meetings",
+    "assistant": "Assistant",
+    "audio": "Audio",
     "general": "सामान्य",
     "models": "मॉडल",
     "advanced": "ऐडवांस",
-    "postProcessing": "पोस्ट प्रोसेस",
-    "history": "इतिहास",
     "debug": "डिबग",
     "about": "के बारे में"
   },
@@ -154,11 +153,11 @@
       "failing": "The assistant has failed {{count}} times in a row. Check the provider settings.",
       "lastError": "The assistant's last check failed:",
       "readiness": {
-        "disabled": "The meeting assistant is off. Turn it on under Advanced settings.",
-        "no_provider": "No provider is set for the meeting assistant. Choose one under Advanced settings.",
-        "unsupported_provider": "{{detail}} cannot run the meeting assistant. Choose another provider under Advanced settings.",
-        "missing_api_key": "No API key for {{detail}}. Add one under Post Processing settings.",
-        "no_model": "No model is selected for {{detail}}. Pick one under Post Processing settings."
+        "disabled": "The meeting assistant is off. Turn it on in Assistant.",
+        "no_provider": "No AI provider is set. Choose one in Assistant.",
+        "unsupported_provider": "{{detail}} cannot run the meeting assistant. Choose another provider in Assistant.",
+        "missing_api_key": "No API key for {{detail}}. Add one in Assistant.",
+        "no_model": "No model is selected for {{detail}}. Pick one in Assistant."
       }
     },
     "summary": {
@@ -259,26 +258,6 @@
     "errors": {
       "selectModel": "मॉडल चुना नहीं जा सका"
     },
-    "permissions": {
-      "title": "अनुमतियों की ज़रूरत है",
-      "description": "Handy को ठीक से काम करने के लिए कुछ अनुमतियों की ज़रूरत है.",
-      "microphone": {
-        "title": "माइक्रोफ़ोन ऐक्सेस",
-        "description": "आपकी आवाज़ सुनकर ट्रांसक्रिप्शन करने के लिए ज़रूरी."
-      },
-      "accessibility": {
-        "title": "ऐक्सेसिबिलिटी ऐक्सेस",
-        "description": "ट्रांसक्राइब किया गया टेक्स्ट आपके ऐप्लिकेशन में टाइप करने के लिए ज़रूरी."
-      },
-      "grant": "अनुमति दें",
-      "granted": "अनुमति मिल गई",
-      "waiting": "इंतज़ार किया जा रहा है...",
-      "allGranted": "सब तैयार!",
-      "errors": {
-        "checkFailed": "अनुमतियां जांची नहीं जा सकीं. कृपया फिर से कोशिश करें.",
-        "requestFailed": "अनुमति मांगी नहीं जा सकी. कृपया फिर से कोशिश करें."
-      }
-    },
     "assistant": {
       "title": "Set up your assistant",
       "description": "The meeting assistant and summaries use an LLM provider. Pick one, add your API key if needed, and test the connection.",
@@ -289,8 +268,7 @@
       "failure": "Connection failed: {{error}}",
       "continue": "Continue",
       "skip": "Skip for now",
-      "hint": "You can change this later under Post Processing settings.",
-      "unsupported": "Apple Intelligence cannot be used for meetings. Pick another provider."
+      "hint": "You can change this later in Assistant."
     }
   },
   "modelSelector": {
@@ -334,24 +312,16 @@
     "general": {
       "title": "सामान्य",
       "shortcut": {
-        "title": "Handy शॉर्टकट",
-        "description": "स्पीच-टू-टेक्स्ट रिकॉर्डिंग शुरू करने के लिए कीबोर्ड शॉर्टकट सेट करें",
+        "title": "Shortcut",
+        "description": "Start or end a meeting from anywhere.",
         "loading": "शॉर्टकट लोड हो रहे हैं...",
         "none": "कोई शॉर्टकट सेट नहीं है",
         "notFound": "शॉर्टकट नहीं मिला",
         "pressKeys": "बटन दबाएं...",
         "bindings": {
-          "transcribe": {
-            "name": "ट्रांसक्राइब शॉर्टकट",
-            "description": "आपकी आवाज़ रिकॉर्ड और ट्रांसक्राइब करने के लिए कीबोर्ड शॉर्टकट."
-          },
-          "cancel": {
-            "name": "रद्द करने का शॉर्टकट",
-            "description": "मौजूदा रिकॉर्डिंग रद्द करने के लिए कीबोर्ड शॉर्टकट."
-          },
-          "transcribe_with_post_process": {
-            "name": "पोस्ट-प्रोसेसिंग हॉटकी",
-            "description": "वैकल्पिक: एक अलग हॉटकी जो आपके ट्रांसक्रिप्शन पर हमेशा AI पोस्ट-प्रोसेसिंग लागू करती है."
+          "toggle_meeting": {
+            "name": "Meeting shortcut",
+            "description": "Starts a meeting in your most recent project, or ends the running one."
           }
         },
         "errors": {
@@ -366,19 +336,46 @@
         "searchPlaceholder": "भाषाएं खोजें...",
         "noResults": "कोई भाषा नहीं मिली",
         "auto": "ऑटो"
-      },
-      "shortcutActivation": {
-        "title": "शॉर्टकट का व्यवहार",
-        "description": "चुनें कि ट्रांसक्राइब शॉर्टकट रिकॉर्डिंग को कैसे शुरू और बंद करे।",
-        "options": {
-          "holdOrToggle": "स्वचालित",
-          "pushToTalk": "दबाए रखें",
-          "toggle": "टॉगल"
+      }
+    },
+    "assistant": {
+      "provider": {
+        "title": "AI provider",
+        "description": "The model Meet Assist uses for nudges, summaries, and image digests.",
+        "test": {
+          "button": "Test connection",
+          "ok": "Connected. {{count}} models available."
         },
-        "descriptions": {
-          "hold_or_toggle": "रिकॉर्ड करने के लिए दबाए रखें या टॉगल करने के लिए टैप करें",
-          "push_to_talk": "जब तक आप शॉर्टकट दबाए रखते हैं, रिकॉर्डिंग होती है",
-          "toggle": "रिकॉर्डिंग शुरू करने के लिए शॉर्टकट टैप करें, रोकने के लिए फिर से टैप करें"
+        "select": {
+          "title": "प्रोवाइडर",
+          "description": "कोई OpenAI-संगत या Anthropic-संगत प्रोवाइडर चुनें."
+        },
+        "apiFormat": {
+          "title": "API फ़ॉर्मेट",
+          "description": "वह अनुरोध फ़ॉर्मेट जो आपके कस्टम एंडपॉइंट को चाहिए.",
+          "options": {
+            "openai": "OpenAI संगत (Chat Completions)",
+            "anthropic": "Anthropic Messages"
+          }
+        },
+        "baseUrl": {
+          "title": "बेस URL",
+          "description": "चुने गए प्रोवाइडर के लिए API बेस URL. केवल कस्टम प्रोवाइडर में बदलाव किया जा सकता है.",
+          "placeholder": "https://api.openai.com/v1",
+          "placeholderAnthropic": "https://api.anthropic.com/v1"
+        },
+        "apiKey": {
+          "title": "API कुंजी",
+          "description": "चुने गए प्रोवाइडर के लिए API कुंजी.",
+          "placeholder": "sk-..."
+        },
+        "model": {
+          "title": "मॉडल",
+          "descriptionCustom": "वह मॉडल आईडी डालें जो आपके कस्टम एंडपॉइंट को चाहिए.",
+          "descriptionDefault": "चुने गए प्रोवाइडर का कोई मॉडल चुनें.",
+          "placeholderWithOptions": "मॉडल खोजें या चुनें",
+          "placeholderNoOptions": "मॉडल का नाम लिखें",
+          "refreshModels": "मॉडल रीफ़्रेश करें"
         }
       }
     },
@@ -434,18 +431,12 @@
     "advanced": {
       "groups": {
         "app": "ऐप",
-        "output": "आउटपुट",
         "transcription": "ट्रांसक्रिप्शन",
-        "history": "इतिहास",
         "experimental": "प्रायोगिक"
       },
       "experimentalToggle": {
         "label": "प्रायोगिक सुविधाएं",
         "description": "ऐसी प्रायोगिक सुविधाएं चालू करें जो अभी बन रही हैं."
-      },
-      "lazyStreamClose": {
-        "label": "ट्रांसक्रिप्शन के बीच माइक खुला रखें",
-        "description": "रिकॉर्डिंग रुकने के बाद माइक्रोफ़ोन स्ट्रीम को 30 सेकंड तक खुला रखता है, जिससे लगातार ट्रांसक्रिप्शन के बीच देरी कम होती है. चालू रहने के दौरान Bluetooth ऑडियो की क्वालिटी पर असर पड़ सकता है."
       },
       "acceleration": {
         "transcribe": {
@@ -471,64 +462,6 @@
       "showTrayIcon": {
         "label": "ट्रे आइकन दिखाएं",
         "description": "सिस्टम ट्रे में Handy का आइकन दिखाएं."
-      },
-      "overlay": {
-        "style": {
-          "title": "ओवरले",
-          "description": "रिकॉर्डिंग ओवरले चुनें: 'कोई नहीं' इसे छिपा देता है, 'मिनिमल' एक छोटा इंडिकेटर दिखाता है, 'लाइव' बोलते समय रीयल टाइम में ट्रांसक्रिप्शन दिखाता है (केवल स्ट्रीमिंग वाले मॉडल — मॉडल पिकर में 'स्ट्रीमिंग' बैज देखें). Linux पर 'कोई नहीं' चुनने का सुझाव दिया जाता है.",
-          "options": {
-            "none": "कोई नहीं",
-            "minimal": "मिनिमल",
-            "live": "लाइव"
-          }
-        },
-        "position": {
-          "title": "ओवरले की जगह",
-          "description": "रिकॉर्डिंग और ट्रांसक्रिप्शन के दौरान ओवरले स्क्रीन पर कहां दिखे.",
-          "options": {
-            "bottom": "नीचे",
-            "top": "ऊपर"
-          }
-        }
-      },
-      "pasteMethod": {
-        "title": "पेस्ट करने का तरीका",
-        "description": "चुनें कि टेक्स्ट कैसे डाला जाए. 'डायरेक्ट': सिस्टम इनपुट के ज़रिए सीधे टाइप करता है. 'कोई नहीं': पेस्ट नहीं करता, केवल इतिहास/क्लिपबोर्ड अपडेट करता है.",
-        "options": {
-          "clipboard": "क्लिपबोर्ड ({{modifier}}+V)",
-          "clipboardCtrlShiftV": "क्लिपबोर्ड (Ctrl+Shift+V)",
-          "clipboardShiftInsert": "क्लिपबोर्ड (Shift+Insert)",
-          "direct": "डायरेक्ट",
-          "none": "कोई नहीं",
-          "externalScript": "बाहरी स्क्रिप्ट"
-        },
-        "externalScriptPlaceholder": "/path/to/your/script.sh"
-      },
-      "typingTool": {
-        "title": "टाइपिंग टूल",
-        "description": "चुनें कि 'डायरेक्ट' पेस्ट के लिए कौन सा Linux टाइपिंग टूल इस्तेमाल किया जाए. 'ऑटो' आपके सिस्टम के लिए सबसे अच्छा उपलब्ध टूल अपने आप चुन लेता है.",
-        "options": {
-          "auto": "ऑटो (सुझाया गया)"
-        }
-      },
-      "clipboardHandling": {
-        "title": "क्लिपबोर्ड मैनेजमेंट",
-        "description": "'क्लिपबोर्ड न बदलें' ट्रांसक्रिप्शन के बाद आपके क्लिपबोर्ड का मौजूदा कॉन्टेंट सुरक्षित रखता है. 'क्लिपबोर्ड पर कॉपी करें' पेस्ट करने के बाद ट्रांसक्रिप्शन का नतीजा आपके क्लिपबोर्ड में छोड़ देता है.",
-        "options": {
-          "dontModify": "क्लिपबोर्ड न बदलें",
-          "copyToClipboard": "क्लिपबोर्ड पर कॉपी करें"
-        }
-      },
-      "autoSubmit": {
-        "title": "ऑटो सबमिट",
-        "description": "टेक्स्ट डालने के बाद, चुना गया बटन कॉम्बिनेशन अपने आप भेजें. macOS पर Cmd+Enter लागू होता है, जबकि Windows/Linux पर Super+Enter इस्तेमाल होता है.",
-        "options": {
-          "off": "बंद",
-          "enter": "Enter",
-          "cmdEnter": "Cmd+Enter",
-          "superEnter": "Super+Enter",
-          "ctrlEnter": "Ctrl+Enter"
-        }
       },
       "translateToEnglish": {
         "label": "अंग्रेज़ी में अनुवाद करें",
@@ -582,85 +515,6 @@
         }
       }
     },
-    "postProcessing": {
-      "hotkey": {
-        "title": "हॉटकी"
-      },
-      "api": {
-        "title": "API",
-        "provider": {
-          "title": "प्रोवाइडर",
-          "description": "कोई OpenAI-संगत या Anthropic-संगत प्रोवाइडर चुनें."
-        },
-        "apiFormat": {
-          "title": "API फ़ॉर्मेट",
-          "description": "वह अनुरोध फ़ॉर्मेट जो आपके कस्टम एंडपॉइंट को चाहिए.",
-          "options": {
-            "openai": "OpenAI संगत (Chat Completions)",
-            "anthropic": "Anthropic Messages"
-          }
-        },
-        "appleIntelligence": {
-          "unavailable": "Apple Intelligence इस डिवाइस पर उपलब्ध नहीं है. इसके लिए macOS Tahoe (26.0) या उसके बाद का वर्शन चलाने वाला Apple Silicon Mac चाहिए, जिसमें System Settings में Apple Intelligence चालू हो."
-        },
-        "baseUrl": {
-          "title": "बेस URL",
-          "description": "चुने गए प्रोवाइडर के लिए API बेस URL. केवल कस्टम प्रोवाइडर में बदलाव किया जा सकता है.",
-          "placeholder": "https://api.openai.com/v1",
-          "placeholderAnthropic": "https://api.anthropic.com/v1"
-        },
-        "apiKey": {
-          "title": "API कुंजी",
-          "description": "चुने गए प्रोवाइडर के लिए API कुंजी.",
-          "placeholder": "sk-..."
-        },
-        "model": {
-          "title": "मॉडल",
-          "descriptionCustom": "वह मॉडल आईडी डालें जो आपके कस्टम एंडपॉइंट को चाहिए.",
-          "descriptionDefault": "चुने गए प्रोवाइडर का कोई मॉडल चुनें.",
-          "placeholderWithOptions": "मॉडल खोजें या चुनें",
-          "placeholderNoOptions": "मॉडल का नाम लिखें",
-          "refreshModels": "मॉडल रीफ़्रेश करें"
-        }
-      },
-      "prompts": {
-        "title": "प्रॉम्प्ट",
-        "selectedPrompt": {
-          "title": "चुना गया प्रॉम्प्ट",
-          "description": "ट्रांसक्रिप्शन को बेहतर बनाने के लिए कोई टेम्पलेट चुनें या नया बनाएं. प्रॉम्प्ट टेक्स्ट में कैप्चर किए गए ट्रांसक्रिप्ट का इस्तेमाल करने के लिए ${output} लिखें."
-        },
-        "noPrompts": "कोई प्रॉम्प्ट उपलब्ध नहीं है",
-        "selectPrompt": "कोई प्रॉम्प्ट चुनें",
-        "createNew": "नया प्रॉम्प्ट बनाएं",
-        "promptLabel": "प्रॉम्प्ट का लेबल",
-        "promptLabelPlaceholder": "प्रॉम्प्ट का नाम डालें",
-        "promptInstructions": "प्रॉम्प्ट के निर्देश",
-        "promptInstructionsPlaceholder": "ट्रांसक्रिप्शन के बाद चलाने के लिए निर्देश लिखें. उदाहरण: इस टेक्स्ट का व्याकरण और स्पष्टता सुधारें: ${output}",
-        "promptTip": "सुझाव: अपने प्रॉम्प्ट में ट्रांसक्राइब किया गया टेक्स्ट डालने के लिए <code>${output}</code> का इस्तेमाल करें.",
-        "updatePrompt": "प्रॉम्प्ट अपडेट करें",
-        "deletePrompt": "प्रॉम्प्ट हटाएं",
-        "createPrompt": "प्रॉम्प्ट बनाएं",
-        "cancel": "रद्द करें",
-        "selectToEdit": "जानकारी देखने और बदलाव करने के लिए, ऊपर कोई प्रॉम्प्ट चुनें.",
-        "createFirst": "अपना पहला पोस्ट-प्रोसेसिंग प्रॉम्प्ट बनाने के लिए, ऊपर 'नया प्रॉम्प्ट बनाएं' पर क्लिक करें."
-      }
-    },
-    "history": {
-      "title": "इतिहास",
-      "openFolder": "रिकॉर्डिंग फ़ोल्डर खोलें",
-      "loading": "इतिहास लोड हो रहा है...",
-      "empty": "अभी तक कोई ट्रांसक्रिप्शन नहीं है. अपना इतिहास बनाने के लिए रिकॉर्डिंग शुरू करें!",
-      "copyToClipboard": "ट्रांसक्रिप्शन क्लिपबोर्ड पर कॉपी करें",
-      "copyError": "ट्रांसक्रिप्शन को क्लिपबोर्ड पर कॉपी नहीं किया जा सका.",
-      "save": "ट्रांसक्रिप्शन सेव करें",
-      "unsave": "सेव किए गए से हटाएं",
-      "delete": "एंट्री हटाएं",
-      "deleteError": "एंट्री हटाई नहीं जा सकी. कृपया फिर से कोशिश करें.",
-      "retranscribe": "फिर से ट्रांसक्राइब करें",
-      "retranscribeError": "फिर से ट्रांसक्राइब नहीं किया जा सका. कृपया फिर से कोशिश करें.",
-      "transcribing": "ट्रांसक्राइब हो रहा है...",
-      "transcriptionFailed": "ट्रांसक्रिप्शन नहीं हो सका. आप रीट्राई आइकन से फिर से ट्रांसक्राइब कर सकते हैं."
-    },
     "debug": {
       "title": "डिबग",
       "logDirectory": {
@@ -697,7 +551,6 @@
       "onboardingPreview": {
         "title": "शुरुआती सेटअप की झलक",
         "description": "अनुमतियों, मॉडल या पूर्णता स्थिति को बदले बिना शुरुआती सेटअप स्क्रीन की झलक देखें",
-        "permissionsButton": "अनुमतियाँ",
         "modelsButton": "मॉडल चयन",
         "exitButton": "झलक से बाहर निकलें"
       },
@@ -709,41 +562,6 @@
         "title": "शब्द सुधार की सीमा",
         "description": "कस्टम शब्द सुधार की संवेदनशीलता"
       },
-      "historyLimit": {
-        "title": "इतिहास की सीमा",
-        "description": "ज़्यादा से ज़्यादा कितनी इतिहास एंट्री रखी जाएं",
-        "entries": "एंट्री"
-      },
-      "recordingRetention": {
-        "title": "रिकॉर्डिंग अपने आप हटाएं",
-        "description": "जगह बचाने के लिए पुरानी रिकॉर्डिंग अपने आप हटाएं",
-        "never": "कभी नहीं",
-        "preserveLimit": "सबसे नई {{count}} रखें",
-        "days3": "3 दिन बाद",
-        "weeks2": "2 हफ़्ते बाद",
-        "months3": "3 महीने बाद",
-        "placeholder": "कितने समय तक रखें, यह चुनें..."
-      },
-      "alwaysOnMicrophone": {
-        "label": "हमेशा चालू माइक्रोफ़ोन",
-        "description": "तेज़ी से काम करने के लिए माइक्रोफ़ोन चालू रखें"
-      },
-      "clamshellMicrophone": {
-        "title": "क्लैमशेल माइक्रोफ़ोन",
-        "description": "लैपटॉप का ढक्कन बंद होने पर इस्तेमाल होने वाला माइक्रोफ़ोन"
-      },
-      "postProcessingToggle": {
-        "label": "पोस्ट प्रोसेसिंग",
-        "description": "ट्रांसक्रिप्शन के बाद AI की मदद से टेक्स्ट सुधारने की सुविधा चालू करें"
-      },
-      "muteWhileRecording": {
-        "label": "रिकॉर्डिंग के दौरान म्यूट करें",
-        "description": "रिकॉर्डिंग के दौरान सिस्टम ऑडियो म्यूट करें"
-      },
-      "appendTrailingSpace": {
-        "label": "आखिर में स्पेस जोड़ें",
-        "description": "पेस्ट किए गए ट्रांसक्रिप्शन के बाद एक स्पेस जोड़ें"
-      },
       "keyboardImplementation": {
         "title": "कीबोर्ड बैकएंड",
         "description": "कीबोर्ड शॉर्टकट का बैकएंड चुनें.",
@@ -753,46 +571,6 @@
         "appData": "ऐप डेटा:",
         "models": "मॉडल:",
         "settings": "सेटिंग:"
-      },
-      "pasteDelay": {
-        "title": "पेस्ट में देरी (पहले)",
-        "description": "टेक्स्ट कॉपी होने के बाद और पेस्ट कीस्ट्रोक भेजने से पहले की देरी (मिलीसेकंड में). अगर कुछ भी पेस्ट न हो रहा हो, तो इसे बढ़ाएं."
-      },
-      "pasteDelayAfter": {
-        "title": "पेस्ट में देरी (बाद में)",
-        "description": "पेस्ट कीस्ट्रोक के बाद और आपका पिछला क्लिपबोर्ड वापस लाने से पहले की देरी (मिलीसेकंड में). अगर ट्रांसक्रिप्शन की जगह आपके क्लिपबोर्ड का पुराना कॉन्टेंट पेस्ट हो रहा हो, तो इसे बढ़ाएं."
-      },
-      "holdThreshold": {
-        "title": "दबाए रखने की सीमा",
-        "description": "केवल स्वचालित मोड में: शॉर्टकट को कितनी देर (मिलीसेकंड में) दबाए रखना होगा ताकि उसे टैप के बजाय दबाए रखना माना जाए। यदि थोड़ी देर दबाए रखने के बाद भी रिकॉर्डिंग चलती रह जाती है तो इसे कम करें; यदि जानबूझकर किए गए टैप को दबाए रखना मान लिया जाता है तो इसे बढ़ाएँ।"
-      },
-      "reliablePaste": {
-        "title": "भरोसेमंद पेस्ट (Beta)",
-        "description": "क्लिपबोर्ड को तय देरी के बाद नहीं, बल्कि टारगेट ऐप असल में ट्रांसक्रिप्शन पढ़ लेने के बाद ही वापस लाएं. यह सिस्टम पर लोड होने के दौरान पुराना क्लिपबोर्ड कॉन्टेंट पेस्ट होने की समस्या ठीक करने के लिए है. इसके लिए क्लिपबोर्ड वाला पेस्ट तरीका ज़रूरी है; सिर्फ़ macOS और Windows पर."
-      },
-      "recordingBuffer": {
-        "title": "अतिरिक्त रिकॉर्डिंग बफ़र",
-        "description": "बटन छोड़ने के बाद भी रिकॉर्डिंग जारी रखने का अतिरिक्त समय (मिलीसेकंड में), ताकि आखिरी हिस्से का ऑडियो कैप्चर हो सके. 0 = कोई अतिरिक्त बफ़र नहीं."
-      },
-      "keyboardDiagnostic": {
-        "title": "कीबोर्ड डायग्नोस्टिक",
-        "description": "जाँचता है कि कीबोर्ड इवेंट Handy तक पहुँच रहे हैं या नहीं. सिर्फ़ इवेंट की गिनती रिकॉर्ड होती है — कभी नहीं कि आपने कौन-सी कुंजियाँ दबाईं.",
-        "run": "10 सेकंड का डायग्नोस्टिक चलाएँ",
-        "running": "सुन रहे हैं… अपना शॉर्टकट कुछ बार दबाएँ (जैसे Option+Space)",
-        "secureInputLabel": "Secure Input",
-        "enabled": "चालू",
-        "disabled": "बंद",
-        "holder": "{{name}} (pid {{pid}}) ने रोका हुआ है",
-        "holderUnknown": "कोई दिखने वाला ऐप नहीं",
-        "keyDown": "कुंजी दबाई",
-        "keyUp": "कुंजी छोड़ी",
-        "flagsChanged": "मॉडिफ़ायर",
-        "mouse": "माउस",
-        "verdictBlocked": "Secure Input कुंजी इवेंट ब्लॉक कर रहा है — जब तक यह हल नहीं होता, सामान्य कुंजी वाले शॉर्टकट काम नहीं कर सकते.",
-        "verdictSuspicious": "मॉडिफ़ायर इवेंट आए, लेकिन कोई कुंजी इवेंट नहीं — Secure Input के बंद दिखने के बावजूद कुछ कुंजियों को दबा रहा है. कृपया इसकी रिपोर्ट GitHub पर करें.",
-        "verdictOk": "कुंजी इवेंट Handy तक सामान्य रूप से पहुँच रहे हैं.",
-        "verdictNoEvents": "कोई इवेंट कैप्चर नहीं हुआ — क्या आपने टेस्ट के दौरान कोई कुंजी दबाई थी?",
-        "failed": "डायग्नोस्टिक विफल: {{error}}"
       }
     },
     "about": {
@@ -834,11 +612,6 @@
       "enabled": {
         "label": "Meeting assistant",
         "description": "When on, every {{interval}} seconds the recent transcript, your project brief and meeting context are sent to the chosen provider so the assistant can decide whether to speak up."
-      },
-      "provider": {
-        "label": "Provider",
-        "description": "Which post-processing provider answers during meetings. Empty uses the post-processing default.",
-        "default": "Same as post-processing"
       },
       "sensitivity": {
         "label": "Sensitivity",
@@ -888,27 +661,14 @@
     "clear": "मिटाएं",
     "noOptionsFound": "कोई विकल्प नहीं मिला"
   },
-  "accessibility": {
-    "permissionsDescription": "ट्रांसक्राइब किया गया टेक्स्ट टाइप करने के लिए, Handy को ऐक्सेसिबिलिटी अनुमतियों की ज़रूरत है.",
-    "openSettings": "सिस्टम सेटिंग खोलें"
-  },
   "errors": {
     "loadDirectory": "फ़ोल्डर लोड करने में गड़बड़ी: {{error}}",
     "micPermissionDeniedTitle": "माइक्रोफ़ोन का ऐक्सेस नहीं दिया गया",
     "micPermissionDenied": {
-      "generic": "ऑपरेटिंग सिस्टम ने माइक्रोफ़ोन का ऐक्सेस नहीं दिया. कृपया अपनी सिस्टम सेटिंग में जाकर माइक्रोफ़ोन की अनुमति दें.",
-      "windows": "Settings → Privacy & security → Microphone में माइक्रोफ़ोन ऐक्सेस चालू करें (डेस्कटॉप ऐप ऐक्सेस समेत).",
-      "macos": "System Settings → Privacy & Security → Microphone में माइक्रोफ़ोन का ऐक्सेस दें.",
-      "linux": "अपने सिस्टम की साउंड या प्राइवेसी सेटिंग में माइक्रोफ़ोन का ऐक्सेस दें."
+      "windows": "Settings → Privacy & security → Microphone में माइक्रोफ़ोन ऐक्सेस चालू करें (डेस्कटॉप ऐप ऐक्सेस समेत)."
     },
-    "noInputDeviceTitle": "कोई माइक्रोफ़ोन नहीं मिला",
-    "noInputDevice": "कोई ऑडियो इनपुट डिवाइस नहीं मिला. कृपया माइक्रोफ़ोन या हेडसेट कनेक्ट करके फिर से कोशिश करें.",
-    "recordingFailed": "रिकॉर्डिंग शुरू नहीं हो सकी: {{error}}",
     "modelLoadFailed": "मॉडल लोड नहीं हो सका: {{model}}",
-    "modelLoadFailedUnknown": "अज्ञात मॉडल",
-    "pasteFailedTitle": "टेक्स्ट पेस्ट नहीं हो सका",
-    "pasteFailed": "खुले हुए ऐप्लिकेशन में टेक्स्ट पेस्ट नहीं किया जा सका.",
-    "transcriptionFailedTitle": "ट्रांसक्रिप्शन नहीं हो सका"
+    "modelLoadFailedUnknown": "अज्ञात मॉडल"
   },
   "appLanguage": {
     "title": "ऐप्लिकेशन की भाषा",
@@ -923,20 +683,8 @@
       "dark": "डार्क"
     }
   },
-  "overlay": {
-    "transcribing": "ट्रांसक्राइब हो रहा है...",
-    "processing": "प्रोसेस हो रहा है...",
-    "loadingModel": "मॉडल लोड हो रहा है..."
-  },
   "secureInput": {
-    "blockedWithCulprit_one": "{{name}} शायद 1 शॉर्टकट को ब्लॉक कर रहा है",
-    "blockedWithCulprit_other": "{{name}} शायद {{count}} शॉर्टकट को ब्लॉक कर रहा है",
-    "blockedNoCulprit_one": "macOS अस्थायी रूप से 1 शॉर्टकट को ब्लॉक कर रहा है",
-    "blockedNoCulprit_other": "macOS अस्थायी रूप से {{count}} शॉर्टकट को ब्लॉक कर रहा है",
-    "recorderBlockedWithCulprit": "{{name}} शायद शॉर्टकट में बदलाव को ब्लॉक कर रहा है",
-    "recorderBlockedNoCulprit": "macOS अस्थायी रूप से शॉर्टकट में बदलाव को ब्लॉक कर रहा है",
     "learnMore": "इसे कैसे ठीक करें",
-    "recorderBlocked": "अभी शॉर्टकट रिकॉर्ड नहीं किए जा सकते — macOS Secure Input कुंजी इवेंट ब्लॉक कर रहा है. पहले Secure Input चेतावनी हल करें.",
-    "dismiss": "खारिज करें"
+    "recorderBlocked": "अभी शॉर्टकट रिकॉर्ड नहीं किए जा सकते — macOS Secure Input कुंजी इवेंट ब्लॉक कर रहा है. पहले Secure Input चेतावनी हल करें."
   }
 }
