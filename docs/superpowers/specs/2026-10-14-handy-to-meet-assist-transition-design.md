@@ -56,7 +56,8 @@ Removed pages: History, Post Processing.
 
 - The assistant on/off toggle stays. It is the privacy opt-in that gates every cloud call (observer, summaries, digests). Its meaning does not change.
 - The provider card sits above the toggle on the same page and is always editable.
-- Turning the assistant on with no usable provider (no model chosen, or a cloud provider with an empty key) keeps the toggle on and highlights the provider card with an inline message saying what is missing. Nothing navigates away.
+- Turning the assistant on with no usable provider (no model chosen, or a non-local provider with an empty key) keeps the toggle on and shows an inline message above the provider card saying what is missing. Nothing navigates away.
+- The missing-piece message reuses the backend's `get_observer_readiness` command and the existing `meetings.observer.readiness.*` strings, reworded to point at the Assistant page. The rule is not duplicated in TypeScript.
 - "Test connection" calls the existing model-listing command (`fetch_post_process_models`, renamed below) and reports success or the provider's error text.
 - `MeetingAssistantSettings` and the components in `PostProcessingSettingsApi/` move under a new `src/components/settings/assistant/` folder. `AssistantOnboarding` imports them from there. No new UI primitives.
 
@@ -72,14 +73,14 @@ Meetings depend on `AudioRecordingManager` and the transcription manager. They d
 - `managers/history.rs`, `commands/history.rs`
 - `apple_intelligence.rs` (only a post-processing provider; the meeting LLM never calls it)
 - `overlay.rs`, after moving `get_monitor_with_cursor` into `intervention.rs`
-- In `actions.rs`: the transcribe, transcribe-with-post-process, and cancel actions and the post-process prompt code. The `ShortcutAction` trait and `ACTION_MAP` stay for the new action.
+- `actions.rs` entirely. The one remaining binding is routed directly in `shortcut/handler.rs` to `meeting::toggle::toggle_meeting`, which also serves the tray, `--toggle-meeting`, and SIGUSR2.
 - `signal_handle.rs` logic tied to dictation; it now forwards only the meeting toggle.
 - Enigo initialisation (`initialize_enigo` command) and the accessibility permission check.
 
 ### Kept and trimmed
 
-- `AudioRecordingManager`. A recording-related setting stays only if meeting capture reads it. The implementation plan greps each of these before deciding: `mute_while_recording`, `always_on_microphone`, clamshell microphone, lazy stream close. Settings read only by the dictation recorder are deleted.
-- `chinese_script.rs`, if meeting transcript lines use it. Otherwise deleted.
+- `managers/audio.rs` keeps only `create_capture_vad` and `microphone_config`. Planning found that meeting capture (`meeting/capture.rs`, `meeting/system_capture.rs`) uses only those two helpers plus the `selected_microphone`, `selected_channel`, and `vad_backend` settings. `AudioRecordingManager` is the dictation recorder, so it is deleted along with always-on microphone, mute while recording, clamshell microphone, lazy stream close, and extra recording buffer. The model idle-unload check keeps only the "meeting is live" guard.
+- `chinese_script.rs`, translate-to-English, custom words, and filler-word removal stay: `TranscriptionManager` applies them to meeting transcripts.
 - Dev CLI: `--transcribe-file`, `--model`, `--device-index`, `--list-devices`, `--list-models`, `--repeat`, `--json`.
 
 ### Shortcut
@@ -125,7 +126,7 @@ Deleted fields include `post_process_enabled`, `post_process_prompts`, `post_pro
 
 ## Frontend removal
 
-Deleted components: `PasteMethod`, `TypingTool`, `ClipboardHandling`, `AutoSubmit`, `AppendTrailingSpace`, `PostProcessingToggle`, `PostProcessingSettingsPrompts`, `post-processing/`, `history/`, `ShortcutActivation`, `ShowOverlay`, `HistoryLimit`, `RecordingRetentionPeriod`, `AccessibilityPermissions`, `SecureInputWarning`, `onboarding/AccessibilityOnboarding`, the overlay window entry under `src/overlay/`, and debug panels for paste delay, reliable paste, and keyboard diagnostics tied to dictation. `MuteWhileRecording`, `AlwaysOnMicrophone`, `ClamshellMicrophoneSelector`, and `LazyStreamClose` follow the backend grep decision.
+Deleted components: `PasteMethod`, `TypingTool`, `ClipboardHandling`, `AutoSubmit`, `AppendTrailingSpace`, `PostProcessingToggle`, `PostProcessingSettingsPrompts`, `post-processing/`, `history/`, `ShortcutActivation`, `ShowOverlay`, `HistoryLimit`, `RecordingRetentionPeriod`, `AccessibilityPermissions`, `SecureInputWarning`, `onboarding/AccessibilityOnboarding`, the overlay window entry under `src/overlay/`, and debug panels for paste delay, reliable paste, and keyboard diagnostics tied to dictation. `MuteWhileRecording`, `AlwaysOnMicrophone`, `ClamshellMicrophoneSelector`, and `LazyStreamClose` are deleted with the recorder.
 
 Onboarding drops the accessibility step: model, then assistant, then done.
 
@@ -187,5 +188,5 @@ Manual, on macOS with `bun run tauri dev`:
 ## Risks
 
 - **Dead shared code.** Removing dictation may leave helpers that only the deleted code called. Clippy's dead-code warnings, enforced with `-D warnings`, catch these.
-- **Hidden coupling to `AudioRecordingManager` settings.** The per-setting grep in the plan decides each one. When unsure, keep the setting.
+- **Stale shortcut bindings.** Old stores contain `transcribe`, `transcribe_with_post_process`, and `cancel` bindings, and the load path only adds bindings, never removes them. The schema 3 migration prunes them and carries the `transcribe` combo over to `toggle_meeting`.
 - **Fewer tests.** Regressions in observer, session, and capture logic are now caught only by the manual pass. This trade-off was chosen deliberately.
