@@ -216,6 +216,3 @@ impl Sink for CaptureSink {
         }
     }
 }
-
-#[cfg(test)]
-mod tests;

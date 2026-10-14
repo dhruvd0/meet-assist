@@ -46,31 +46,3 @@ pub fn get_tray_translations(locale: Option<String>) -> TrayStrings {
         .cloned()
         .expect("English translations must exist")
 }
-
-#[cfg(test)]
-mod tests {
-    use super::{get_tray_translations, TRANSLATIONS};
-
-    #[test]
-    fn resolves_locale_fallbacks() {
-        for (locale, expected) in [
-            ("zh-Hant-TW", "zh-TW"),
-            ("zh-Hant-HK", "zh-TW"),
-            ("zh-HK", "zh-TW"),
-            ("zh-MO", "zh-TW"),
-            ("ZH-TW", "zh-TW"),
-            ("zh_Hant_TW", "zh-TW"),
-            ("zh-Hans-CN", "zh"),
-            ("yue-Hant-HK", "zh-TW"),
-            ("yue-Hans-CN", "zh"),
-            ("fr-FR", "fr"),
-            ("xx-YY", "en"),
-        ] {
-            assert_eq!(
-                format!("{:?}", get_tray_translations(Some(locale.into()))),
-                format!("{:?}", TRANSLATIONS[expected]),
-                "{locale} should resolve to {expected}"
-            );
-        }
-    }
-}

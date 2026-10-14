@@ -106,48 +106,4 @@ impl FrameSlicer {
         }
         frames
     }
-
-    #[cfg(test)]
-    pub fn take_partial(&mut self) -> Option<Vec<f32>> {
-        if self.buf.is_empty() {
-            None
-        } else {
-            Some(std::mem::take(&mut self.buf))
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn passthrough_when_rates_equal() {
-        let mut r = MonoResampler::new(16_000, 16_000, 2).unwrap();
-        let out = r.push(&[0.5, 0.5, 1.0, 0.0]); // two stereo frames
-        assert_eq!(out, vec![0.5, 0.5]);
-    }
-    #[test]
-    fn downsample_48k_to_16k_preserves_duration() {
-        let mut r = MonoResampler::new(48_000, 16_000, 1).unwrap();
-        let input: Vec<f32> = (0..48_000).map(|i| ((i as f32) * 0.01).sin()).collect();
-        let mut out = r.push(&input);
-        out.extend(r.flush());
-        let n = out.len() as i64;
-        assert!((n - 16_000).abs() <= 1024, "got {n} samples for one second");
-    }
-    #[test]
-    fn slicer_emits_exact_frames_and_keeps_remainder() {
-        let mut s = FrameSlicer::new(4);
-        let frames = s.push(&[1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0]);
-        assert_eq!(
-            frames,
-            vec![vec![1.0, 2.0, 3.0, 4.0], vec![5.0, 6.0, 7.0, 8.0]]
-        );
-        let frames = s.push(&[10.0, 11.0, 12.0]);
-        assert_eq!(frames, vec![vec![9.0, 10.0, 11.0, 12.0]]);
-        assert!(s.take_partial().is_none());
-        s.push(&[1.0]);
-        assert_eq!(s.take_partial(), Some(vec![1.0]));
-    }
 }

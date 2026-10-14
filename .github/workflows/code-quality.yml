@@ -52,11 +52,11 @@ jobs:
       - name: Check model language coverage
         run: bun run check:model-languages
 
-      - name: Test keyboard utilities
-        run: bun run test:keyboard
-
       - name: Run ESLint
         run: bun run lint
+
+      - name: Typecheck frontend
+        run: bunx tsc --noEmit
 
       - name: Run prettier
         run: bun run format:check

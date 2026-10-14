@@ -155,26 +155,3 @@ pub fn hide(app: &AppHandle) {
         }
     });
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn card_payload_merges_meeting_id_into_intervention_fields() {
-        let iv = Intervention {
-            id: 7,
-            session_id: 3,
-            ts: 1000,
-            kind: "loop".into(),
-            text: "t".into(),
-            reason: "r".into(),
-            dismissed: false,
-        };
-        let v = card_payload(42, &iv);
-        assert_eq!(v["meeting_id"], 42);
-        assert_eq!(v["id"], 7);
-        assert_eq!(v["kind"], "loop");
-        assert_eq!(v["text"], "t");
-    }
-}

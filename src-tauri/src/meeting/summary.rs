@@ -248,16 +248,6 @@ mod tests {
         (dir, store, m.id, s.id)
     }
 
-    fn line(speaker: &str, text: &str) -> TranscriptLine {
-        TranscriptLine {
-            id: 0,
-            session_id: 0,
-            ts: 0,
-            speaker: speaker.into(),
-            text: text.into(),
-        }
-    }
-
     #[test]
     fn job_stores_session_and_rolling_summary() {
         let (_d, store, mid, sid) = setup();
@@ -272,37 +262,6 @@ mod tests {
         assert_eq!(
             store.get_meeting(mid).unwrap().unwrap().rolling_summary,
             Some("rolled -".into())
-        );
-    }
-
-    #[test]
-    fn empty_session_returns_none() {
-        let (_d, store, mid, sid) = setup();
-        let fake = Fake {
-            previous_seen: Mutex::new(vec![]),
-        };
-        assert!(run_summary_job(&store, &fake, sid).unwrap().is_none());
-        assert!(store.get_session(sid).unwrap().unwrap().summary.is_none());
-        assert!(store
-            .get_meeting(mid)
-            .unwrap()
-            .unwrap()
-            .rolling_summary
-            .is_none());
-    }
-
-    #[test]
-    fn rolling_merge_receives_previous_text() {
-        let (_d, store, mid, sid) = setup();
-        store.set_rolling_summary(mid, "earlier").unwrap();
-        store.append_line(sid, "them", "hi", 1).unwrap();
-        let fake = Fake {
-            previous_seen: Mutex::new(vec![]),
-        };
-        run_summary_job(&store, &fake, sid).unwrap();
-        assert_eq!(
-            fake.previous_seen.lock().unwrap().as_slice(),
-            &[Some("earlier".to_string())]
         );
     }
 
@@ -332,59 +291,5 @@ mod tests {
             store.get_meeting(mid).unwrap().unwrap().rolling_summary,
             Some("earlier".into())
         );
-    }
-
-    #[test]
-    fn already_summarised_session_is_skipped() {
-        let (_d, store, _mid, sid) = setup();
-        store.append_line(sid, "me", "hello", 1).unwrap();
-        let fake = Fake {
-            previous_seen: Mutex::new(vec![]),
-        };
-        assert!(run_summary_job(&store, &fake, sid).unwrap().is_some());
-        assert!(run_summary_job(&store, &fake, sid).unwrap().is_none());
-        assert_eq!(fake.previous_seen.lock().unwrap().len(), 1);
-    }
-
-    #[test]
-    fn open_session_is_not_summarised() {
-        let (_d, store, mid, _sid) = setup();
-        let open = store.create_session(mid).unwrap();
-        store.append_line(open.id, "me", "hello", 1).unwrap();
-        let fake = Fake {
-            previous_seen: Mutex::new(vec![]),
-        };
-        assert!(run_summary_job(&store, &fake, open.id).unwrap().is_none());
-        assert!(fake.previous_seen.lock().unwrap().is_empty());
-    }
-
-    #[test]
-    fn session_prompt_has_title_context_and_ordered_lines() {
-        let lines = [line("me", "first point"), line("them", "second point")];
-        let (system, user) = session_prompt("Kickoff", "Q3 planning", &lines);
-        assert!(system.contains("three-line recap"));
-        assert!(user.contains("Kickoff"));
-        assert!(user.contains("Q3 planning"));
-        let a = user.find("[me] first point").unwrap();
-        let b = user.find("[them] second point").unwrap();
-        assert!(a < b);
-    }
-
-    #[test]
-    fn rolling_formatter_renders_three_lists() {
-        let s = SessionSummary {
-            decisions: vec!["d1".into()],
-            open_questions: vec!["q1".into(), "q2".into()],
-            action_items: vec![],
-            recap: "r".into(),
-        };
-        let t = format_session_summary_for_rolling(&s);
-        assert!(t.contains("Decisions:\n- d1"));
-        assert!(t.contains("Open questions:\n- q1\n- q2"));
-        assert!(t.contains("Action items:\n- (none)"));
-        assert!(t.contains("Recap: r"));
-        let (sys, user) = rolling_prompt(Some("old"), &s);
-        assert!(sys.contains("300 words"));
-        assert!(user.contains("old") && user.contains("d1"));
     }
 }

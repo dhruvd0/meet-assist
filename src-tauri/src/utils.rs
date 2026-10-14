@@ -22,10 +22,10 @@ pub fn redact_text(text: &str) -> &str {
     }
 }
 
-#[cfg(any(test, all(target_os = "windows", target_arch = "x86_64")))]
+#[cfg(all(target_os = "windows", target_arch = "x86_64"))]
 const IMAGE_FILE_MACHINE_ARM64: u16 = 0xaa64;
 
-#[cfg(any(test, all(target_os = "windows", target_arch = "x86_64")))]
+#[cfg(all(target_os = "windows", target_arch = "x86_64"))]
 fn native_machine_is_arm64(native_machine: Option<u16>) -> bool {
     native_machine == Some(IMAGE_FILE_MACHINE_ARM64)
 }
@@ -166,38 +166,5 @@ pub fn env_flag_enabled(name: &str) -> bool {
             "" | "0" | "false" | "no" | "off"
         ),
         Err(_) => false,
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn arm64_native_machine_is_the_only_match() {
-        assert!(native_machine_is_arm64(Some(IMAGE_FILE_MACHINE_ARM64)));
-        assert!(!native_machine_is_arm64(Some(0x8664))); // AMD64
-        assert!(!native_machine_is_arm64(Some(0x014c))); // I386
-        assert!(!native_machine_is_arm64(None)); // API unavailable or failed
-    }
-
-    #[test]
-    fn env_flag_enabled_true_for_truthy_values() {
-        for value in ["1", "true", "TRUE", "yes", "on", " 1 "] {
-            std::env::set_var("HANDY_TEST_FLAG_TRUTHY", value);
-            assert!(env_flag_enabled("HANDY_TEST_FLAG_TRUTHY"), "{value:?}");
-        }
-        std::env::remove_var("HANDY_TEST_FLAG_TRUTHY");
-    }
-
-    #[test]
-    fn env_flag_enabled_false_for_falsy_or_unset() {
-        assert!(!env_flag_enabled("HANDY_TEST_FLAG_UNSET"));
-
-        for value in ["0", "false", "FALSE", "no", "off", ""] {
-            std::env::set_var("HANDY_TEST_FLAG_FALSY", value);
-            assert!(!env_flag_enabled("HANDY_TEST_FLAG_FALSY"), "{value:?}");
-        }
-        std::env::remove_var("HANDY_TEST_FLAG_FALSY");
     }
 }

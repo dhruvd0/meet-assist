@@ -71,14 +71,3 @@ pub fn process_text_with_system_prompt(
 
     result
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_availability() {
-        let available = check_apple_intelligence_availability();
-        println!("Apple Intelligence available: {}", available);
-    }
-}

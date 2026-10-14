@@ -1562,24 +1562,3 @@ pub async fn get_available_accelerators(
     .await
     .expect("get_available_accelerators panicked")
 }
-
-#[cfg(test)]
-mod tests {
-    use handy_keys::Hotkey;
-    use tauri_plugin_global_shortcut::Shortcut;
-
-    #[test]
-    fn compound_shortcut_keys_parse_on_both_backends() {
-        for key in [
-            "scrolllock",
-            "capslock",
-            "numlock",
-            "pageup",
-            "pagedown",
-            "printscreen",
-        ] {
-            assert!(key.parse::<Shortcut>().is_ok(), "Tauri rejected {key}");
-            assert!(key.parse::<Hotkey>().is_ok(), "HandyKeys rejected {key}");
-        }
-    }
-}

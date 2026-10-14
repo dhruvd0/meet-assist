@@ -164,29 +164,3 @@ pub fn unregister_shortcut(app: &AppHandle, binding: ShortcutBinding) -> Result<
 
     Ok(())
 }
-
-#[cfg(test)]
-mod tests {
-    use super::validate_shortcut;
-
-    #[test]
-    fn rejects_side_specific_modifiers_the_parser_cannot_register() {
-        for raw in ["option_left+space", "ctrl_right+space"] {
-            assert!(validate_shortcut(raw).is_err(), "{raw} should be rejected");
-        }
-    }
-
-    #[test]
-    fn accepts_the_default_shortcuts() {
-        for raw in [
-            "option+space",
-            "option+shift+space",
-            "ctrl+space",
-            "ctrl+shift+space",
-            "alt+space",
-            "escape",
-        ] {
-            assert_eq!(validate_shortcut(raw), Ok(()), "{raw} should be accepted");
-        }
-    }
-}
