@@ -110,12 +110,26 @@ fn position_top_right(app: &AppHandle, window: &tauri::webview::WebviewWindow) {
 
 /// The monitor under the mouse cursor, falling back to the primary monitor.
 fn get_monitor_with_cursor(app: &AppHandle) -> Option<tauri::Monitor> {
+    let primary = app.primary_monitor().ok().flatten();
     if let Ok(cursor) = app.cursor_position() {
-        if let Ok(Some(monitor)) = app.monitor_from_point(cursor.x, cursor.y) {
+        // `cursor_position` and `monitor_from_point` use different spaces off
+        // Windows. tao reads the cursor in logical points and scales it by the
+        // primary monitor's factor (macos/util `cursor_position`; linux/util
+        // uses the GDK scale), but `monitor_from_point` compares against
+        // logical bounds (CGDisplayBounds / GDK geometry). Undo that scaling.
+        // Windows is physical on both sides.
+        #[cfg(not(target_os = "windows"))]
+        let (x, y) = {
+            let scale = primary.as_ref().map_or(1.0, |m| m.scale_factor());
+            (cursor.x / scale, cursor.y / scale)
+        };
+        #[cfg(target_os = "windows")]
+        let (x, y) = (cursor.x, cursor.y);
+        if let Ok(Some(monitor)) = app.monitor_from_point(x, y) {
             return Some(monitor);
         }
     }
-    app.primary_monitor().ok().flatten()
+    primary
 }
 
 /// Card payload: the intervention's fields plus `meeting_id`, so the card can
