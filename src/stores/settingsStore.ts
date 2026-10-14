@@ -4,11 +4,10 @@ import { listen } from "@tauri-apps/api/event";
 import type {
   AppSettings as Settings,
   AudioDevice,
-  PostProcessApiFormat,
+  LlmApiFormat,
   ChineseScript,
   TranscribeAcceleratorSetting,
   OrtAcceleratorSetting,
-  ShortcutActivation,
   VadBackend,
 } from "@/bindings";
 import { commands } from "@/bindings";
@@ -22,7 +21,7 @@ interface SettingsStore {
   audioDevices: AudioDevice[];
   outputDevices: AudioDevice[];
   customSounds: { start: boolean; stop: boolean };
-  postProcessModelOptions: Record<string, string[]>;
+  llmModelOptions: Record<string, string[]>;
   // null until loadUpdateChecksLocked() resolves
   updateChecksLocked: boolean | null;
 
@@ -44,27 +43,21 @@ interface SettingsStore {
   isUpdatingKey: (key: string) => boolean;
   playTestSound: (soundType: "start" | "stop") => Promise<void>;
   checkCustomSounds: () => Promise<void>;
-  setPostProcessProvider: (providerId: string) => Promise<void>;
-  updatePostProcessSetting: (
+  setLlmProvider: (providerId: string) => Promise<void>;
+  updateLlmSetting: (
     settingType: "base_url" | "api_key" | "model",
     providerId: string,
     value: string,
   ) => Promise<void>;
-  updatePostProcessBaseUrl: (
+  updateLlmBaseUrl: (providerId: string, baseUrl: string) => Promise<void>;
+  updateLlmApiFormat: (
     providerId: string,
-    baseUrl: string,
+    apiFormat: LlmApiFormat,
   ) => Promise<void>;
-  updatePostProcessApiFormat: (
-    providerId: string,
-    apiFormat: PostProcessApiFormat,
-  ) => Promise<void>;
-  updatePostProcessApiKey: (
-    providerId: string,
-    apiKey: string,
-  ) => Promise<void>;
-  updatePostProcessModel: (providerId: string, model: string) => Promise<void>;
-  fetchPostProcessModels: (providerId: string) => Promise<string[]>;
-  setPostProcessModelOptions: (providerId: string, models: string[]) => void;
+  updateLlmApiKey: (providerId: string, apiKey: string) => Promise<void>;
+  updateLlmModel: (providerId: string, model: string) => Promise<void>;
+  fetchLlmModels: (providerId: string) => Promise<string[]>;
+  setLlmModelOptions: (providerId: string, models: string[]) => void;
 
   // Internal state setters
   setSettings: (settings: Settings | null) => void;
@@ -77,7 +70,7 @@ interface SettingsStore {
 }
 
 // Note: Default settings are now fetched from Rust via commands.getDefaultSettings()
-// This ensures platform-specific defaults (like overlay_position, shortcuts, paste_method) work correctly
+// This ensures platform-specific defaults (like shortcuts) work correctly
 
 const DEFAULT_AUDIO_DEVICE: AudioDevice = {
   index: "default",
@@ -88,8 +81,6 @@ const DEFAULT_AUDIO_DEVICE: AudioDevice = {
 const settingUpdaters: {
   [K in keyof Settings]?: (value: Settings[K]) => Promise<unknown>;
 } = {
-  always_on_microphone: (value) =>
-    commands.updateMicrophoneMode(value as boolean),
   audio_feedback: (value) =>
     commands.changeAudioFeedbackSetting(value as boolean),
   audio_feedback_volume: (value) =>
@@ -104,10 +95,6 @@ const settingUpdaters: {
     commands.changeShowWhatsNewOnUpdateSetting(value as boolean),
   whats_new_last_seen_version: (value) =>
     commands.changeWhatsNewLastSeenVersionSetting(value as string),
-  shortcut_activation: (value) =>
-    commands.changeShortcutActivationSetting(value as ShortcutActivation),
-  hold_threshold_ms: (value) =>
-    commands.changeHoldThresholdMsSetting(value as number),
   selected_microphone: (value) =>
     commands.setSelectedMicrophone(
       (value as string) === "Default" || value === null
@@ -122,54 +109,26 @@ const settingUpdaters: {
       throw new Error(result.error);
     }
   },
-  clamshell_microphone: (value) =>
-    commands.setClamshellMicrophone(
-      (value as string) === "Default" ? "default" : (value as string),
-    ),
   selected_output_device: (value) =>
     commands.setSelectedOutputDevice(
       (value as string) === "Default" || value === null
         ? "default"
         : (value as string),
     ),
-  recording_retention_period: (value) =>
-    commands.updateRecordingRetentionPeriod(value as string),
   translate_to_english: (value) =>
     commands.changeTranslateToEnglishSetting(value as boolean),
   selected_language: (value) =>
     commands.changeSelectedLanguageSetting(value as string),
-  overlay_position: (value) =>
-    commands.changeOverlayPositionSetting(value as string),
   debug_mode: (value) => commands.changeDebugModeSetting(value as boolean),
   custom_words: (value) => commands.updateCustomWords(value as string[]),
   word_correction_threshold: (value) =>
     commands.changeWordCorrectionThresholdSetting(value as number),
-  paste_delay_ms: (value) =>
-    commands.changePasteDelayMsSetting(value as number),
-  paste_delay_after_ms: (value) =>
-    commands.changePasteDelayAfterMsSetting(value as number),
-  reliable_paste: (value) =>
-    commands.changeReliablePasteSetting(value as boolean),
-  paste_method: (value) => commands.changePasteMethodSetting(value as string),
-  typing_tool: (value) => commands.changeTypingToolSetting(value as string),
-  external_script_path: (value) =>
-    commands.changeExternalScriptPathSetting(value as string | null),
-  clipboard_handling: (value) =>
-    commands.changeClipboardHandlingSetting(value as string),
-  auto_submit: (value) => commands.changeAutoSubmitSetting(value as boolean),
-  auto_submit_key: (value) =>
-    commands.changeAutoSubmitKeySetting(value as string),
-  history_limit: (value) => commands.updateHistoryLimit(value as number),
-  post_process_enabled: (value) =>
-    commands.changePostProcessEnabledSetting(value as boolean),
   meeting_assistant_enabled: (value) =>
     commands.changeMeetingAssistantSetting(value as boolean),
   meeting_system_audio_enabled: (value) =>
     commands.changeMeetingSystemAudioSetting(value as boolean),
   meeting_vision_enabled: (value) =>
     commands.changeMeetingVisionSetting(value as boolean),
-  meeting_provider_id: (value) =>
-    commands.changeMeetingProviderSetting(value as string),
   meeting_sensitivity: (value) =>
     commands.changeMeetingSensitivitySetting(
       value as "low" | "medium" | "high",
@@ -178,20 +137,11 @@ const settingUpdaters: {
     commands.changeMeetingObserverIntervalSetting(value as number),
   meeting_beep_enabled: (value) =>
     commands.changeMeetingBeepSetting(value as boolean),
-  post_process_selected_prompt_id: (value) =>
-    commands.setPostProcessSelectedPrompt(value as string),
-  mute_while_recording: (value) =>
-    commands.changeMuteWhileRecordingSetting(value as boolean),
-  append_trailing_space: (value) =>
-    commands.changeAppendTrailingSpaceSetting(value as boolean),
   log_level: (value) => commands.setLogLevel(value as any),
   app_language: (value) => commands.changeAppLanguageSetting(value as string),
   theme: (value) => commands.changeThemeSetting(value as string),
   experimental_enabled: (value) =>
     commands.changeExperimentalEnabledSetting(value as boolean),
-  lazy_stream_close: (value) =>
-    commands.changeLazyStreamCloseSetting(value as boolean),
-  overlay_style: (value) => commands.changeOverlayStyleSetting(value as string),
   vad_enabled: (value) => commands.changeVadEnabledSetting(value as boolean),
   vad_backend: async (value) => {
     const result = await commands.changeVadBackendSetting(value as VadBackend);
@@ -216,8 +166,6 @@ const settingUpdaters: {
     commands.changeOrtAcceleratorSetting(value as OrtAcceleratorSetting),
   transcribe_gpu_device: (value) =>
     commands.changeTranscribeGpuDevice(value as string | null),
-  extra_recording_buffer_ms: (value) =>
-    commands.changeExtraRecordingBufferSetting(value as number),
 };
 
 export const useSettingsStore = create<SettingsStore>()(
@@ -229,7 +177,7 @@ export const useSettingsStore = create<SettingsStore>()(
     audioDevices: [],
     outputDevices: [],
     customSounds: { start: false, stop: false },
-    postProcessModelOptions: {},
+    llmModelOptions: {},
     updateChecksLocked: null,
 
     // Internal setters
@@ -256,9 +204,7 @@ export const useSettingsStore = create<SettingsStore>()(
           const settings = result.data;
           const normalizedSettings: Settings = {
             ...settings,
-            always_on_microphone: settings.always_on_microphone ?? false,
             selected_microphone: settings.selected_microphone ?? "Default",
-            clamshell_microphone: settings.clamshell_microphone ?? "Default",
             selected_output_device:
               settings.selected_output_device ?? "Default",
           };
@@ -457,39 +403,35 @@ export const useSettingsStore = create<SettingsStore>()(
       }
     },
 
-    setPostProcessProvider: async (providerId) => {
-      const {
-        settings,
-        setUpdating,
-        refreshSettings,
-        setPostProcessModelOptions,
-      } = get();
-      const updateKey = "post_process_provider_id";
-      const previousId = settings?.post_process_provider_id ?? null;
+    setLlmProvider: async (providerId) => {
+      const { settings, setUpdating, refreshSettings, setLlmModelOptions } =
+        get();
+      const updateKey = "llm_provider_id";
+      const previousId = settings?.llm_provider_id ?? null;
 
       setUpdating(updateKey, true);
 
       if (settings) {
         set((state) => ({
           settings: state.settings
-            ? { ...state.settings, post_process_provider_id: providerId }
+            ? { ...state.settings, llm_provider_id: providerId }
             : null,
         }));
       }
 
       // Clear cached model options for the new provider so the dropdown
       // doesn't show stale models from a previous fetch or base_url.
-      setPostProcessModelOptions(providerId, []);
+      setLlmModelOptions(providerId, []);
 
       try {
-        await commands.setPostProcessProvider(providerId);
+        await commands.setLlmProvider(providerId);
         await refreshSettings();
       } catch (error) {
         console.error("Failed to set post-process provider:", error);
         if (previousId !== null) {
           set((state) => ({
             settings: state.settings
-              ? { ...state.settings, post_process_provider_id: previousId }
+              ? { ...state.settings, llm_provider_id: previousId }
               : null,
           }));
         }
@@ -499,23 +441,23 @@ export const useSettingsStore = create<SettingsStore>()(
     },
 
     // Generic updater for post-processing provider settings
-    updatePostProcessSetting: async (
+    updateLlmSetting: async (
       settingType: "base_url" | "api_key" | "model",
       providerId: string,
       value: string,
     ) => {
       const { setUpdating, refreshSettings } = get();
-      const updateKey = `post_process_${settingType}:${providerId}`;
+      const updateKey = `llm_${settingType}:${providerId}`;
 
       setUpdating(updateKey, true);
 
       try {
         if (settingType === "base_url") {
-          await commands.changePostProcessBaseUrlSetting(providerId, value);
+          await commands.changeLlmBaseUrlSetting(providerId, value);
         } else if (settingType === "api_key") {
-          await commands.changePostProcessApiKeySetting(providerId, value);
+          await commands.changeLlmApiKeySetting(providerId, value);
         } else if (settingType === "model") {
-          await commands.changePostProcessModelSetting(providerId, value);
+          await commands.changeLlmModelSetting(providerId, value);
         }
         await refreshSettings();
       } catch (error) {
@@ -528,15 +470,15 @@ export const useSettingsStore = create<SettingsStore>()(
       }
     },
 
-    updatePostProcessBaseUrl: async (providerId, baseUrl) => {
+    updateLlmBaseUrl: async (providerId, baseUrl) => {
       const { setUpdating, refreshSettings } = get();
-      const updateKey = `post_process_base_url:${providerId}`;
+      const updateKey = `llm_base_url:${providerId}`;
 
       setUpdating(updateKey, true);
 
       try {
         // Persist the new base URL first.
-        const urlResult = await commands.changePostProcessBaseUrlSetting(
+        const urlResult = await commands.changeLlmBaseUrlSetting(
           providerId,
           baseUrl,
         );
@@ -548,7 +490,7 @@ export const useSettingsStore = create<SettingsStore>()(
         // Reset the stored model since the previous value is almost certainly
         // invalid for the new endpoint (e.g. switching Custom from Groq to
         // Cerebras). Only proceed if the reset succeeds.
-        const modelResult = await commands.changePostProcessModelSetting(
+        const modelResult = await commands.changeLlmModelSetting(
           providerId,
           "",
         );
@@ -559,8 +501,8 @@ export const useSettingsStore = create<SettingsStore>()(
 
         // Clear cached model options only after both backend writes succeed.
         set((state) => ({
-          postProcessModelOptions: {
-            ...state.postProcessModelOptions,
+          llmModelOptions: {
+            ...state.llmModelOptions,
             [providerId]: [],
           },
         }));
@@ -574,22 +516,22 @@ export const useSettingsStore = create<SettingsStore>()(
       }
     },
 
-    updatePostProcessApiFormat: async (providerId, apiFormat) => {
+    updateLlmApiFormat: async (providerId, apiFormat) => {
       const { setUpdating, refreshSettings } = get();
-      const updateKey = `post_process_api_format:${providerId}`;
+      const updateKey = `llm_api_format:${providerId}`;
 
       // The format decides the auth headers, so models listed under the old
       // format may not reflect this one - user should click refresh after
       set((state) => ({
-        postProcessModelOptions: {
-          ...state.postProcessModelOptions,
+        llmModelOptions: {
+          ...state.llmModelOptions,
           [providerId]: [],
         },
       }));
       setUpdating(updateKey, true);
 
       try {
-        const result = await commands.changePostProcessApiFormatSetting(
+        const result = await commands.changeLlmApiFormatSetting(
           providerId,
           apiFormat,
         );
@@ -605,32 +547,32 @@ export const useSettingsStore = create<SettingsStore>()(
       }
     },
 
-    updatePostProcessApiKey: async (providerId, apiKey) => {
+    updateLlmApiKey: async (providerId, apiKey) => {
       // Clear cached models when API key changes - user should click refresh after
       set((state) => ({
-        postProcessModelOptions: {
-          ...state.postProcessModelOptions,
+        llmModelOptions: {
+          ...state.llmModelOptions,
           [providerId]: [],
         },
       }));
-      return get().updatePostProcessSetting("api_key", providerId, apiKey);
+      return get().updateLlmSetting("api_key", providerId, apiKey);
     },
 
-    updatePostProcessModel: async (providerId, model) => {
-      return get().updatePostProcessSetting("model", providerId, model);
+    updateLlmModel: async (providerId, model) => {
+      return get().updateLlmSetting("model", providerId, model);
     },
 
-    fetchPostProcessModels: async (providerId) => {
-      const updateKey = `post_process_models_fetch:${providerId}`;
-      const { setUpdating, setPostProcessModelOptions } = get();
+    fetchLlmModels: async (providerId) => {
+      const updateKey = `llm_models_fetch:${providerId}`;
+      const { setUpdating, setLlmModelOptions } = get();
 
       setUpdating(updateKey, true);
 
       try {
         // Call Tauri backend command instead of fetch
-        const result = await commands.fetchPostProcessModels(providerId);
+        const result = await commands.fetchLlmModels(providerId);
         if (result.status === "ok") {
-          setPostProcessModelOptions(providerId, result.data);
+          setLlmModelOptions(providerId, result.data);
           return result.data;
         } else {
           console.error("Failed to fetch models:", result.error);
@@ -645,10 +587,10 @@ export const useSettingsStore = create<SettingsStore>()(
       }
     },
 
-    setPostProcessModelOptions: (providerId, models) =>
+    setLlmModelOptions: (providerId, models) =>
       set((state) => ({
-        postProcessModelOptions: {
-          ...state.postProcessModelOptions,
+        llmModelOptions: {
+          ...state.llmModelOptions,
           [providerId]: models,
         },
       })),

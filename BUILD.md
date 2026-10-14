@@ -70,7 +70,7 @@ ORT_LIB_LOCATION=$(brew --prefix onnxruntime)/lib ORT_PREFER_DYNAMIC_LINK=1 bun 
   ```bash
   # Ubuntu/Debian
   sudo apt update
-  sudo apt install build-essential clang libclang-dev libevdev-dev libasound2-dev pkg-config libssl-dev libvulkan-dev vulkan-tools glslc spirv-headers glslang-tools libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libgtk-layer-shell0 libgtk-layer-shell-dev patchelf cmake
+  sudo apt install build-essential clang libclang-dev libevdev-dev libasound2-dev pkg-config libssl-dev libvulkan-dev vulkan-tools glslc spirv-headers glslang-tools libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf cmake
 
   # Fedora/RHEL
   sudo dnf groupinstall "Development Tools"
@@ -78,12 +78,11 @@ ORT_LIB_LOCATION=$(brew --prefix onnxruntime)/lib ORT_PREFER_DYNAMIC_LINK=1 bun 
     clang clang-devel libevdev-devel \
     spirv-headers-devel spirv-tools-devel glslang \
     gtk3-devel webkit2gtk4.1-devel libappindicator-gtk3-devel librsvg2-devel \
-    gtk-layer-shell gtk-layer-shell-devel \
     cmake
 
   # Arch Linux
   sudo pacman -S base-devel clang libevdev shaderc spirv-headers glslang alsa-lib pkgconf openssl vulkan-devel \
-    gtk3 webkit2gtk-4.1 libappindicator-gtk3 librsvg gtk-layer-shell \
+    gtk3 webkit2gtk-4.1 libappindicator-gtk3 librsvg \
     cmake
   ```
 
@@ -146,14 +145,18 @@ Resources only need re-copying if they change upstream (new icons, sounds, model
 
 ## Troubleshooting
 
-### macOS Accessibility remains enabled after a local rebuild
+### macOS Accessibility and the meeting shortcut
 
-Local builds use the ad-hoc `signingIdentity: "-"`. A rebuild can have a new macOS code
+On macOS the meeting shortcut uses the Tauri global shortcut by default, which needs no
+Accessibility permission. Accessibility is only needed if you switch **Advanced >
+Keyboard Implementation** to Handy Keys. Without it, Meet Assist falls back to the Tauri
+shortcut on launch and saves that choice.
+
+Local builds use the ad-hoc `signingIdentity: "-"`, so a rebuild can have a new macOS code
 identity while the old **System Settings > Privacy & Security > Accessibility** entry
-remains visibly enabled, leaving Meet Assist on `Waiting...`.
-
-After installing the final bundle at `"/Applications/Meet Assist.app"`, quit Meet Assist, clear only its
-stale Accessibility record, then reopen it:
+remains visibly enabled but no longer applies. If you use Handy Keys and it stops working
+after a rebuild, quit Meet Assist, clear only its stale Accessibility record, reopen it,
+and grant Accessibility again:
 
 ```bash
 osascript -e 'tell application id "com.meetassist.app" to quit' || true
@@ -161,8 +164,8 @@ tccutil reset Accessibility com.meetassist.app
 open "/Applications/Meet Assist.app"
 ```
 
-Grant Accessibility again when prompted. This does not reset Microphone or other TCC
-services, and official releases normally do not need it.
+This does not reset Microphone or other TCC services, and official releases normally do
+not need it.
 
 For optional diagnosis, compare the designated requirements of the previous and rebuilt
 bundles:
@@ -174,9 +177,6 @@ codesign -dr - "/Applications/Meet Assist.app" 2>&1
 
 An ad-hoc requirement contains a `cdhash`; a changed requirement confirms the rebuild is
 not covered by the old grant. The reset procedure does not require this check.
-
-See [issue #1618](https://github.com/cjpais/Handy/issues/1618) for the related onboarding
-and stale-permission report.
 
 ### AppImage build fails on Arch / rolling-release distros
 

@@ -36,21 +36,18 @@ tauri-plugin-log = "2.7.1"
 tauri-plugin-opener = "2.5.2"
 tauri-plugin-store = "2.4.1"
 tauri-plugin-os = "2.3.2"
-tauri-plugin-clipboard-manager = "2.3.2"
 tauri-plugin-macos-permissions = "2.3.0"
 tauri-plugin-process = "2.3.1"
 rusqlite_migration = "2.3"
 tauri-plugin-fs = "2.4.4"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-rdev = { git = "https://github.com/rustdesk-org/rdev" }
 anyhow = "1.0.95"
 hound = "3.5.1"
 log = "0.4.25"
 env_filter = "0.1.0"
 tokio = "1.43.0"
 earshot = "1.2.2"
-enigo = "0.6.1"
 # Feedback sounds. No `recording`: microphone capture is handy-recorder's.
 rodio = { version = "0.23.0", default-features = false, features = ["playback", "wav", "flac", "mp3", "vorbis"] }
 handy-recorder = "0.1"
@@ -156,16 +153,13 @@ transcribe-cpp = { version = "0.4.0", default-features = false }
 [target.'cfg(target_os = "macos")'.dependencies]
 tauri-nspanel = { git = "https://github.com/ahkohd/tauri-nspanel", branch = "v2.1" }
 transcribe-cpp = { version = "0.4.0", default-features = false, features = ["metal"] }
-# Used by the receipt-sequenced ("reliable") paste path for lazy NSPasteboard
-# promises. Versions track what Tauri already pulls in.
+# Login items (autostart.rs) and process info (system_capture.rs). Versions
+# track what Tauri already pulls in.
 objc2 = "0.6"
 objc2-foundation = "0.3"
-objc2-app-kit = "0.3"
 objc2-service-management = "0.3.2"
 
 [target.'cfg(target_os = "linux")'.dependencies]
-gtk-layer-shell = { version = "0.8", features = ["v0_6"] }
-gtk = "0.18"
 transcribe-cpp = { version = "0.4.0", default-features = false, features = [
   "dynamic-backends",
   "vulkan",
@@ -193,9 +187,6 @@ tao-macros = { git = "https://github.com/cjpais/tao", rev = "c3bee28c1d446d95f08
 
 [dev-dependencies]
 tempfile = "3"
-# Test-only tokio features for the local socket servers exercising the
-# resumable HTTP downloader; normal builds keep the leaner feature set.
-tokio = { version = "1.43.0", features = ["macros", "net", "io-util", "sync", "time", "rt-multi-thread"] }
 
 [profile.release]
 lto = true

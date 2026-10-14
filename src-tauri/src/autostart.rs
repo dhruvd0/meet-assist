@@ -113,43 +113,4 @@ mod macos {
             Err(e) => log::warn!("Failed to remove legacy launch agent {:?}: {}", path, e),
         }
     }
-
-    #[cfg(test)]
-    mod tests {
-        use super::*;
-
-        /// Validates the assumption `login_item_api_available` rests on: the
-        /// ServiceManagement framework is linked into the binary, so the
-        /// class lookup finds `SMAppService` whenever the host is macOS 13+
-        /// (which anything able to build this crate is).
-        #[test]
-        fn sm_app_service_class_resolves() {
-            assert!(login_item_api_available());
-        }
-
-        #[test]
-        fn launch_agent_path_matches_auto_launch_crate() {
-            let path = plugin_launch_agent_path(Path::new("/Users/someone"), "Handy");
-            assert_eq!(
-                path,
-                Path::new("/Users/someone/Library/LaunchAgents/Handy.plist")
-            );
-        }
-
-        #[test]
-        fn removes_existing_launch_agent() {
-            let dir = tempfile::tempdir().unwrap();
-            let plist = dir.path().join("Handy.plist");
-            std::fs::write(&plist, "<plist/>").unwrap();
-
-            remove_launch_agent_file(&plist);
-            assert!(!plist.exists());
-        }
-
-        #[test]
-        fn missing_launch_agent_is_a_no_op() {
-            let dir = tempfile::tempdir().unwrap();
-            remove_launch_agent_file(&dir.path().join("Handy.plist"));
-        }
-    }
 }

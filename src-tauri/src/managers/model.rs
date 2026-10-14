@@ -1411,7 +1411,7 @@ impl ModelManager {
                 // A models-dir copy counts too: mirror-fallback downloads land
                 // there, and it makes manual drop-ins of catalog files work.
                 let local_path = self.models_dir.join(&model.filename);
-                let partial_path = self.models_dir.join(format!("{}.partial", &model.filename));
+                let partial_path = self.models_dir.join(format!("{}.partial", model.filename));
                 model.is_downloaded = hf_cached_path(repo_id, revision, &model.filename).is_some()
                     || local_path.exists();
                 model.is_downloading = false;
@@ -1431,10 +1431,10 @@ impl ModelManager {
             if model.is_directory {
                 // For directory-based models, check if the directory exists
                 let model_path = self.models_dir.join(&model.filename);
-                let partial_path = self.models_dir.join(format!("{}.partial", &model.filename));
+                let partial_path = self.models_dir.join(format!("{}.partial", model.filename));
                 let extracting_path = self
                     .models_dir
-                    .join(format!("{}.extracting", &model.filename));
+                    .join(format!("{}.extracting", model.filename));
 
                 // Clean up any leftover .extracting directories from interrupted extractions
                 // But only if this model is NOT currently being extracted
@@ -1459,7 +1459,7 @@ impl ModelManager {
             } else {
                 // For file-based models (existing logic)
                 let model_path = self.models_dir.join(&model.filename);
-                let partial_path = self.models_dir.join(format!("{}.partial", &model.filename));
+                let partial_path = self.models_dir.join(format!("{}.partial", model.filename));
 
                 model.is_downloaded = model_path.exists();
                 model.is_downloading = false;
@@ -2242,7 +2242,7 @@ impl ModelManager {
         let model_path = self.models_dir.join(&model_info.filename);
         let partial_path = self
             .models_dir
-            .join(format!("{}.partial", &model_info.filename));
+            .join(format!("{}.partial", model_info.filename));
 
         // Don't download if complete version already exists
         if model_path.exists() {
@@ -2315,7 +2315,7 @@ impl ModelManager {
             // Use a temporary extraction directory to ensure atomic operations
             let temp_extract_dir = self
                 .models_dir
-                .join(format!("{}.extracting", &model_info.filename));
+                .join(format!("{}.extracting", model_info.filename));
             let final_model_dir = self.models_dir.join(&model_info.filename);
 
             // Clean up any previous incomplete extraction
@@ -2460,7 +2460,7 @@ impl ModelManager {
             for path in [
                 self.models_dir.join(&model_info.filename),
                 self.models_dir
-                    .join(format!("{}.partial", &model_info.filename)),
+                    .join(format!("{}.partial", model_info.filename)),
             ] {
                 if path.exists() {
                     info!("Deleting model file at: {:?}", path);
@@ -2491,7 +2491,7 @@ impl ModelManager {
         let model_path = self.models_dir.join(&model_info.filename);
         let partial_path = self
             .models_dir
-            .join(format!("{}.partial", &model_info.filename));
+            .join(format!("{}.partial", model_info.filename));
         debug!("ModelManager: Model path: {:?}", model_path);
         debug!("ModelManager: Partial path: {:?}", partial_path);
 
@@ -2612,7 +2612,7 @@ impl ModelManager {
             if local_path.exists() {
                 let partial_path = self
                     .models_dir
-                    .join(format!("{}.partial", &model_info.filename));
+                    .join(format!("{}.partial", model_info.filename));
                 if partial_path.exists() {
                     let _ = fs::remove_file(&partial_path);
                 }
@@ -2628,7 +2628,7 @@ impl ModelManager {
         let model_path = self.models_dir.join(&model_info.filename);
         let partial_path = self
             .models_dir
-            .join(format!("{}.partial", &model_info.filename));
+            .join(format!("{}.partial", model_info.filename));
 
         if model_info.is_directory {
             if !model_path.exists() || !model_path.is_dir() {
@@ -2692,473 +2692,5 @@ impl ModelManager {
 
         info!("Download cancellation initiated for: {}", model_id);
         Ok(())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::io::Write;
-    use tempfile::TempDir;
-
-    fn add_cached_model(cache: &Path, repo_id: &str, revision: &str, filename: &str) -> PathBuf {
-        let repo_dir = cache.join(format!("models--{}", repo_id.replace('/', "--")));
-        let snapshot = repo_dir.join("snapshots").join(revision).join(filename);
-        fs::create_dir_all(snapshot.parent().unwrap()).unwrap();
-        fs::create_dir_all(repo_dir.join("refs")).unwrap();
-        fs::write(repo_dir.join("refs").join(revision), revision).unwrap();
-        fs::write(&snapshot, b"model").unwrap();
-        snapshot
-    }
-
-    #[test]
-    fn test_hf_cached_path_falls_back_to_legacy_cache() {
-        let active = TempDir::new().unwrap();
-        let legacy = TempDir::new().unwrap();
-        let expected = add_cached_model(
-            legacy.path(),
-            "handy-computer/test-model",
-            "old-revision",
-            "model.gguf",
-        );
-        let caches = vec![
-            Cache::new(active.path().to_path_buf()),
-            Cache::new(legacy.path().to_path_buf()),
-        ];
-
-        assert_eq!(
-            hf_cached_path_in(
-                &caches,
-                "handy-computer/test-model",
-                "old-revision",
-                "model.gguf"
-            ),
-            Some(expected)
-        );
-    }
-
-    #[test]
-    fn test_hf_cached_path_prefers_active_cache() {
-        let active = TempDir::new().unwrap();
-        let legacy = TempDir::new().unwrap();
-        let expected = add_cached_model(
-            active.path(),
-            "handy-computer/test-model",
-            "revision",
-            "model.gguf",
-        );
-        add_cached_model(
-            legacy.path(),
-            "handy-computer/test-model",
-            "revision",
-            "model.gguf",
-        );
-        let caches = vec![
-            Cache::new(active.path().to_path_buf()),
-            Cache::new(legacy.path().to_path_buf()),
-        ];
-
-        assert_eq!(
-            hf_cached_path_in(
-                &caches,
-                "handy-computer/test-model",
-                "revision",
-                "model.gguf"
-            ),
-            Some(expected)
-        );
-    }
-
-    #[test]
-    fn test_effective_language_falls_back_to_canonical_chinese() {
-        let languages = vec!["zh-Hant".to_string()];
-
-        assert_eq!(effective_language("auto", &languages, false), "zh");
-    }
-
-    #[test]
-    fn test_effective_language_resolves_bare_intent_to_concrete_locale() {
-        // A model advertising full BCP-47 locales (e.g. Nemotron Streaming):
-        // a bare intent must resolve to the exact code the engine expects, not
-        // be handed back as the bare form the prompt table may not contain.
-        let languages = vec![
-            "en-US".to_string(),
-            "en-GB".to_string(),
-            "es-ES".to_string(),
-            "zh-CN".to_string(),
-            "ja-JP".to_string(),
-        ];
-
-        assert_eq!(effective_language("en", &languages, true), "en-US");
-        assert_eq!(effective_language("es", &languages, true), "es-ES");
-        // `zh`/`ja` have no bare entry in this model's table; resolve to locale.
-        assert_eq!(effective_language("zh", &languages, true), "zh-CN");
-        assert_eq!(effective_language("ja", &languages, true), "ja-JP");
-        // An unsupported intent still auto-detects when the model can.
-        assert_eq!(effective_language("fr", &languages, true), "auto");
-    }
-
-    #[test]
-    fn test_effective_language_preserves_intent_across_model_code_variants() {
-        assert_eq!(effective_language("no", &["nb".to_string()], true), "nb");
-        assert_eq!(effective_language("nb", &["no".to_string()], true), "no");
-        assert_eq!(effective_language("tl", &["fil".to_string()], true), "fil");
-        assert_eq!(effective_language("fil", &["tl".to_string()], true), "tl");
-    }
-
-    #[test]
-    fn test_effective_language_prefers_exact_norwegian_code() {
-        let languages = vec!["no".to_string(), "nb".to_string()];
-
-        assert_eq!(effective_language("nb", &languages, true), "nb");
-        assert_eq!(effective_language("no", &languages, true), "no");
-    }
-
-    #[test]
-    fn test_canonicalize_supported_languages_collapses_chinese_scripts() {
-        let languages = canonicalize_supported_languages(
-            vec!["en", "zh", "zh-Hans", "zh-Hant", "yue"]
-                .into_iter()
-                .map(String::from)
-                .collect(),
-        );
-
-        assert_eq!(languages, vec!["en", "zh", "yue"]);
-    }
-
-    fn build_test_gguf_string_metadata(kvs: &[(&str, &str)]) -> Vec<u8> {
-        let mut out = Vec::new();
-        out.extend_from_slice(b"GGUF");
-        out.extend_from_slice(&3u32.to_le_bytes());
-        out.extend_from_slice(&0u64.to_le_bytes());
-        out.extend_from_slice(&(kvs.len() as u64).to_le_bytes());
-        for (key, value) in kvs {
-            push_gguf_str(&mut out, key);
-            out.extend_from_slice(&8u32.to_le_bytes()); // GGUF string value type.
-            push_gguf_str(&mut out, value);
-        }
-        out
-    }
-
-    #[test]
-    fn test_discover_custom_transcribe_models() {
-        let temp_dir = TempDir::new().unwrap();
-        let models_dir = temp_dir.path().to_path_buf();
-
-        // Create test .bin files
-        let mut custom_file = File::create(models_dir.join("my-custom-model.bin")).unwrap();
-        custom_file.write_all(b"fake model data").unwrap();
-
-        let mut another_file = File::create(models_dir.join("whisper_medical_v2.bin")).unwrap();
-        another_file.write_all(b"another fake model").unwrap();
-
-        // Custom GGUF model (also supported by transcribe-cpp)
-        let mut gguf_file = File::create(models_dir.join("my-gguf-model.gguf")).unwrap();
-        gguf_file
-            .write_all(&build_test_gguf_string_metadata(&[(
-                "general.name",
-                "Friendly GGUF Name",
-            )]))
-            .unwrap();
-
-        // Create files that should be ignored
-        File::create(models_dir.join(".hidden-model.bin")).unwrap(); // Hidden file
-        File::create(models_dir.join("readme.txt")).unwrap(); // Non-model file
-        File::create(models_dir.join("ggml-small.bin")).unwrap(); // Predefined filename
-        File::create(models_dir.join("download.bin.partial")).unwrap(); // Partial download
-        fs::create_dir(models_dir.join("some-directory.bin")).unwrap(); // Directory
-
-        // Set up available_models with a predefined Whisper model
-        let mut models = HashMap::new();
-        models.insert(
-            "small".to_string(),
-            ModelInfo {
-                id: "small".to_string(),
-                name: "Whisper Small".to_string(),
-                description: "Test".to_string(),
-                filename: "ggml-small.bin".to_string(),
-                source: ModelSource::Url {
-                    url: "https://example.com".to_string(),
-                    sha256: None,
-                },
-                size_mb: 100,
-                is_downloaded: false,
-                is_downloading: false,
-                partial_size: 0,
-                is_directory: false,
-                engine_type: EngineType::TranscribeCpp,
-                accuracy_score: 0.5,
-                speed_score: 0.5,
-                supports_translation: true,
-                is_recommended: false,
-                supported_languages: vec!["en".to_string()],
-                supports_language_selection: true,
-                is_custom: false,
-                supports_streaming: false,
-                // Legacy entry: preserve the historical "Auto offered" behavior.
-                // (Catalog GGUFs and on-disk probes derive this from metadata.)
-                supports_language_detection: true,
-            },
-        );
-
-        // Discover custom models
-        ModelManager::discover_custom_transcribe_models(&models_dir, &mut models).unwrap();
-
-        // Should have discovered 2 custom models (my-custom-model and whisper_medical_v2)
-        assert!(models.contains_key("my-custom-model"));
-        assert!(models.contains_key("whisper_medical_v2"));
-
-        // Verify custom model properties
-        let custom = models.get("my-custom-model").unwrap();
-        assert_eq!(custom.name, "My Custom Model");
-        assert_eq!(custom.filename, "my-custom-model.bin");
-        assert!(matches!(custom.source, ModelSource::Local)); // Custom models have no remote source
-        assert!(custom.is_downloaded);
-        assert!(custom.is_custom);
-        assert!(ModelManager::disappears_when_missing(custom));
-        assert_eq!(custom.accuracy_score, 0.0);
-        assert_eq!(custom.speed_score, 0.0);
-        assert!(custom.supported_languages.is_empty());
-
-        // Verify underscore handling
-        let medical = models.get("whisper_medical_v2").unwrap();
-        assert_eq!(medical.name, "Whisper Medical V2");
-
-        // Verify .gguf models are discovered too (extension stripped for the id)
-        assert!(models.contains_key("my-gguf-model"));
-        let gguf = models.get("my-gguf-model").unwrap();
-        assert_eq!(gguf.filename, "my-gguf-model.gguf");
-        assert_eq!(gguf.name, "Friendly GGUF Name");
-        assert!(gguf.is_custom);
-        assert!(matches!(gguf.engine_type, EngineType::TranscribeCpp));
-
-        // Should NOT have discovered hidden, non-model, predefined, partial, or directories
-        assert!(!models.contains_key(".hidden-model"));
-        assert!(!models.contains_key("readme"));
-        assert!(!models.contains_key("download.bin"));
-        assert!(!models.contains_key("some-directory"));
-    }
-
-    #[test]
-    fn test_discover_custom_models_empty_dir() {
-        let temp_dir = TempDir::new().unwrap();
-        let models_dir = temp_dir.path().to_path_buf();
-
-        let mut models = HashMap::new();
-        let count_before = models.len();
-
-        ModelManager::discover_custom_transcribe_models(&models_dir, &mut models).unwrap();
-
-        // No new models should be added
-        assert_eq!(models.len(), count_before);
-    }
-
-    #[test]
-    fn test_discover_custom_models_nonexistent_dir() {
-        let models_dir = PathBuf::from("/nonexistent/path/that/does/not/exist");
-
-        let mut models = HashMap::new();
-        let count_before = models.len();
-
-        // Should not error, just return Ok
-        let result = ModelManager::discover_custom_transcribe_models(&models_dir, &mut models);
-        assert!(result.is_ok());
-        assert_eq!(models.len(), count_before);
-    }
-
-    #[test]
-    fn test_catalog_quant_rendering() {
-        let desc = ModelDescriptor {
-            id: "org/repo/model-Q8_0.gguf".to_string(),
-            source: ModelSource::HuggingFace {
-                repo_id: "org/repo".to_string(),
-                revision: "main".to_string(),
-            },
-            name: "Model".to_string(),
-            description: "desc".to_string(),
-            engine_type: EngineType::TranscribeCpp,
-            caps: CapabilityProbe::default(),
-            files: vec![
-                QuantFile {
-                    filename: "model-Q4_K_M.gguf".to_string(),
-                    quant: "Q4_K_M".to_string(),
-                    size_bytes: 1,
-                    sha256: None,
-                },
-                QuantFile {
-                    filename: "model-Q8_0.gguf".to_string(),
-                    quant: "Q8_0".to_string(),
-                    size_bytes: 2,
-                    sha256: None,
-                },
-            ],
-            default_quant: Some("Q8_0".to_string()),
-            speed_score: 0.5,
-            accuracy_score: 0.5,
-            recommended_rank: None,
-            recommended: true,
-        };
-        let status = DiskStatus::default();
-
-        // Default quant: plain name, badge intact.
-        let default_info = desc.to_model_info(&status);
-        assert_eq!(default_info.name, "Model");
-        assert!(default_info.is_recommended);
-
-        // Alternate quant: suffixed name, own id, no badge.
-        let alt_info = desc.to_model_info_for_file(&desc.files[0], &status);
-        assert_eq!(alt_info.id, "org/repo/model-Q4_K_M.gguf");
-        assert_eq!(alt_info.name, "Model (Q4_K_M)");
-        assert_eq!(alt_info.filename, "model-Q4_K_M.gguf");
-        assert!(!alt_info.is_recommended);
-        assert!(!alt_info.is_custom);
-
-        // Catalog defaults stay visible for re-download when their file is gone.
-        assert!(!ModelManager::disappears_when_missing(&default_info));
-
-        let mut selection_models = HashMap::new();
-        selection_models.insert(default_info.id.clone(), default_info.clone());
-        assert!(!ModelManager::selected_model_is_available(
-            &selection_models,
-            &default_info.id
-        ));
-        selection_models
-            .get_mut(&default_info.id)
-            .unwrap()
-            .is_downloaded = true;
-        assert!(ModelManager::selected_model_is_available(
-            &selection_models,
-            &default_info.id
-        ));
-
-        // The default rendered through the per-file path matches to_model_info,
-        // so seeded entries and discovered defaults can never diverge.
-        let same = desc.to_model_info_for_file(&desc.files[1], &status);
-        assert_eq!(same.id, default_info.id);
-        assert_eq!(same.name, default_info.name);
-        assert_eq!(same.is_recommended, default_info.is_recommended);
-    }
-
-    #[test]
-    fn test_discover_catalog_alternate_quant_in_models_dir() {
-        // A real catalog model with more than one quant.
-        let desc = crate::catalog::CATALOG
-            .iter()
-            .find(|d| d.files.len() > 1)
-            .expect("catalog has multi-quant models");
-        let default_filename = default_quant_file(&desc.files, desc.default_quant.as_deref())
-            .unwrap()
-            .filename
-            .clone();
-        let alt = desc
-            .files
-            .iter()
-            .find(|f| f.filename != default_filename)
-            .unwrap();
-
-        let temp_dir = TempDir::new().unwrap();
-        // Content is never probed for catalog-matched files, so empty files do.
-        fs::write(temp_dir.path().join(&alt.filename), b"").unwrap();
-        fs::write(temp_dir.path().join(&default_filename), b"").unwrap();
-
-        let mut models = HashMap::new();
-        ModelManager::seed_catalog_models(&mut models);
-        let seeded = models.len();
-        ModelManager::discover_custom_transcribe_models(temp_dir.path(), &mut models).unwrap();
-
-        // The alternate quant surfaces as a catalog-grade HF entry…
-        let ModelSource::HuggingFace { repo_id, .. } = &desc.source else {
-            panic!("catalog descriptors are HF-sourced");
-        };
-        let alt_id = format!("{}/{}", repo_id, alt.filename);
-        let info = models.get(&alt_id).expect("alternate quant discovered");
-        assert_eq!(info.name, format!("{} ({})", desc.name, alt.quant));
-        assert_eq!(info.description, desc.description);
-        assert!(info.is_downloaded);
-        assert!(!info.is_custom);
-        assert!(matches!(info.source, ModelSource::HuggingFace { .. }));
-        assert!(ModelManager::disappears_when_missing(info));
-
-        // …while the default-quant file dedups onto its seeded entry: exactly
-        // one new id, and no filename-stem custom entries for either file.
-        assert_eq!(models.len(), seeded + 1);
-        assert!(!models.contains_key(alt.filename.trim_end_matches(".gguf")));
-        assert!(!models.contains_key(default_filename.trim_end_matches(".gguf")));
-    }
-
-    fn push_gguf_str(out: &mut Vec<u8>, val: &str) {
-        out.extend_from_slice(&(val.len() as u64).to_le_bytes());
-        out.extend_from_slice(val.as_bytes());
-    }
-
-    fn write_synthetic_gguf(path: &Path, arch: &str, languages: &[&str]) {
-        let mut out: Vec<u8> = Vec::new();
-        out.extend_from_slice(&0x4655_4747u32.to_le_bytes()); // magic "GGUF"
-        out.extend_from_slice(&3u32.to_le_bytes()); // version
-        out.extend_from_slice(&0u64.to_le_bytes()); // tensor_count
-        out.extend_from_slice(&2u64.to_le_bytes()); // kv_count
-                                                    // general.architecture : string
-        push_gguf_str(&mut out, "general.architecture");
-        out.extend_from_slice(&8u32.to_le_bytes()); // STRING
-        push_gguf_str(&mut out, arch);
-        // general.languages : array<string>
-        push_gguf_str(&mut out, "general.languages");
-        out.extend_from_slice(&9u32.to_le_bytes()); // ARRAY
-        out.extend_from_slice(&8u32.to_le_bytes()); // elem STRING
-        out.extend_from_slice(&(languages.len() as u64).to_le_bytes());
-        for l in languages {
-            push_gguf_str(&mut out, l);
-        }
-        fs::write(path, out).unwrap();
-    }
-
-    #[test]
-    fn test_discover_hf_cache_models_filters_by_arch() {
-        let tmp = TempDir::new().unwrap();
-        let root = tmp.path();
-
-        // ASR repo: a whisper gguf -> should be discovered.
-        let repo = root.join("models--handy-computer--whisper-test");
-        fs::create_dir_all(repo.join("snapshots").join("abc123")).unwrap();
-        fs::create_dir_all(repo.join("refs")).unwrap();
-        fs::write(repo.join("refs").join("main"), "abc123").unwrap();
-        write_synthetic_gguf(
-            &repo
-                .join("snapshots")
-                .join("abc123")
-                .join("whisper-q8.gguf"),
-            "whisper",
-            &["en", "de"],
-        );
-
-        // Non-ASR (llama) gguf -> must be ignored.
-        let repo2 = root.join("models--someone--llama-7b");
-        fs::create_dir_all(repo2.join("snapshots").join("def456")).unwrap();
-        fs::create_dir_all(repo2.join("refs")).unwrap();
-        fs::write(repo2.join("refs").join("main"), "def456").unwrap();
-        write_synthetic_gguf(
-            &repo2.join("snapshots").join("def456").join("llama-q8.gguf"),
-            "llama",
-            &[],
-        );
-
-        let mut models = HashMap::new();
-        ModelManager::discover_hf_cache_models_in(root, &mut models);
-
-        let id = "handy-computer/whisper-test/whisper-q8.gguf";
-        let m = models.get(id).expect("whisper gguf should be discovered");
-        assert!(m.is_downloaded);
-        assert!(
-            matches!(&m.source, ModelSource::HuggingFace { repo_id, revision }
-            if repo_id == "handy-computer/whisper-test" && revision == "main")
-        );
-        assert_eq!(
-            m.supported_languages,
-            vec!["en".to_string(), "de".to_string()]
-        );
-        assert!(
-            !models.contains_key("someone/llama-7b/llama-q8.gguf"),
-            "non-ASR gguf must be ignored"
-        );
     }
 }

@@ -12,4 +12,5 @@ pub mod session;
 pub mod store;
 pub mod summary;
 pub mod system_capture;
+pub mod toggle;
 pub mod tools;

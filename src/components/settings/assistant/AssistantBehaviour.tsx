@@ -1,0 +1,105 @@
+import React, { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
+import type { MeetingSensitivity } from "@/bindings";
+import { useSettings } from "../../../hooks/useSettings";
+import { Dropdown } from "../../ui/Dropdown";
+import { Input } from "../../ui/Input";
+import { SettingContainer } from "../../ui/SettingContainer";
+import { SettingsGroup } from "../../ui/SettingsGroup";
+import { ToggleSwitch } from "../../ui/ToggleSwitch";
+
+const MIN_INTERVAL = 10;
+const MAX_INTERVAL = 120;
+const DEFAULT_INTERVAL_SECS = 20;
+
+/** When and how loudly the assistant speaks up during a meeting. */
+export const AssistantBehaviour: React.FC = () => {
+  const { t } = useTranslation();
+  const { getSetting, updateSetting, isUpdating } = useSettings();
+
+  const interval =
+    getSetting("meeting_observer_interval_secs") ?? DEFAULT_INTERVAL_SECS;
+  const [draft, setDraft] = useState(String(interval));
+  const enabled = getSetting("meeting_assistant_enabled") ?? false;
+  useEffect(() => setDraft(String(interval)), [interval]);
+
+  const sensitivityOptions = (["low", "medium", "high"] as const).map((v) => ({
+    value: v,
+    label: t(`settings.meeting.sensitivity.${v}`),
+  }));
+
+  const commitInterval = () => {
+    const n = Math.round(Number(draft));
+    if (!Number.isFinite(n) || draft.trim() === "") {
+      setDraft(String(interval));
+      return;
+    }
+    const clamped = Math.min(MAX_INTERVAL, Math.max(MIN_INTERVAL, n));
+    setDraft(String(clamped));
+    if (clamped !== interval)
+      updateSetting("meeting_observer_interval_secs", clamped);
+  };
+
+  return (
+    <SettingsGroup
+      title={t("settings.meeting.title")}
+      description={t("settings.meeting.description")}
+    >
+      <ToggleSwitch
+        checked={enabled}
+        onChange={(v) => updateSetting("meeting_assistant_enabled", v)}
+        isUpdating={isUpdating("meeting_assistant_enabled")}
+        label={t("settings.meeting.enabled.label")}
+        description={t("settings.meeting.enabled.description", { interval })}
+        descriptionMode="inline"
+        grouped={true}
+      />
+      <SettingContainer
+        title={t("settings.meeting.sensitivity.label")}
+        description={t("settings.meeting.sensitivity.description")}
+        descriptionMode="tooltip"
+        grouped={true}
+      >
+        <Dropdown
+          options={sensitivityOptions}
+          selectedValue={getSetting("meeting_sensitivity") ?? "medium"}
+          onSelect={(v) =>
+            updateSetting("meeting_sensitivity", v as MeetingSensitivity)
+          }
+          disabled={!enabled || isUpdating("meeting_sensitivity")}
+        />
+      </SettingContainer>
+      <SettingContainer
+        title={t("settings.meeting.interval.label")}
+        description={t("settings.meeting.interval.description")}
+        descriptionMode="tooltip"
+        grouped={true}
+      >
+        <Input
+          type="number"
+          variant="compact"
+          className="w-24"
+          min={MIN_INTERVAL}
+          max={MAX_INTERVAL}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commitInterval}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") e.currentTarget.blur();
+          }}
+          disabled={!enabled || isUpdating("meeting_observer_interval_secs")}
+        />
+      </SettingContainer>
+      <ToggleSwitch
+        checked={getSetting("meeting_beep_enabled") ?? true}
+        onChange={(v) => updateSetting("meeting_beep_enabled", v)}
+        isUpdating={isUpdating("meeting_beep_enabled")}
+        disabled={!enabled}
+        label={t("settings.meeting.beep.label")}
+        description={t("settings.meeting.beep.description")}
+        descriptionMode="tooltip"
+        grouped={true}
+      />
+    </SettingsGroup>
+  );
+};

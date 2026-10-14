@@ -2,21 +2,20 @@
   "tray": {
     "settings": "Настройки...",
     "checkUpdates": "Проверить обновления...",
-    "copyLastTranscript": "Скопировать последнюю транскрипцию",
     "unloadModel": "Выгрузить модель",
     "model": "Модель",
     "quit": "Выход",
-    "cancel": "Отмена",
-    "secureInputWarning": "⚠ Сочетания клавиш заблокированы Secure Input"
+    "startMeeting": "Start Meeting",
+    "endMeeting": "End Meeting"
   },
   "sidebar": {
     "projects": "Projects",
     "meetings": "Meetings",
+    "assistant": "Assistant",
+    "audio": "Audio",
     "general": "Общие",
     "models": "Модели",
     "advanced": "Продвинутые",
-    "postProcessing": "Постобработка",
-    "history": "История",
     "debug": "Отладка",
     "about": "О программе"
   },
@@ -154,11 +153,11 @@
       "failing": "The assistant has failed {{count}} times in a row. Check the provider settings.",
       "lastError": "The assistant's last check failed:",
       "readiness": {
-        "disabled": "The meeting assistant is off. Turn it on under Advanced settings.",
-        "no_provider": "No provider is set for the meeting assistant. Choose one under Advanced settings.",
-        "unsupported_provider": "{{detail}} cannot run the meeting assistant. Choose another provider under Advanced settings.",
-        "missing_api_key": "No API key for {{detail}}. Add one under Post Processing settings.",
-        "no_model": "No model is selected for {{detail}}. Pick one under Post Processing settings."
+        "disabled": "The meeting assistant is off. Turn it on in Assistant.",
+        "no_provider": "No AI provider is set. Choose one in Assistant.",
+        "unsupported_provider": "{{detail}} cannot run the meeting assistant. Choose another provider in Assistant.",
+        "missing_api_key": "No API key for {{detail}}. Add one in Assistant.",
+        "no_model": "No model is selected for {{detail}}. Pick one in Assistant."
       }
     },
     "summary": {
@@ -259,26 +258,6 @@
     "errors": {
       "selectModel": "Не удалось выбрать модель"
     },
-    "permissions": {
-      "title": "Требуются разрешения",
-      "description": "Handy требуются некоторые разрешения для корректной работы.",
-      "microphone": {
-        "title": "Доступ к микрофону",
-        "description": "Необходим для прослушивания вашего голоса для транскрипции."
-      },
-      "accessibility": {
-        "title": "Доступ к универсальному доступу",
-        "description": "Необходим для ввода расшифрованного текста в ваши приложения."
-      },
-      "grant": "Предоставить разрешение",
-      "granted": "Предоставлено",
-      "waiting": "Ожидание...",
-      "allGranted": "Всё готово!",
-      "errors": {
-        "checkFailed": "Не удалось проверить разрешения. Пожалуйста, попробуйте снова.",
-        "requestFailed": "Не удалось запросить разрешение. Пожалуйста, попробуйте снова."
-      }
-    },
     "assistant": {
       "title": "Set up your assistant",
       "description": "The meeting assistant and summaries use an LLM provider. Pick one, add your API key if needed, and test the connection.",
@@ -289,12 +268,12 @@
       "failure": "Connection failed: {{error}}",
       "continue": "Continue",
       "skip": "Skip for now",
-      "hint": "You can change this later under Post Processing settings.",
-      "unsupported": "Apple Intelligence cannot be used for meetings. Pick another provider."
+      "hint": "You can change this later in Assistant."
     }
   },
   "modelSelector": {
     "custom": "Пользовательская",
+    "legacy": "Устаревшее",
     "streaming": "Потоковый",
     "active": "Активный",
     "switching": "Переключение...",
@@ -314,64 +293,35 @@
     "noModelDownloadRequired": "Нет модели – требуется загрузка",
     "deleteModel": "Удалить {{modelName}}",
     "downloadSpeed": "{{speed}} МБ/с",
-    "capabilities": {
-      "languageSelection": "Поддерживает несколько языков ввода",
-      "languageCount": "{{total}} языков",
-      "translation": "Может переводить на английский",
-      "translate": "Перевод на английский",
-      "singleLanguage": "Поддерживает только этот язык",
-      "languageOnly": "Только {{language}}",
-      "streaming": "Показывает транскрипцию в реальном времени во время речи"
-    },
     "cancel": "Отмена",
     "cancelDownload": "Отменить загрузку",
-    "legacy": "Устаревшее"
+    "capabilities": {
+      "languageSelection": "Поддерживает несколько языков ввода",
+      "singleLanguage": "Поддерживает только этот язык",
+      "languageCount": "{{total}} языков",
+      "languageOnly": "Только {{language}}",
+      "translation": "Может переводить на английский",
+      "translate": "Перевод на английский",
+      "streaming": "Показывает транскрипцию в реальном времени во время речи"
+    }
   },
   "settings": {
     "modelSettings": {
       "title": "Настройки {{model}}"
     },
-    "models": {
-      "title": "Модели транскрипции",
-      "description": "Выберите модель транскрипции или загрузите дополнительные модели. Разные модели предлагают разные уровни точности и скорости.",
-      "deleteConfirm": "Вы уверены, что хотите удалить {{modelName}}? Вам нужно будет загрузить её снова, чтобы использовать.",
-      "deleteActiveConfirm": "{{modelName}} — ваша активная модель. Удаление остановит транскрипцию, пока вы не выберете новую модель. Вы уверены?",
-      "deleteTitle": "Удалить модель",
-      "filters": {
-        "allLanguages": "Все языки",
-        "streaming": "Фильтровать модели с поддержкой транскрипции в реальном времени",
-        "translation": "Фильтровать модели с поддержкой перевода на английский"
-      },
-      "noModelsMatch": "Нет моделей, соответствующих этому фильтру.",
-      "yourModels": "Загруженные модели",
-      "availableModels": "Доступны для загрузки",
-      "searchPlaceholder": "Поиск моделей по имени…",
-      "rescan": {
-        "label": "Пересканировать",
-        "tooltip": "Пересканировать модели, добавленные в папку моделей или кэш Hugging Face вне Handy"
-      }
-    },
     "general": {
       "title": "Общие",
       "shortcut": {
-        "title": "Ярлыки Handy",
-        "description": "Настройте сочетания клавиш для запуска записи речи в текст",
+        "title": "Shortcut",
+        "description": "Start or end a meeting from anywhere.",
         "loading": "Загрузка ярлыков...",
         "none": "Ярлыки не настроены",
         "notFound": "Ярлык не найден",
         "pressKeys": "Нажимайте клавиши...",
         "bindings": {
-          "transcribe": {
-            "name": "Горячая клавиша транскрипции",
-            "description": "Сочетание клавиш для записи и транскрибирования вашего голоса."
-          },
-          "cancel": {
-            "name": "Горячая клавиша отмены",
-            "description": "Сочетание клавиш для отмены текущей записи."
-          },
-          "transcribe_with_post_process": {
-            "name": "Горячая клавиша постобработки",
-            "description": "Специальное сочетание клавиш для ИИ-постобработки вашей транскрипции."
+          "toggle_meeting": {
+            "name": "Meeting shortcut",
+            "description": "Starts a meeting in your most recent project, or ends the running one."
           }
         },
         "errors": {
@@ -386,21 +336,68 @@
         "searchPlaceholder": "Поиск языков...",
         "noResults": "Языки не найдены",
         "auto": "Авто"
-      },
-      "shortcutActivation": {
-        "title": "Поведение сочетания клавиш",
-        "description": "Выберите, как горячая клавиша транскрипции запускает и останавливает запись.",
-        "options": {
-          "holdOrToggle": "Автоматически",
-          "pushToTalk": "Удержание",
-          "toggle": "Переключение"
+      }
+    },
+    "assistant": {
+      "provider": {
+        "title": "AI provider",
+        "description": "The model Meet Assist uses for nudges, summaries, and image digests.",
+        "test": {
+          "button": "Test connection",
+          "ok": "Connected. {{count}} models available."
         },
-        "descriptions": {
-          "hold_or_toggle": "Удерживайте для записи или нажмите кратко для переключения",
-          "push_to_talk": "Записывает, пока сочетание клавиш удерживается",
-          "toggle": "Нажмите сочетание клавиш, чтобы начать запись, нажмите ещё раз, чтобы остановить"
+        "select": {
+          "title": "Поставщик",
+          "description": "Выберите поставщика, совместимого с OpenAI или Anthropic."
+        },
+        "apiFormat": {
+          "title": "Формат API",
+          "description": "Формат запроса, ожидаемый вашей пользовательской конечной точкой.",
+          "options": {
+            "openai": "Совместимый с OpenAI (Chat Completions)",
+            "anthropic": "Anthropic Messages"
+          }
+        },
+        "baseUrl": {
+          "title": "Базовый URL",
+          "description": "Базовый URL-адрес API для выбранного провайдера. Редактировать можно только настраиваемого поставщика.",
+          "placeholder": "https://api.openai.com/v1",
+          "placeholderAnthropic": "https://api.anthropic.com/v1"
+        },
+        "apiKey": {
+          "title": "API-ключ",
+          "description": "API-ключ для выбранного провайдера.",
+          "placeholder": "sk-..."
+        },
+        "model": {
+          "title": "Модель",
+          "descriptionCustom": "Укажите идентификатор модели, ожидаемый вашей пользовательской конечной точкой.",
+          "descriptionDefault": "Выберите модель, предоставляемую выбранным поставщиком.",
+          "placeholderWithOptions": "Найдите или выберите модель",
+          "placeholderNoOptions": "Введите название модели",
+          "refreshModels": "Обновить модели"
         }
       }
+    },
+    "models": {
+      "title": "Модели транскрипции",
+      "description": "Выберите модель транскрипции или загрузите дополнительные модели. Разные модели предлагают разные уровни точности и скорости.",
+      "searchPlaceholder": "Поиск моделей по имени…",
+      "yourModels": "Загруженные модели",
+      "availableModels": "Доступны для загрузки",
+      "deleteConfirm": "Вы уверены, что хотите удалить {{modelName}}? Вам нужно будет загрузить её снова, чтобы использовать.",
+      "deleteActiveConfirm": "{{modelName}} — ваша активная модель. Удаление остановит транскрипцию, пока вы не выберете новую модель. Вы уверены?",
+      "deleteTitle": "Удалить модель",
+      "filters": {
+        "allLanguages": "Все языки",
+        "streaming": "Фильтровать модели с поддержкой транскрипции в реальном времени",
+        "translation": "Фильтровать модели с поддержкой перевода на английский"
+      },
+      "rescan": {
+        "label": "Пересканировать",
+        "tooltip": "Пересканировать модели, добавленные в папку моделей или кэш Hugging Face вне Handy"
+      },
+      "noModelsMatch": "Нет моделей, соответствующих этому фильтру."
     },
     "sound": {
       "title": "Звук",
@@ -434,18 +431,12 @@
     "advanced": {
       "groups": {
         "app": "Приложение",
-        "output": "Вывод",
         "transcription": "Транскрипция",
-        "history": "История",
         "experimental": "Экспериментальное"
       },
       "experimentalToggle": {
         "label": "Экспериментальные функции",
         "description": "Включить экспериментальные функции, которые находятся в разработке."
-      },
-      "lazyStreamClose": {
-        "label": "Оставлять микрофон включённым между транскрипциями",
-        "description": "Оставляет поток микрофона открытым в течение 30 секунд после остановки записи, уменьшая задержку при последовательных транскрипциях. Может ухудшить качество звука Bluetooth."
       },
       "acceleration": {
         "transcribe": {
@@ -471,64 +462,6 @@
       "showTrayIcon": {
         "label": "Показать значок в трее",
         "description": "Отображать значок Handy в системном трее."
-      },
-      "overlay": {
-        "style": {
-          "title": "Наложение",
-          "description": "Выберите наложение при записи: «Нет» скрывает его, «Минимальное» показывает компактный индикатор, «В реальном времени» показывает транскрипцию по мере речи (только модели с поддержкой потоковой обработки — ищите значок «Потоковый» в списке моделей). В Linux рекомендуется «Нет».",
-          "options": {
-            "none": "Нет",
-            "minimal": "Минимальное",
-            "live": "В реальном времени"
-          }
-        },
-        "position": {
-          "title": "Позиция индикатора",
-          "description": "Отображение индикатора визуальной обратной связи во время записи и транскрипции. В Linux рекомендуется выбрать «Нет».",
-          "options": {
-            "bottom": "Снизу",
-            "top": "Сверху"
-          }
-        }
-      },
-      "pasteMethod": {
-        "title": "Метод вставки",
-        "description": "Выбрать способ вставки текста. Прямой: имитирует набор текста через системный ввод. Нет: пропуск вставки, обновление только истории/буфера обмена.",
-        "options": {
-          "clipboard": "Буфер обмена ({{modifier}}+V)",
-          "clipboardCtrlShiftV": "Буфер обмена (Ctrl+Shift+V)",
-          "clipboardShiftInsert": "Буфер обмена (Shift+Insert)",
-          "direct": "Прямой",
-          "none": "Нет",
-          "externalScript": "Внешний скрипт"
-        },
-        "externalScriptPlaceholder": "/path/to/your/script.sh"
-      },
-      "typingTool": {
-        "title": "Инструмент ввода",
-        "description": "Выберите, какой инструмент ввода в Linux использовать для метода прямой вставки. Auto автоматически определит и использует лучший доступный инструмент для вашей системы.",
-        "options": {
-          "auto": "Auto (Рекомендуется)"
-        }
-      },
-      "clipboardHandling": {
-        "title": "Обработка буфера обмена",
-        "description": "Функция «Не изменять буфер обмена» сохраняет текущее содержимое буфера обмена после транскрипции. Копировать в буфер обмена оставляет результат транскрипции в буфере обмена после вставки.",
-        "options": {
-          "dontModify": "Не изменять буфер обмена",
-          "copyToClipboard": "Копировать в буфер обмена"
-        }
-      },
-      "autoSubmit": {
-        "title": "Автоматическая отправка",
-        "description": "Автоматически отправляет выбранную комбинацию клавиш после вставки текста. Cmd+Enter применяется на macOS, а Windows/Linux используют Super+Enter.",
-        "options": {
-          "off": "Выкл.",
-          "enter": "Ввод",
-          "cmdEnter": "Cmd+Ввод",
-          "superEnter": "Super+Ввод",
-          "ctrlEnter": "Ctrl+Ввод"
-        }
       },
       "translateToEnglish": {
         "label": "Перевести на английский",
@@ -582,85 +515,6 @@
         }
       }
     },
-    "postProcessing": {
-      "hotkey": {
-        "title": "Горячая клавиша"
-      },
-      "api": {
-        "title": "API",
-        "provider": {
-          "title": "Поставщик",
-          "description": "Выберите поставщика, совместимого с OpenAI или Anthropic."
-        },
-        "apiFormat": {
-          "title": "Формат API",
-          "description": "Формат запроса, ожидаемый вашей пользовательской конечной точкой.",
-          "options": {
-            "openai": "Совместимый с OpenAI (Chat Completions)",
-            "anthropic": "Anthropic Messages"
-          }
-        },
-        "appleIntelligence": {
-          "unavailable": "Apple Intelligence недоступен на этом устройстве. Требуется Apple Silicon Mac под управлением macOS Tahoe (26.0) или более поздней версии с включенным Apple Intelligence в настройках системы."
-        },
-        "baseUrl": {
-          "title": "Базовый URL",
-          "description": "Базовый URL-адрес API для выбранного провайдера. Редактировать можно только настраиваемого поставщика.",
-          "placeholder": "https://api.openai.com/v1",
-          "placeholderAnthropic": "https://api.anthropic.com/v1"
-        },
-        "apiKey": {
-          "title": "API-ключ",
-          "description": "API-ключ для выбранного провайдера.",
-          "placeholder": "sk-..."
-        },
-        "model": {
-          "title": "Модель",
-          "descriptionCustom": "Укажите идентификатор модели, ожидаемый вашей пользовательской конечной точкой.",
-          "descriptionDefault": "Выберите модель, предоставляемую выбранным поставщиком.",
-          "placeholderWithOptions": "Найдите или выберите модель",
-          "placeholderNoOptions": "Введите название модели",
-          "refreshModels": "Обновить модели"
-        }
-      },
-      "prompts": {
-        "title": "Запрос к модели",
-        "selectedPrompt": {
-          "title": "Выберите запрос",
-          "description": "Выберите запрос для постобработки транскрипции или создайте новый. Используйте ${output} внутри текста запроса для ссылки на записанную транскрипцию."
-        },
-        "noPrompts": "Нет доступных запросов",
-        "selectPrompt": "Выберите запрос",
-        "createNew": "Создать новый запрос",
-        "promptLabel": "Название запроса",
-        "promptLabelPlaceholder": "Введите название запроса",
-        "promptInstructions": "Инструкции",
-        "promptInstructionsPlaceholder": "Напишите инструкции для постобработки транскрипции. Например: Улучшить грамматику и ясность следующего текста: ${output}",
-        "promptTip": "Совет: используйте <code>${output}</code>, чтобы вставить транскрипцию.",
-        "updatePrompt": "Обновить запрос",
-        "deletePrompt": "Удалить запрос",
-        "createPrompt": "Создать запрос",
-        "cancel": "Отмена",
-        "selectToEdit": "Выберите запрос выше, чтобы просмотреть и изменить его сведения.",
-        "createFirst": "Нажмите «Создать новый запрос» выше, чтобы создать первый запрос для постобработки."
-      }
-    },
-    "history": {
-      "title": "История",
-      "openFolder": "Открыть папку с записями",
-      "loading": "Загрузка истории...",
-      "empty": "Транскрипций пока нет. Начните запись, чтобы создать свою историю!",
-      "copyToClipboard": "Скопировать транскрипцию в буфер обмена",
-      "copyError": "Не удалось скопировать транскрипцию в буфер обмена.",
-      "save": "Сохранить транскрипцию",
-      "unsave": "Удалить из сохраненных",
-      "delete": "Удалить запись",
-      "deleteError": "Не удалось удалить запись. Пожалуйста, попробуйте еще раз.",
-      "retranscribe": "Перетранскрибировать",
-      "retranscribeError": "Не удалось перетранскрибировать. Пожалуйста, попробуйте снова.",
-      "transcribing": "Транскрибирование...",
-      "transcriptionFailed": "Транскрипция не удалась. Вы можете перетранскрибировать, используя значок повтора."
-    },
     "debug": {
       "title": "Отлаживать",
       "logDirectory": {
@@ -687,99 +541,6 @@
         "description": "Автоматически проверять наличие новых версий Handy",
         "lockedDescription": "Отключено системной конфигурацией (HANDY_DISABLE_UPDATER)"
       },
-      "soundTheme": {
-        "label": "Звуковая тема",
-        "description": "Выберите звуковую тему для начала и остановки записи обратной связи."
-      },
-      "wordCorrectionThreshold": {
-        "title": "Порог исправления слов",
-        "description": "Чувствительность к пользовательским исправлениям слов"
-      },
-      "historyLimit": {
-        "title": "Размер истории",
-        "description": "Максимальное количество записей истории, которые можно сохранить",
-        "entries": "записи"
-      },
-      "recordingRetention": {
-        "title": "Автоматическое удаление записей",
-        "description": "Автоматически удалять старые записи для экономии места",
-        "never": "Никогда",
-        "preserveLimit": "Хранить последние {{count}}",
-        "days3": "Через 3 дня",
-        "weeks2": "Через 2 недели",
-        "months3": "Через 3 месяца",
-        "placeholder": "Выберите срок хранения..."
-      },
-      "alwaysOnMicrophone": {
-        "label": "Всегда включенный микрофон",
-        "description": "Держите микрофон активным для более быстрого ответа"
-      },
-      "clamshellMicrophone": {
-        "title": "Раскладной микрофон",
-        "description": "Микрофон для использования при закрытой крышке ноутбука"
-      },
-      "postProcessingToggle": {
-        "label": "Постобработка",
-        "description": "Включить уточнение текста с помощью искусственного интеллекта после транскрипции"
-      },
-      "muteWhileRecording": {
-        "label": "Отключить звук во время записи",
-        "description": "Отключение звука системы во время записи"
-      },
-      "appendTrailingSpace": {
-        "label": "Добавить пробел",
-        "description": "Добавить пробел после вставленной транскрипции"
-      },
-      "keyboardImplementation": {
-        "title": "Реализация клавиатуры",
-        "description": "Выберите бэкенд для клавиатурных сочетаний.",
-        "bindingsReset": "Клавиатурные сочетания были несовместимы и сброшены к значениям по умолчанию"
-      },
-      "paths": {
-        "appData": "Данные приложения:",
-        "models": "Модели:",
-        "settings": "Настройки:"
-      },
-      "pasteDelay": {
-        "title": "Задержка вставки (до)",
-        "description": "Задержка (в миллисекундах) после копирования текста, перед отправкой нажатия клавиши вставки. Увеличьте, если ничего не вставляется."
-      },
-      "pasteDelayAfter": {
-        "title": "Задержка вставки (после)",
-        "description": "Задержка (в миллисекундах) после нажатия клавиши вставки, перед восстановлением предыдущего буфера обмена. Увеличьте, если вместо транскрипции вставляется старое содержимое буфера обмена."
-      },
-      "holdThreshold": {
-        "title": "Порог удержания",
-        "description": "Только для автоматического режима: сколько (в миллисекундах) нужно удерживать сочетание клавиш, чтобы это считалось удержанием, а не кратким нажатием. Уменьшите, если после короткого удержания запись продолжается; увеличьте, если намеренные краткие нажатия воспринимаются как удержание."
-      },
-      "reliablePaste": {
-        "title": "Надёжная вставка (Beta)",
-        "description": "Восстанавливать буфер обмена только после того, как целевое приложение действительно прочитает транскрипцию, а не по фиксированной задержке. Предназначено для устранения вставки старого содержимого буфера обмена при нагрузке на систему. Требуется метод вставки через буфер обмена; только macOS и Windows."
-      },
-      "recordingBuffer": {
-        "title": "Дополнительный буфер записи",
-        "description": "Дополнительное время (в миллисекундах) для продолжения записи после отпускания клавиши, чтобы захватить завершающий звук. 0 = без дополнительного буфера."
-      },
-      "keyboardDiagnostic": {
-        "title": "Диагностика клавиатуры",
-        "description": "Проверяет, доходят ли события клавиатуры до Handy. Записывается только количество событий — никогда то, какие клавиши вы нажимаете.",
-        "run": "Запустить 10-секундную диагностику",
-        "running": "Прослушивание… нажмите своё сочетание клавиш несколько раз (например, Option+Space)",
-        "secureInputLabel": "Secure Input",
-        "enabled": "включён",
-        "disabled": "выключен",
-        "holder": "удерживает {{name}} (pid {{pid}})",
-        "holderUnknown": "видимый владелец не найден",
-        "keyDown": "Нажатие клавиши",
-        "keyUp": "Отпускание клавиши",
-        "flagsChanged": "Модификаторы",
-        "mouse": "Мышь",
-        "verdictBlocked": "Secure Input блокирует события клавиш — сочетания с обычной клавишей не смогут работать, пока это не будет устранено.",
-        "verdictSuspicious": "События модификаторов приходят, а события клавиш — нет: что-то подавляет клавиши, хотя Secure Input отмечен как выключенный. Пожалуйста, сообщите об этом на GitHub.",
-        "verdictOk": "События клавиш доходят до Handy нормально.",
-        "verdictNoEvents": "События не зафиксированы — вы нажимали клавиши во время теста?",
-        "failed": "Диагностика не удалась: {{error}}"
-      },
       "whatsNewPreview": {
         "title": "Предпросмотр новинок",
         "description": "Открыть последние встроенные примечания к выпуску, не отмечая их как просмотренные",
@@ -790,9 +551,26 @@
       "onboardingPreview": {
         "title": "Предпросмотр первоначальной настройки",
         "description": "Просмотрите экраны первоначальной настройки, не изменяя разрешения, модели или статус завершения",
-        "permissionsButton": "Разрешения",
         "modelsButton": "Выбор модели",
         "exitButton": "Выйти из предпросмотра"
+      },
+      "soundTheme": {
+        "label": "Звуковая тема",
+        "description": "Выберите звуковую тему для начала и остановки записи обратной связи."
+      },
+      "wordCorrectionThreshold": {
+        "title": "Порог исправления слов",
+        "description": "Чувствительность к пользовательским исправлениям слов"
+      },
+      "keyboardImplementation": {
+        "title": "Реализация клавиатуры",
+        "description": "Выберите бэкенд для клавиатурных сочетаний.",
+        "bindingsReset": "Клавиатурные сочетания были несовместимы и сброшены к значениям по умолчанию"
+      },
+      "paths": {
+        "appData": "Данные приложения:",
+        "models": "Модели:",
+        "settings": "Настройки:"
       }
     },
     "about": {
@@ -800,6 +578,10 @@
       "version": {
         "title": "Версия",
         "description": "Текущая версия Handy"
+      },
+      "whatsNewUpdates": {
+        "label": "Показывать новинки",
+        "description": "Показывать примечания к выпуску после обновлений Handy"
       },
       "appDataDirectory": {
         "title": "Каталог данных приложения",
@@ -822,10 +604,6 @@
           "description": "Высокопроизводительная модель автоматического распознавания речи OpenAI Whisper",
           "details": "Handy использует ggml для быстрого локального преобразования речи в текст. Спасибо великолепной работе Георгия Герганова и участников."
         }
-      },
-      "whatsNewUpdates": {
-        "label": "Показывать новинки",
-        "description": "Показывать примечания к выпуску после обновлений Handy"
       }
     },
     "meeting": {
@@ -834,11 +612,6 @@
       "enabled": {
         "label": "Meeting assistant",
         "description": "When on, every {{interval}} seconds the recent transcript, your project brief and meeting context are sent to the chosen provider so the assistant can decide whether to speak up."
-      },
-      "provider": {
-        "label": "Provider",
-        "description": "Which post-processing provider answers during meetings. Empty uses the post-processing default.",
-        "default": "Same as post-processing"
       },
       "sensitivity": {
         "label": "Sensitivity",
@@ -876,6 +649,9 @@
     "portableUpdateBrowseMessage": "Портативные установки нельзя обновить автоматически. Скачайте последнюю версию для вашей системы со страницы GitHub Releases и установите её в ту же папку — папка Data/ (настройки, модели, записи) останется на месте.",
     "portableUpdateBrowseButton": "Открыть GitHub Releases"
   },
+  "whatsNew": {
+    "title": "Новое в Handy v{{version}}"
+  },
   "common": {
     "loading": "Загрузка...",
     "delete": "Удалить",
@@ -885,27 +661,16 @@
     "clear": "Очистить",
     "noOptionsFound": "Вариантов не найдено"
   },
-  "accessibility": {
-    "permissionsDescription": "Handy необходимы разрешения на доступ для ввода расшифрованного текста.",
-    "openSettings": "Открыть настройки системы"
-  },
   "errors": {
     "loadDirectory": "Ошибка загрузки каталога: {{error}}.",
     "micPermissionDeniedTitle": "Доступ к микрофону запрещён",
+    "meetingToggleFailedTitle": "Couldn't start the meeting",
     "micPermissionDenied": {
-      "generic": "Доступ к микрофону был запрещён операционной системой. Предоставьте разрешение на использование микрофона в настройках системы.",
       "windows": "Включите доступ к микрофону в Параметры → Конфиденциальность и безопасность → Микрофон (включая доступ классических приложений).",
-      "macos": "Предоставьте доступ к микрофону в Системные настройки → Конфиденциальность и безопасность → Микрофон.",
-      "linux": "Предоставьте доступ к микрофону в настройках звука или конфиденциальности вашей системы."
+      "macos": "Enable microphone access for Meet Assist in System Settings → Privacy & Security → Microphone."
     },
-    "noInputDeviceTitle": "Микрофон не найден",
-    "noInputDevice": "Аудиоустройство ввода не обнаружено. Подключите микрофон или гарнитуру и попробуйте снова.",
-    "recordingFailed": "Не удалось начать запись: {{error}}",
     "modelLoadFailed": "Не удалось загрузить модель: {{model}}",
-    "modelLoadFailedUnknown": "неизвестная модель",
-    "pasteFailedTitle": "Не удалось вставить текст",
-    "pasteFailed": "Не удалось вставить текст в активное приложение.",
-    "transcriptionFailedTitle": "Ошибка транскрипции"
+    "modelLoadFailedUnknown": "неизвестная модель"
   },
   "appLanguage": {
     "title": "Язык приложения",
@@ -920,23 +685,8 @@
       "dark": "Тёмная"
     }
   },
-  "overlay": {
-    "transcribing": "Расшифровка...",
-    "processing": "Обработка...",
-    "loadingModel": "Загрузка модели..."
-  },
-  "whatsNew": {
-    "title": "Новое в Handy v{{version}}"
-  },
   "secureInput": {
-    "blockedWithCulprit_one": "{{name}} может блокировать 1 сочетание клавиш",
-    "blockedWithCulprit_other": "{{name}} может блокировать {{count}} сочетаний клавиш",
-    "blockedNoCulprit_one": "macOS временно блокирует 1 сочетание клавиш",
-    "blockedNoCulprit_other": "macOS временно блокирует {{count}} сочетаний клавиш",
-    "recorderBlockedWithCulprit": "{{name}} может блокировать изменение сочетаний клавиш",
-    "recorderBlockedNoCulprit": "macOS временно блокирует изменение сочетаний клавиш",
     "learnMore": "Как это исправить",
-    "recorderBlocked": "Сейчас нельзя записать сочетание клавиш — Secure Input в macOS блокирует события клавиш. Сначала устраните предупреждение о Secure Input.",
-    "dismiss": "Скрыть"
+    "recorderBlocked": "Сейчас нельзя записать сочетание клавиш — Secure Input в macOS блокирует события клавиш. Сначала устраните предупреждение о Secure Input."
   }
 }

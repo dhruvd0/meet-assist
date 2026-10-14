@@ -104,8 +104,9 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({ onError }) => {
         const modelId = event.payload;
         setTimeout(async () => {
           try {
-            const isRecording = await commands.isRecording();
-            if (!isRecording) {
+            // Don't swap the engine under a live meeting.
+            const { meeting_id } = await commands.meetingState();
+            if (meeting_id === null) {
               setPendingModelId(modelId);
               setModelError(null);
               setShowModelDropdown(false);

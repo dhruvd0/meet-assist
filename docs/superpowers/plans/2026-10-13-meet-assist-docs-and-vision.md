@@ -33,9 +33,11 @@
 ### Task 1: Write `docs/VISION.md`
 
 **Files:**
+
 - Create: `docs/VISION.md`
 
 **Interfaces:**
+
 - Consumes: spec sections 1, 2, 5.
 - Produces: `docs/VISION.md`, linked from README (Task 3) and AGENTS (Task 4).
 
@@ -80,11 +82,11 @@ Meeting bots that join the call as a participant are intrusive, record everyone,
 
 ## Platform status
 
-| Platform | Microphone capture | System audio capture |
-| -------- | ------------------ | -------------------- |
+| Platform | Microphone capture | System audio capture                                                                    |
+| -------- | ------------------ | --------------------------------------------------------------------------------------- |
 | macOS    | Working (Handy)    | Planned, first target. CoreAudio process tap on 14.2+, ScreenCaptureKit fallback on 13. |
-| Windows  | Working (Handy)    | Planned, WASAPI loopback. Not yet verified. |
-| Linux    | Working (Handy)    | Planned, PulseAudio/PipeWire monitor source. Not yet verified. |
+| Windows  | Working (Handy)    | Planned, WASAPI loopback. Not yet verified.                                             |
+| Linux    | Working (Handy)    | Planned, PulseAudio/PipeWire monitor source. Not yet verified.                          |
 
 Where system audio is unavailable, a meeting runs microphone-only and the UI says so.
 
@@ -124,9 +126,11 @@ status so contributors stop reading the repo as a dictation app."
 ### Task 2: Write `docs/ARCHITECTURE.md`
 
 **Files:**
+
 - Create: `docs/ARCHITECTURE.md`
 
 **Interfaces:**
+
 - Consumes: spec sections 3, 4, 5. Existing module list from `src-tauri/src/` and `src/`.
 - Produces: `docs/ARCHITECTURE.md`, linked from README and AGENTS.
 
@@ -162,33 +166,33 @@ Both pipelines share `TranscriptionManager`, the model store, settings, the LLM 
 
 ### Existing (from Handy)
 
-| Path | Role |
-| --- | --- |
-| `lib.rs` | Tauri setup, manager initialization, tray, shortcuts |
-| `managers/audio.rs` | Microphone selection and recording via `handy-recorder` |
-| `managers/transcription.rs` | Model lifecycle, batch `transcribe(Vec<f32>)`, streaming preview |
-| `managers/model.rs` | Model download and discovery |
-| `managers/history.rs` | SQLite transcription history (pattern reused by the meeting store) |
-| `audio_toolkit/audio/sink.rs` | `CaptureVad`: frames in, speech segments out |
-| `audio_toolkit/vad/` | Silero VAD |
-| `llm_client.rs` | Chat completion client, OpenAI and Anthropic formats, JSON schema responses |
-| `audio_feedback.rs` | Plays feedback sounds via rodio |
-| `overlay.rs` | Always-on-top recording overlay window |
-| `settings.rs` | Persisted settings and migrations |
-| `commands/` | Tauri commands exposed to the frontend via tauri-specta |
+| Path                          | Role                                                                        |
+| ----------------------------- | --------------------------------------------------------------------------- |
+| `lib.rs`                      | Tauri setup, manager initialization, tray, shortcuts                        |
+| `managers/audio.rs`           | Microphone selection and recording via `handy-recorder`                     |
+| `managers/transcription.rs`   | Model lifecycle, batch `transcribe(Vec<f32>)`, streaming preview            |
+| `managers/model.rs`           | Model download and discovery                                                |
+| `managers/history.rs`         | SQLite transcription history (pattern reused by the meeting store)          |
+| `audio_toolkit/audio/sink.rs` | `CaptureVad`: frames in, speech segments out                                |
+| `audio_toolkit/vad/`          | Silero VAD                                                                  |
+| `llm_client.rs`               | Chat completion client, OpenAI and Anthropic formats, JSON schema responses |
+| `audio_feedback.rs`           | Plays feedback sounds via rodio                                             |
+| `overlay.rs`                  | Always-on-top recording overlay window                                      |
+| `settings.rs`                 | Persisted settings and migrations                                           |
+| `commands/`                   | Tauri commands exposed to the frontend via tauri-specta                     |
 
 ### Planned (meeting subsystem)
 
-| Path | Role |
-| --- | --- |
-| `meeting/mod.rs` | `MeetingManager`, Tauri state. Session state machine `Idle -> Live <-> Paused -> Ended`. |
-| `meeting/capture.rs` | `MeetingCapture`: mic plus system audio, both resampled to 16 kHz mono, one `CaptureVad` per source, emits `Utterance { speaker, samples, started_at }`. |
-| `meeting/transcriber.rs` | Worker thread. Utterances in order to `TranscriptionManager::transcribe()`. Appends `TranscriptLine`, emits `meeting:transcript-line`. |
-| `meeting/observer.rs` | Timer loop, default 20 s. Builds the judge prompt, calls `llm_client` with a JSON schema, applies 60 s cooldown and dedupe, fires beep and `meeting:intervention`. |
-| `meeting/summary.rs` | Session summary on end, then rolling meeting summary merge. |
-| `meeting/store.rs` | SQLite tables `meetings`, `sessions`, `transcript_lines`, `interventions`. |
-| `audio_toolkit/audio/system_capture/{macos,windows,linux}.rs` | Trait `SystemCapture { start(cb), stop() }`. macOS CoreAudio process tap (14.2+) with ScreenCaptureKit fallback; Windows WASAPI loopback; Linux PulseAudio/PipeWire monitor via cpal. |
-| `commands/meeting.rs` | `list_meetings`, `get_meeting`, `start_meeting`, `pause_meeting`, `resume_meeting`, `end_meeting`, `update_meeting_context`, `update_meeting_title`, `delete_meeting`, `dismiss_intervention`. |
+| Path                                                          | Role                                                                                                                                                                                           |
+| ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `meeting/mod.rs`                                              | `MeetingManager`, Tauri state. Session state machine `Idle -> Live <-> Paused -> Ended`.                                                                                                       |
+| `meeting/capture.rs`                                          | `MeetingCapture`: mic plus system audio, both resampled to 16 kHz mono, one `CaptureVad` per source, emits `Utterance { speaker, samples, started_at }`.                                       |
+| `meeting/transcriber.rs`                                      | Worker thread. Utterances in order to `TranscriptionManager::transcribe()`. Appends `TranscriptLine`, emits `meeting:transcript-line`.                                                         |
+| `meeting/observer.rs`                                         | Timer loop, default 20 s. Builds the judge prompt, calls `llm_client` with a JSON schema, applies 60 s cooldown and dedupe, fires beep and `meeting:intervention`.                             |
+| `meeting/summary.rs`                                          | Session summary on end, then rolling meeting summary merge.                                                                                                                                    |
+| `meeting/store.rs`                                            | SQLite tables `meetings`, `sessions`, `transcript_lines`, `interventions`.                                                                                                                     |
+| `audio_toolkit/audio/system_capture/{macos,windows,linux}.rs` | Trait `SystemCapture { start(cb), stop() }`. macOS CoreAudio process tap (14.2+) with ScreenCaptureKit fallback; Windows WASAPI loopback; Linux PulseAudio/PipeWire monitor via cpal.          |
+| `commands/meeting.rs`                                         | `list_meetings`, `get_meeting`, `start_meeting`, `pause_meeting`, `resume_meeting`, `end_meeting`, `update_meeting_context`, `update_meeting_title`, `delete_meeting`, `dismiss_intervention`. |
 
 ## Data model (planned)
 
@@ -208,7 +212,12 @@ Request, in order: rolling summary, user context, recent interventions, last ~3 
 Response schema:
 
 ```json
-{ "intervene": false, "kind": "loop | stuck | info | idea | null", "text": "string | null", "reason": "string" }
+{
+  "intervene": false,
+  "kind": "loop | stuck | info | idea | null",
+  "text": "string | null",
+  "reason": "string"
+}
 ```
 
 Sensitivity setting adds one instruction: low restricts to loop and explicit stuck, high permits ideas freely.
@@ -221,25 +230,25 @@ Sensitivity setting adds one instruction: low restricts to loop and explicit stu
 
 ### Existing
 
-| Path | Role |
-| --- | --- |
-| `App.tsx` | Shell, onboarding, sidebar routing |
-| `components/settings/` | Dictation and provider settings |
-| `components/ui/` | Shared primitives (buttons, inputs, selects). Meeting screens must reuse these. |
-| `stores/settingsStore.ts` | Zustand settings store |
-| `overlay/` | Separate window entry for the recording overlay |
-| `bindings.ts` | Generated by tauri-specta, do not edit by hand |
+| Path                      | Role                                                                            |
+| ------------------------- | ------------------------------------------------------------------------------- |
+| `App.tsx`                 | Shell, onboarding, sidebar routing                                              |
+| `components/settings/`    | Dictation and provider settings                                                 |
+| `components/ui/`          | Shared primitives (buttons, inputs, selects). Meeting screens must reuse these. |
+| `stores/settingsStore.ts` | Zustand settings store                                                          |
+| `overlay/`                | Separate window entry for the recording overlay                                 |
+| `bindings.ts`             | Generated by tauri-specta, do not edit by hand                                  |
 
 ### Planned
 
-| Path | Role |
-| --- | --- |
-| `stores/meetingStore.ts` | Meeting list, active meeting, live transcript buffer, interventions. Subscribes to the events above. |
-| `components/meetings/MeetingList.tsx` | Landing screen, first sidebar entry |
-| `components/meetings/MeetingDetail.tsx` | Title, controls, context editor, transcript thread by session, intervention timeline, summaries |
-| `components/meetings/MeetingControls.tsx` | Start / Pause / Resume / End, shared with tray actions |
-| `components/settings/meeting/` | Provider, sensitivity, observer interval, system-audio source, beep, keep-audio toggle |
-| `intervention/` | Separate window entry for the floating intervention card, same pattern as `overlay/` |
+| Path                                      | Role                                                                                                 |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `stores/meetingStore.ts`                  | Meeting list, active meeting, live transcript buffer, interventions. Subscribes to the events above. |
+| `components/meetings/MeetingList.tsx`     | Landing screen, first sidebar entry                                                                  |
+| `components/meetings/MeetingDetail.tsx`   | Title, controls, context editor, transcript thread by session, intervention timeline, summaries      |
+| `components/meetings/MeetingControls.tsx` | Start / Pause / Resume / End, shared with tray actions                                               |
+| `components/settings/meeting/`            | Provider, sensitivity, observer interval, system-audio source, beep, keep-audio toggle               |
+| `intervention/`                           | Separate window entry for the floating intervention card, same pattern as `overlay/`                 |
 
 ## Failure handling (planned)
 
@@ -261,9 +270,11 @@ Sensitivity setting adds one instruction: low restricts to loop and explicit stu
 - [ ] **Step 2: Verify every "existing" path really exists**
 
 Run:
+
 ```bash
 cd /Users/dhruv/meet-assist && for f in src-tauri/src/lib.rs src-tauri/src/managers/audio.rs src-tauri/src/managers/transcription.rs src-tauri/src/managers/model.rs src-tauri/src/managers/history.rs src-tauri/src/audio_toolkit/audio/sink.rs src-tauri/src/audio_toolkit/vad src-tauri/src/llm_client.rs src-tauri/src/audio_feedback.rs src-tauri/src/overlay.rs src-tauri/src/settings.rs src-tauri/src/commands src/App.tsx src/components/settings src/components/ui src/stores/settingsStore.ts src/overlay src/bindings.ts; do test -e "$f" && echo "ok $f" || echo "MISSING $f"; done
 ```
+
 Expected: every line starts with `ok`. If any is MISSING, fix the table row rather than the filesystem.
 
 - [ ] **Step 3: Format check**
@@ -286,9 +297,11 @@ readers do not look for code that is not there yet."
 ### Task 3: Rewrite `README.md`
 
 **Files:**
+
 - Modify: `README.md` (lines 1-124 replaced; lines 125 to end kept with edits noted below)
 
 **Interfaces:**
+
 - Consumes: `docs/VISION.md`, `docs/ARCHITECTURE.md`.
 - Produces: README with sections `Why`, `How it works`, `Status`, `Quick start`, `Dictation (inherited from Handy)`, then the kept troubleshooting material.
 
@@ -377,7 +390,6 @@ handy --help                    # Show all available flags
 > ```bash
 > "/Applications/Meet Assist.app/Contents/MacOS/<binary>" --toggle-transcription   # list the folder to find the binary name
 > ```
-
 ````
 
 - [ ] **Step 2: In the kept remainder, replace every `com.pais.handy` with `com.meetassist.app`**
@@ -415,9 +427,11 @@ Expected: no output. If any, delete those sections; they describe upstream, not 
 - [ ] **Step 6: Link check**
 
 Run:
+
 ```bash
 cd /Users/dhruv/meet-assist && grep -o '](\([^)#]*\.md\)' README.md | sed 's/](//' | sort -u | while read f; do test -f "$f" && echo "ok $f" || echo "MISSING $f"; done
 ```
+
 Expected: all `ok`.
 
 - [ ] **Step 7: Format and commit**
@@ -439,9 +453,11 @@ directory change for people migrating from Handy."
 ### Task 4: Update `AGENTS.md`
 
 **Files:**
+
 - Modify: `AGENTS.md`
 
 **Interfaces:**
+
 - Consumes: `docs/ARCHITECTURE.md`, `docs/VISION.md`.
 - Produces: AGENTS.md that describes the fork accurately and no longer mandates upstream's freeze or template.
 
@@ -460,6 +476,7 @@ This file provides guidance to AI coding assistants working with code in this re
 Old: `Handy is a cross-platform desktop speech-to-text application built with Tauri 2.x (Rust backend + React/TypeScript frontend).`
 
 New:
+
 ```markdown
 Meet Assist is a cross-platform desktop app built with Tauri 2.x (Rust backend + React/TypeScript frontend). It has two pipelines sharing one transcription engine: the inherited dictation pipeline (shipping) and the meeting pipeline (planned, see `docs/ARCHITECTURE.md`). The module lists below describe the dictation pipeline that exists today.
 ```
@@ -509,9 +526,11 @@ module layout, and tells assistants which existing seams to reuse."
 ### Task 5: Trim `CONTRIBUTING.md`
 
 **Files:**
+
 - Modify: `CONTRIBUTING.md` (full replacement)
 
 **Interfaces:**
+
 - Consumes: nothing new.
 - Produces: contributing guide scoped to this fork.
 
@@ -574,9 +593,11 @@ MIT, see [LICENSE](LICENSE). Contributions are licensed the same way.
 - [ ] **Step 2: Link check**
 
 Run:
+
 ```bash
 cd /Users/dhruv/meet-assist && grep -o '](\([^)#]*\.md\|LICENSE\)' CONTRIBUTING.md | sed 's/](//' | sort -u | while read f; do test -f "$f" && echo "ok $f" || echo "MISSING $f"; done
 ```
+
 Expected: all `ok`.
 
 - [ ] **Step 3: Format and commit**
@@ -596,16 +617,19 @@ style, and PR rules that still apply here."
 ### Task 6: Rename product in config
 
 **Files:**
+
 - Modify: `src-tauri/tauri.conf.json:3` (`productName`), `src-tauri/tauri.conf.json:5` (`identifier`)
 - Modify: `package.json:2` (`name`)
 - Modify: `src-tauri/Cargo.toml:4` (`description`)
 
 **Interfaces:**
+
 - Produces: product name `Meet Assist`, identifier `com.meetassist.app`, npm name `meet-assist`. Cargo crate name remains `handy`.
 
 - [ ] **Step 1: Apply the renames**
 
 Run:
+
 ```bash
 cd /Users/dhruv/meet-assist \
 && sed -i '' 's/"productName": "Handy"/"productName": "Meet Assist"/' src-tauri/tauri.conf.json \
@@ -618,6 +642,7 @@ cd /Users/dhruv/meet-assist \
 
 Run: `cd /Users/dhruv/meet-assist && jq -r '.productName, .identifier' src-tauri/tauri.conf.json && jq -r '.name' package.json && grep '^description' src-tauri/Cargo.toml`
 Expected:
+
 ```
 Meet Assist
 com.meetassist.app
@@ -651,6 +676,7 @@ keep nix, CI, and bundle scripts untouched."
 ### Task 7: Final consistency pass
 
 **Files:**
+
 - Read-only check across `README.md`, `AGENTS.md`, `CONTRIBUTING.md`, `docs/VISION.md`, `docs/ARCHITECTURE.md`.
 
 - [ ] **Step 1: Every rewritten doc credits upstream exactly once or more**

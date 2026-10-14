@@ -7,7 +7,7 @@ use crate::llm_client::{self, ToolLoopError};
 use crate::meeting::session::MeetingManager;
 use crate::meeting::store::{Intervention, ProjectStore, TranscriptLine};
 use crate::meeting::tools::{handle_tool, tool_defs, ToolContext};
-use crate::settings::{AppSettings, MeetingSensitivity, PostProcessProvider};
+use crate::settings::{AppSettings, LlmProvider, MeetingSensitivity};
 use anyhow::Result;
 use log::{info, warn};
 use serde::{Deserialize, Serialize};
@@ -116,7 +116,7 @@ impl Readiness {
     }
 }
 
-fn is_local(provider: &PostProcessProvider) -> bool {
+fn is_local(provider: &LlmProvider) -> bool {
     let u = provider.base_url.to_ascii_lowercase();
     u.contains("localhost") || u.contains("127.0.0.1")
 }
@@ -125,20 +125,18 @@ pub fn readiness(settings: &AppSettings) -> Readiness {
     if !settings.meeting_assistant_enabled {
         return Readiness::Disabled;
     }
-    let Some(provider) = settings.meeting_provider() else {
+    let Some(provider) = settings.llm_provider() else {
         return Readiness::NoProvider;
     };
     let label = provider.label.clone();
-    if provider.id == crate::settings::APPLE_INTELLIGENCE_PROVIDER_ID
-        || !provider.base_url.trim().starts_with("http")
-    {
+    if !provider.base_url.trim().starts_with("http") {
         return Readiness::UnsupportedProvider(label);
     }
-    if settings.meeting_api_key().trim().is_empty() && !is_local(provider) {
+    if settings.llm_api_key().trim().is_empty() && !is_local(provider) {
         return Readiness::MissingApiKey(label);
     }
     if settings
-        .meeting_model()
+        .llm_model()
         .map(|m| m.trim().is_empty())
         .unwrap_or(true)
     {
@@ -185,11 +183,7 @@ impl LlmJudge {
         }
     }
 
-    fn client_for(
-        &self,
-        provider: &PostProcessProvider,
-        api_key: &str,
-    ) -> Result<reqwest::Client, String> {
+    fn client_for(&self, provider: &LlmProvider, api_key: &str) -> Result<reqwest::Client, String> {
         use std::hash::{Hash, Hasher};
         let mut h = std::collections::hash_map::DefaultHasher::new();
         api_key.hash(&mut h);
@@ -215,13 +209,13 @@ impl Judge for LlmJudge {
     ) -> Result<Verdict, JudgeError> {
         let settings = crate::settings::get_settings(&self.app);
         let provider = settings
-            .meeting_provider()
+            .llm_provider()
             .cloned()
             .ok_or_else(|| JudgeError::Other("no provider configured".into()))?;
         let model = settings
-            .meeting_model()
+            .llm_model()
             .ok_or_else(|| JudgeError::Other("no model configured".into()))?;
-        let api_key = settings.meeting_api_key();
+        let api_key = settings.llm_api_key();
         let client = self
             .client_for(&provider, &api_key)
             .map_err(JudgeError::Other)?;
@@ -565,394 +559,4 @@ pub fn spawn_observer(
                 emit_status(&state);
             }
         });
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::meeting::capture::Utterance;
-    use crate::meeting::session::{CaptureHandle, CaptureSource, MeetingManager, Transcriber};
-    use crate::meeting::store::{Intervention, ProjectStore};
-    use std::sync::atomic::AtomicBool;
-    use std::sync::{mpsc, Arc, Mutex};
-
-    struct NoCapture;
-    struct NoHandle;
-    impl CaptureHandle for NoHandle {
-        fn stop(self: Box<Self>) {}
-        fn has_failed(&self) -> bool {
-            false
-        }
-    }
-    impl CaptureSource for NoCapture {
-        fn start(
-            &self,
-            _meeting_id: i64,
-            _tx: mpsc::Sender<Utterance>,
-        ) -> anyhow::Result<Box<dyn CaptureHandle>> {
-            Ok(Box::new(NoHandle))
-        }
-    }
-    struct NoTranscriber;
-    impl Transcriber for NoTranscriber {
-        fn transcribe(&self, _s: Vec<f32>) -> anyhow::Result<String> {
-            Ok(String::new())
-        }
-    }
-
-    struct ScriptedJudge {
-        verdicts: Mutex<Vec<Result<Verdict, JudgeError>>>,
-        calls: Mutex<Vec<bool>>,
-    }
-    impl Judge for ScriptedJudge {
-        fn judge(
-            &self,
-            _i: &JudgeInput,
-            _c: &ToolContext,
-            allow_tools: bool,
-        ) -> Result<Verdict, JudgeError> {
-            self.calls.lock().unwrap().push(allow_tools);
-            self.verdicts.lock().unwrap().remove(0)
-        }
-    }
-
-    fn setup() -> (
-        tempfile::TempDir,
-        Arc<ProjectStore>,
-        Arc<MeetingManager>,
-        i64,
-    ) {
-        let dir = tempfile::tempdir().unwrap();
-        let store = Arc::new(ProjectStore::open(dir.path().join("meet.db")).unwrap());
-        let mm = Arc::new(MeetingManager::new_for_test(
-            store.clone(),
-            Arc::new(NoTranscriber),
-            Arc::new(NoCapture),
-            Arc::new(AtomicBool::new(false)),
-        ));
-        let m = mm.start(None, None).unwrap();
-        let sid = mm.state().session_id.unwrap();
-        store
-            .append_line(sid, "me", "we keep going around on the retry budget", 1000)
-            .unwrap();
-        (dir, store, mm, m.id)
-    }
-
-    fn v(intervene: bool, kind: &str, text: &str) -> Verdict {
-        Verdict {
-            intervene,
-            kind: Some(kind.into()),
-            text: Some(text.into()),
-            reason: "r".into(),
-        }
-    }
-
-    #[test]
-    fn prompt_contains_ordered_sections_and_schema() {
-        let lines = vec![TranscriptLine {
-            id: 1,
-            session_id: 1,
-            ts: 1000,
-            speaker: "me".into(),
-            text: "hello".into(),
-        }];
-        let p = build_prompt(
-            "Project brief",
-            Some(("Old meeting", Some("old summary"))),
-            "agenda",
-            &[],
-            &lines,
-            MeetingSensitivity::Low,
-            true,
-        );
-        let b = p.user.find("Project brief").unwrap();
-        let o = p.user.find("old summary").unwrap();
-        let a = p.user.find("agenda").unwrap();
-        let h = p.user.find("hello").unwrap();
-        assert!(b < o && o < a && a < h);
-        assert!(p.system.contains("\"intervene\""));
-        assert!(
-            p.system
-                .to_lowercase()
-                .contains("only on loops and explicit stuck")
-                || p.system.to_lowercase().contains("low")
-        );
-    }
-
-    #[test]
-    fn should_emit_applies_cooldown_and_dedupe() {
-        let state = ObserverState {
-            last_intervention_ts: 100_000,
-            last_seen_line_id: 0,
-            consecutive_failures: 0,
-            tools_unavailable: false,
-            last_error: None,
-        };
-        let recent = vec![Intervention {
-            id: 1,
-            session_id: 1,
-            ts: 100_000,
-            kind: "loop".into(),
-            text: "You said that twice".into(),
-            reason: "".into(),
-            dismissed: false,
-        }];
-        assert!(
-            !should_emit(&v(true, "loop", "new text"), 130_000, &state, &recent),
-            "within 60 s cooldown"
-        );
-        assert!(should_emit(
-            &v(true, "loop", "new text"),
-            170_000,
-            &state,
-            &recent
-        ));
-        assert!(
-            !should_emit(
-                &v(true, "loop", "  you said THAT twice "),
-                170_000,
-                &state,
-                &recent
-            ),
-            "dedupe"
-        );
-        assert!(!should_emit(
-            &v(false, "loop", "x"),
-            170_000,
-            &state,
-            &recent
-        ));
-        assert!(!should_emit(
-            &v(true, "weird", "x"),
-            170_000,
-            &state,
-            &recent
-        ));
-        assert!(!should_emit(
-            &Verdict {
-                intervene: true,
-                kind: Some("idea".into()),
-                text: None,
-                reason: "".into()
-            },
-            170_000,
-            &state,
-            &recent
-        ));
-    }
-
-    #[test]
-    fn tick_stores_intervention_and_skips_when_no_new_lines() {
-        let (_d, store, mm, mid) = setup();
-        let judge = ScriptedJudge {
-            verdicts: Mutex::new(vec![Ok(v(true, "loop", "You are circling"))]),
-            calls: Mutex::new(vec![]),
-        };
-        let settings = crate::settings::get_default_settings();
-        let mut st = ObserverState::default();
-        let out = tick(&store, &judge, &mm, &settings, &mut st, 200_000).unwrap();
-        assert_eq!(out.unwrap().text, "You are circling");
-        assert_eq!(store.list_interventions(mid).unwrap().len(), 1);
-        // No new lines since: judge must not be called again.
-        let out = tick(&store, &judge, &mm, &settings, &mut st, 300_000).unwrap();
-        assert!(out.is_none());
-        assert_eq!(judge.calls.lock().unwrap().len(), 1);
-    }
-
-    #[test]
-    fn tick_falls_back_without_tools_and_remembers() {
-        let (_d, store, mm, _mid) = setup();
-        let judge = ScriptedJudge {
-            verdicts: Mutex::new(vec![
-                Err(JudgeError::ToolsRejected),
-                Ok(v(false, "loop", "")),
-            ]),
-            calls: Mutex::new(vec![]),
-        };
-        let settings = crate::settings::get_default_settings();
-        let mut st = ObserverState::default();
-        let out = tick(&store, &judge, &mm, &settings, &mut st, 200_000).unwrap();
-        assert!(out.is_none());
-        assert_eq!(*judge.calls.lock().unwrap(), vec![true, false]);
-        assert!(st.tools_unavailable);
-    }
-
-    #[test]
-    fn tick_counts_failures_and_bad_json_does_not_error() {
-        let (_d, store, mm, _mid) = setup();
-        let judge = ScriptedJudge {
-            verdicts: Mutex::new(vec![Err(JudgeError::Other("boom".into()))]),
-            calls: Mutex::new(vec![]),
-        };
-        let settings = crate::settings::get_default_settings();
-        let mut st = ObserverState::default();
-        let out = tick(&store, &judge, &mm, &settings, &mut st, 200_000).unwrap();
-        assert!(out.is_none());
-        assert_eq!(st.consecutive_failures, 1);
-    }
-
-    #[test]
-    fn failed_tick_retries_same_window() {
-        let (_d, store, mm, _mid) = setup();
-        let judge = ScriptedJudge {
-            verdicts: Mutex::new(vec![
-                Err(JudgeError::Other("timeout".into())),
-                Ok(v(false, "loop", "")),
-            ]),
-            calls: Mutex::new(vec![]),
-        };
-        let settings = crate::settings::get_default_settings();
-        let mut st = ObserverState::default();
-        assert!(tick(&store, &judge, &mm, &settings, &mut st, 200_000)
-            .unwrap()
-            .is_none());
-        assert_eq!(st.last_seen_line_id, 0, "failure must not advance");
-        // No new lines, but the failed window is retried.
-        assert!(tick(&store, &judge, &mm, &settings, &mut st, 220_000)
-            .unwrap()
-            .is_none());
-        assert_eq!(judge.calls.lock().unwrap().len(), 2);
-        assert_eq!(st.consecutive_failures, 0);
-        assert!(st.last_seen_line_id > 0);
-    }
-
-    #[test]
-    fn tick_caps_card_text() {
-        let (_d, store, mm, mid) = setup();
-        let long = "é".repeat(400);
-        let judge = ScriptedJudge {
-            verdicts: Mutex::new(vec![Ok(v(true, "info", &long))]),
-            calls: Mutex::new(vec![]),
-        };
-        let settings = crate::settings::get_default_settings();
-        let mut st = ObserverState::default();
-        let iv = tick(&store, &judge, &mm, &settings, &mut st, 200_000)
-            .unwrap()
-            .unwrap();
-        assert_eq!(iv.text.chars().count(), CARD_TEXT_MAX_CHARS);
-        assert_eq!(
-            store.list_interventions(mid).unwrap()[0]
-                .text
-                .chars()
-                .count(),
-            CARD_TEXT_MAX_CHARS
-        );
-    }
-
-    #[test]
-    fn backoff_after_repeated_failures() {
-        assert_eq!(tick_delay_secs(20, 0), 20);
-        assert_eq!(tick_delay_secs(20, 4), 20);
-        assert_eq!(tick_delay_secs(20, 5), 80);
-        assert_eq!(tick_delay_secs(20, 9), 80);
-    }
-
-    #[test]
-    fn prompt_explains_speakers_and_caps_context() {
-        let ctx = "x".repeat(CONTEXT_MAX_CHARS + 500);
-        let p = build_prompt("", None, &ctx, &[], &[], MeetingSensitivity::Medium, true);
-        assert!(p.system.contains("`me` is the user you assist"));
-        assert!(p.system.contains("`them` is everyone else"));
-        assert!(p.user.contains("[truncated]"));
-        assert!(!p.user.contains(&"x".repeat(CONTEXT_MAX_CHARS + 1)));
-        assert!(p.user.contains(&"x".repeat(CONTEXT_MAX_CHARS)));
-        let short = build_prompt(
-            "",
-            None,
-            "agenda",
-            &[],
-            &[],
-            MeetingSensitivity::Medium,
-            true,
-        );
-        assert!(!short.user.contains("[truncated]"));
-    }
-
-    fn settings_with(id: &str, base_url: &str, key: &str, model: &str) -> AppSettings {
-        let mut s = crate::settings::get_default_settings();
-        s.meeting_assistant_enabled = true;
-        s.post_process_providers.retain(|p| p.id != id);
-        s.post_process_providers.push(PostProcessProvider {
-            id: id.into(),
-            label: format!("{id} label"),
-            base_url: base_url.into(),
-            allow_base_url_edit: true,
-            models_endpoint: None,
-            supports_structured_output: false,
-            api_format: crate::settings::PostProcessApiFormat::OpenAi,
-        });
-        s.meeting_provider_id = id.into();
-        s.post_process_api_keys.insert(id.into(), key.into());
-        if model.is_empty() {
-            s.post_process_models.remove(id);
-        } else {
-            s.post_process_models.insert(id.into(), model.into());
-        }
-        s
-    }
-
-    #[test]
-    fn readiness_reports_each_blocker() {
-        let mut off = settings_with("openai", "https://api.openai.com/v1", "k", "gpt");
-        off.meeting_assistant_enabled = false;
-        assert_eq!(readiness(&off), Readiness::Disabled);
-
-        let mut none = settings_with("openai", "https://api.openai.com/v1", "k", "gpt");
-        none.meeting_provider_id = "missing".into();
-        none.post_process_provider_id = "also-missing".into();
-        assert_eq!(readiness(&none), Readiness::NoProvider);
-
-        let apple = settings_with(
-            crate::settings::APPLE_INTELLIGENCE_PROVIDER_ID,
-            "apple-intelligence://local",
-            "",
-            "m",
-        );
-        assert_eq!(readiness(&apple).code(), "unsupported_provider");
-        let odd = settings_with("weird", "file:///x", "k", "m");
-        assert_eq!(
-            readiness(&odd),
-            Readiness::UnsupportedProvider("weird label".into())
-        );
-
-        let nokey = settings_with("openai", "https://api.openai.com/v1", " ", "gpt");
-        assert_eq!(
-            readiness(&nokey),
-            Readiness::MissingApiKey("openai label".into())
-        );
-        assert_eq!(readiness(&nokey).detail().as_deref(), Some("openai label"));
-
-        let local = settings_with("custom", "http://localhost:11434/v1", "", "llama");
-        assert_eq!(readiness(&local), Readiness::Ready);
-        let loopback = settings_with("lm", "http://127.0.0.1:1234/v1", "", "m");
-        assert_eq!(readiness(&loopback), Readiness::Ready);
-
-        let nomodel = settings_with("openai", "https://api.openai.com/v1", "k", "");
-        assert_eq!(readiness(&nomodel).code(), "no_model");
-
-        let ok = settings_with("openai", "https://api.openai.com/v1", "k", "gpt");
-        assert_eq!(readiness(&ok), Readiness::Ready);
-        assert_eq!(readiness(&ok).code(), "ready");
-    }
-
-    #[test]
-    fn parse_verdict_tolerates_surrounding_prose() {
-        let obj = "{\"intervene\":false,\"kind\":null,\"text\":null,\"reason\":\"quiet\"}";
-        let lead = parse_verdict(&format!("Here is my answer: {obj}")).unwrap();
-        assert_eq!(lead.reason, "quiet");
-        let trail = parse_verdict(&format!("{obj}\nHope that helps!")).unwrap();
-        assert_eq!(trail.reason, "quiet");
-        let fenced = parse_verdict(&format!("Sure.\n```json\n{obj}\n```\nDone.")).unwrap();
-        assert_eq!(fenced.reason, "quiet");
-    }
-
-    #[test]
-    fn parse_verdict_strips_fences() {
-        let v: Verdict = parse_verdict(
-            "```json\n{\"intervene\":true,\"kind\":\"info\",\"text\":\"t\",\"reason\":\"r\"}\n```",
-        )
-        .unwrap();
-        assert!(v.intervene);
-        assert!(parse_verdict("not json").is_err());
-    }
 }

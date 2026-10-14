@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Button } from "../../ui/Button";
 import { SettingContainer } from "../../ui/SettingContainer";
 
-export type OnboardingPreviewStep = "accessibility" | "model";
+export type OnboardingPreviewStep = "model";
 
 interface OnboardingPreviewProps {
   onPreview: (step: OnboardingPreviewStep) => void;
@@ -26,13 +26,6 @@ export const OnboardingPreview: React.FC<OnboardingPreviewProps> = ({
       grouped={grouped}
     >
       <div className="flex gap-2">
-        <Button
-          variant="secondary"
-          size="md"
-          onClick={() => onPreview("accessibility")}
-        >
-          {t("settings.debug.onboardingPreview.permissionsButton")}
-        </Button>
         <Button
           variant="secondary"
           size="md"

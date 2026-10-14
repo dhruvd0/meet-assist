@@ -2,21 +2,20 @@
   "tray": {
     "settings": "Indstillinger...",
     "checkUpdates": "Tjek for opdateringer...",
-    "copyLastTranscript": "Kopiér seneste transskription",
     "unloadModel": "Frigør model",
     "model": "Model",
     "quit": "Afslut",
-    "cancel": "Annuller",
-    "secureInputWarning": "⚠ Genveje blokeret af Secure Input"
+    "startMeeting": "Start Meeting",
+    "endMeeting": "End Meeting"
   },
   "sidebar": {
     "projects": "Projects",
     "meetings": "Meetings",
+    "assistant": "Assistant",
+    "audio": "Audio",
     "general": "Generelt",
     "models": "Modeller",
     "advanced": "Avanceret",
-    "postProcessing": "Efterbehandling",
-    "history": "Historik",
     "debug": "Fejlfinding",
     "about": "Om"
   },
@@ -154,11 +153,11 @@
       "failing": "The assistant has failed {{count}} times in a row. Check the provider settings.",
       "lastError": "The assistant's last check failed:",
       "readiness": {
-        "disabled": "The meeting assistant is off. Turn it on under Advanced settings.",
-        "no_provider": "No provider is set for the meeting assistant. Choose one under Advanced settings.",
-        "unsupported_provider": "{{detail}} cannot run the meeting assistant. Choose another provider under Advanced settings.",
-        "missing_api_key": "No API key for {{detail}}. Add one under Post Processing settings.",
-        "no_model": "No model is selected for {{detail}}. Pick one under Post Processing settings."
+        "disabled": "The meeting assistant is off. Turn it on in Assistant.",
+        "no_provider": "No AI provider is set. Choose one in Assistant.",
+        "unsupported_provider": "{{detail}} cannot run the meeting assistant. Choose another provider in Assistant.",
+        "missing_api_key": "No API key for {{detail}}. Add one in Assistant.",
+        "no_model": "No model is selected for {{detail}}. Pick one in Assistant."
       }
     },
     "summary": {
@@ -259,26 +258,6 @@
     "errors": {
       "selectModel": "Kunne ikke vælge model"
     },
-    "permissions": {
-      "title": "Tilladelser påkrævet",
-      "description": "Handy har brug for et par tilladelser for at fungere korrekt.",
-      "microphone": {
-        "title": "Mikrofonadgang",
-        "description": "Påkrævet for at høre din stemme til transskription."
-      },
-      "accessibility": {
-        "title": "Tilgængelighedsadgang",
-        "description": "Påkrævet for at skrive den transskriberede tekst ind i dine programmer."
-      },
-      "grant": "Giv tilladelse",
-      "granted": "Givet",
-      "waiting": "Venter...",
-      "allGranted": "Alt er klar!",
-      "errors": {
-        "checkFailed": "Kunne ikke tjekke tilladelser. Prøv igen.",
-        "requestFailed": "Kunne ikke anmode om tilladelse. Prøv igen."
-      }
-    },
     "assistant": {
       "title": "Set up your assistant",
       "description": "The meeting assistant and summaries use an LLM provider. Pick one, add your API key if needed, and test the connection.",
@@ -289,8 +268,7 @@
       "failure": "Connection failed: {{error}}",
       "continue": "Continue",
       "skip": "Skip for now",
-      "hint": "You can change this later under Post Processing settings.",
-      "unsupported": "Apple Intelligence cannot be used for meetings. Pick another provider."
+      "hint": "You can change this later in Assistant."
     }
   },
   "modelSelector": {
@@ -334,24 +312,16 @@
     "general": {
       "title": "Generelt",
       "shortcut": {
-        "title": "Handy-genveje",
-        "description": "Konfigurer tastaturgenveje til at udløse tale-til-tekst-optagelse",
+        "title": "Shortcut",
+        "description": "Start or end a meeting from anywhere.",
         "loading": "Indlæser genveje...",
         "none": "Ingen genveje konfigureret",
         "notFound": "Genvej ikke fundet",
         "pressKeys": "Tryk på ønskede taster...",
         "bindings": {
-          "transcribe": {
-            "name": "Transskriptionsgenvej",
-            "description": "Tastaturgenvejen til at optage og transskribere din stemme."
-          },
-          "cancel": {
-            "name": "Annulleringsgenvej",
-            "description": "Tastaturgenvejen til at annullere den aktuelle optagelse."
-          },
-          "transcribe_with_post_process": {
-            "name": "Genvej til efterbehandling",
-            "description": "Valgfrit: En dedikeret genvej, der altid anvender AI-efterbehandling på din transskription."
+          "toggle_meeting": {
+            "name": "Meeting shortcut",
+            "description": "Starts a meeting in your most recent project, or ends the running one."
           }
         },
         "errors": {
@@ -366,19 +336,46 @@
         "searchPlaceholder": "Søg efter sprog...",
         "noResults": "Ingen sprog fundet",
         "auto": "Automatisk"
-      },
-      "shortcutActivation": {
-        "title": "Genvejens adfærd",
-        "description": "Vælg, hvordan transskriptionsgenvejen starter og stopper optagelsen.",
-        "options": {
-          "holdOrToggle": "Automatisk",
-          "pushToTalk": "Hold",
-          "toggle": "Skift"
+      }
+    },
+    "assistant": {
+      "provider": {
+        "title": "AI provider",
+        "description": "The model Meet Assist uses for nudges, summaries, and image digests.",
+        "test": {
+          "button": "Test connection",
+          "ok": "Connected. {{count}} models available."
         },
-        "descriptions": {
-          "hold_or_toggle": "Hold nede for at optage, eller tryk kort for at slå til/fra",
-          "push_to_talk": "Optager, mens du holder genvejen nede",
-          "toggle": "Tryk på genvejen for at starte optagelsen, tryk igen for at stoppe"
+        "select": {
+          "title": "Udbyder",
+          "description": "Vælg en OpenAI- eller Anthropic-kompatibel udbyder."
+        },
+        "apiFormat": {
+          "title": "API-format",
+          "description": "Det anmodningsformat, som det brugerdefinerede endpoint forventer.",
+          "options": {
+            "openai": "OpenAI-kompatibel (Chat Completions)",
+            "anthropic": "Anthropic Messages"
+          }
+        },
+        "baseUrl": {
+          "title": "Basis-URL",
+          "description": "API-basis-URL for den valgte udbyder. Kun den brugerdefinerede udbyder kan redigeres.",
+          "placeholder": "https://api.openai.com/v1",
+          "placeholderAnthropic": "https://api.anthropic.com/v1"
+        },
+        "apiKey": {
+          "title": "API-nøgle",
+          "description": "API-nøgle til den valgte udbyder.",
+          "placeholder": "sk-..."
+        },
+        "model": {
+          "title": "Model",
+          "descriptionCustom": "Angiv den modelidentifikator, som det brugerdefinerede endpoint forventer.",
+          "descriptionDefault": "Vælg en model, der udbydes af den valgte udbyder.",
+          "placeholderWithOptions": "Søg eller vælg en model",
+          "placeholderNoOptions": "Skriv et modelnavn",
+          "refreshModels": "Opdater modeller"
         }
       }
     },
@@ -434,18 +431,12 @@
     "advanced": {
       "groups": {
         "app": "App",
-        "output": "Output",
         "transcription": "Transskription",
-        "history": "Historik",
         "experimental": "Eksperimentel"
       },
       "experimentalToggle": {
         "label": "Eksperimentelle funktioner",
         "description": "Aktivér eksperimentelle funktioner, der stadig er under udvikling."
-      },
-      "lazyStreamClose": {
-        "label": "Hold mikrofon åben mellem transskriptioner",
-        "description": "Holder mikrofonstrømmen åben i 30 sekunder, efter at optagelsen stopper, hvilket reducerer ventetid ved transskriptioner lige efter hinanden. Kan forringe Bluetooth-lydkvaliteten, mens den er aktiv."
       },
       "acceleration": {
         "transcribe": {
@@ -471,64 +462,6 @@
       "showTrayIcon": {
         "label": "Vis proceslinjeikon",
         "description": "Vis Handy-ikonet i meddelelsesområdet."
-      },
-      "overlay": {
-        "style": {
-          "title": "Overlay",
-          "description": "Vælg optagelses-overlay: Ingen skjuler det, Minimal viser en kompakt pille, Live viser transskription i realtid, mens du taler (kun modeller med streaming-understøttelse — se efter Streaming-mærket i modelvælgeren). På Linux anbefales 'Ingen'.",
-          "options": {
-            "none": "Ingen",
-            "minimal": "Minimal",
-            "live": "Live"
-          }
-        },
-        "position": {
-          "title": "Overlay-placering",
-          "description": "Hvor overlayet vises på skærmen under optagelse og transskription.",
-          "options": {
-            "bottom": "Bund",
-            "top": "Top"
-          }
-        }
-      },
-      "pasteMethod": {
-        "title": "Indsætningsmetode",
-        "description": "Vælg, hvordan tekst indsættes. Direkte: simulerer tastetryk via systeminput. Ingen: springer indsætning over, opdaterer kun historik/udklipsholder.",
-        "options": {
-          "clipboard": "Udklipsholder ({{modifier}}+V)",
-          "clipboardCtrlShiftV": "Udklipsholder (Ctrl+Shift+V)",
-          "clipboardShiftInsert": "Udklipsholder (Shift+Insert)",
-          "direct": "Direkte",
-          "none": "Ingen",
-          "externalScript": "Eksternt script"
-        },
-        "externalScriptPlaceholder": "/sti/til/dit/script.sh"
-      },
-      "typingTool": {
-        "title": "Skriveværktøj",
-        "description": "Vælg hvilket Linux-skriveværktøj der skal bruges til Direkte indsætningsmetode. Auto registrerer og bruger automatisk det bedste tilgængelige værktøj til dit system.",
-        "options": {
-          "auto": "Auto (anbefalet)"
-        }
-      },
-      "clipboardHandling": {
-        "title": "Håndtering af udklipsholder",
-        "description": "Rør ikke ved udklipsholder bevarer dit nuværende udklipsholderindhold efter transskription. Kopiér til udklipsholder efterlader transskriptionsresultatet i din udklipsholder efter indsætning.",
-        "options": {
-          "dontModify": "Rør ikke ved udklipsholder",
-          "copyToClipboard": "Kopiér til udklipsholder"
-        }
-      },
-      "autoSubmit": {
-        "title": "Automatisk indsendelse",
-        "description": "Send automatisk den valgte tastekombination efter tekstindsættelse. Cmd+Enter gælder på macOS, mens Windows/Linux bruger Super+Enter.",
-        "options": {
-          "off": "Fra",
-          "enter": "Enter",
-          "cmdEnter": "Cmd+Enter",
-          "superEnter": "Super+Enter",
-          "ctrlEnter": "Ctrl+Enter"
-        }
       },
       "translateToEnglish": {
         "label": "Oversæt til engelsk",
@@ -582,85 +515,6 @@
         }
       }
     },
-    "postProcessing": {
-      "hotkey": {
-        "title": "Genvejstast"
-      },
-      "api": {
-        "title": "API",
-        "provider": {
-          "title": "Udbyder",
-          "description": "Vælg en OpenAI- eller Anthropic-kompatibel udbyder."
-        },
-        "apiFormat": {
-          "title": "API-format",
-          "description": "Det anmodningsformat, som det brugerdefinerede endpoint forventer.",
-          "options": {
-            "openai": "OpenAI-kompatibel (Chat Completions)",
-            "anthropic": "Anthropic Messages"
-          }
-        },
-        "appleIntelligence": {
-          "unavailable": "Apple Intelligence er ikke tilgængelig på denne enhed. Kræver en Apple Silicon Mac med macOS Tahoe (26.0) eller nyere med Apple Intelligence aktiveret i Systemindstillinger."
-        },
-        "baseUrl": {
-          "title": "Basis-URL",
-          "description": "API-basis-URL for den valgte udbyder. Kun den brugerdefinerede udbyder kan redigeres.",
-          "placeholder": "https://api.openai.com/v1",
-          "placeholderAnthropic": "https://api.anthropic.com/v1"
-        },
-        "apiKey": {
-          "title": "API-nøgle",
-          "description": "API-nøgle til den valgte udbyder.",
-          "placeholder": "sk-..."
-        },
-        "model": {
-          "title": "Model",
-          "descriptionCustom": "Angiv den modelidentifikator, som det brugerdefinerede endpoint forventer.",
-          "descriptionDefault": "Vælg en model, der udbydes af den valgte udbyder.",
-          "placeholderWithOptions": "Søg eller vælg en model",
-          "placeholderNoOptions": "Skriv et modelnavn",
-          "refreshModels": "Opdater modeller"
-        }
-      },
-      "prompts": {
-        "title": "Prompt",
-        "selectedPrompt": {
-          "title": "Valgt prompt",
-          "description": "Vælg en skabelon til at forfine transskriptioner, eller opret en ny. Brug ${output} i promptteksten for at referere til den fangede transskription."
-        },
-        "noPrompts": "Ingen prompts tilgængelige",
-        "selectPrompt": "Vælg en prompt",
-        "createNew": "Opret ny prompt",
-        "promptLabel": "Promptnavn",
-        "promptLabelPlaceholder": "Indtast promptnavn",
-        "promptInstructions": "Promptinstruktioner",
-        "promptInstructionsPlaceholder": "Skriv de instruktioner, der skal køres efter transskription. Eksempel: Forbedr grammatik og klarhed for følgende tekst: ${output}",
-        "promptTip": "Tip: Brug <code>${output}</code> til at indsætte den transskriberede tekst i din prompt.",
-        "updatePrompt": "Opdater prompt",
-        "deletePrompt": "Slet prompt",
-        "createPrompt": "Opret prompt",
-        "cancel": "Annuller",
-        "selectToEdit": "Vælg en prompt ovenfor for at se og redigere dens detaljer.",
-        "createFirst": "Klik på 'Opret ny prompt' ovenfor for at oprette din første efterbehandlingsprompt."
-      }
-    },
-    "history": {
-      "title": "Historik",
-      "openFolder": "Åbn optagelsesmappe",
-      "loading": "Indlæser historik...",
-      "empty": "Ingen transskriptioner endnu. Start optagelse for at opbygge din historik!",
-      "copyToClipboard": "Kopiér transskription til udklipsholder",
-      "copyError": "Kunne ikke kopiere transskriptionen til udklipsholderen.",
-      "save": "Gem transskription",
-      "unsave": "Fjern fra gemte",
-      "delete": "Slet post",
-      "deleteError": "Kunne ikke slette posten. Prøv igen.",
-      "retranscribe": "Transskribér igen",
-      "retranscribeError": "Kunne ikke transskribere igen. Prøv igen.",
-      "transcribing": "Transskriberer...",
-      "transcriptionFailed": "Transskription mislykkedes. Du kan transskribere igen ved hjælp af genforsøgsikonet."
-    },
     "debug": {
       "title": "Fejlfinding",
       "logDirectory": {
@@ -697,7 +551,6 @@
       "onboardingPreview": {
         "title": "Forhåndsvis introduktion",
         "description": "Forhåndsvis introduktionsskærmene uden at ændre tilladelser, modeller eller fuldførelsesstatus",
-        "permissionsButton": "Tilladelser",
         "modelsButton": "Modelvalg",
         "exitButton": "Afslut forhåndsvisning"
       },
@@ -709,41 +562,6 @@
         "title": "Tærskel for ordkorrektion",
         "description": "Følsomhed for brugerdefinerede ordkorrektioner"
       },
-      "historyLimit": {
-        "title": "Historikgrænse",
-        "description": "Maksimalt antal historikposter, der skal beholdes",
-        "entries": "poster"
-      },
-      "recordingRetention": {
-        "title": "Automatisk sletning af optagelser",
-        "description": "Slet automatisk gamle optagelser for at spare plads",
-        "never": "Aldrig",
-        "preserveLimit": "Behold de seneste {{count}}",
-        "days3": "Efter 3 dage",
-        "weeks2": "Efter 2 uger",
-        "months3": "Efter 3 måneder",
-        "placeholder": "Vælg opbevaringsperiode..."
-      },
-      "alwaysOnMicrophone": {
-        "label": "Altid aktiv mikrofon",
-        "description": "Hold mikrofonen aktiv for hurtigere reaktion"
-      },
-      "clamshellMicrophone": {
-        "title": "Clamshell-mikrofon",
-        "description": "Mikrofon, der skal bruges, når den bærbares låg er lukket"
-      },
-      "postProcessingToggle": {
-        "label": "Efterbehandling",
-        "description": "Aktivér AI-drevet tekstforbedring efter transskription"
-      },
-      "muteWhileRecording": {
-        "label": "Mute under optagelse",
-        "description": "Sluk for systemlyd under optagelse"
-      },
-      "appendTrailingSpace": {
-        "label": "Tilføj efterfølgende mellemrum",
-        "description": "Tilføj et mellemrum efter indsat transskription"
-      },
       "keyboardImplementation": {
         "title": "Tastaturimplementering",
         "description": "Vælg backend til tastaturgenveje.",
@@ -753,46 +571,6 @@
         "appData": "Appdata:",
         "models": "Modeller:",
         "settings": "Indstillinger:"
-      },
-      "pasteDelay": {
-        "title": "Forsinkelse af indsættelse (før)",
-        "description": "Forsinkelse (i millisekunder) efter kopiering af tekst, før tastetrykket for indsætning sendes. Øg, hvis intet bliver indsat."
-      },
-      "pasteDelayAfter": {
-        "title": "Forsinkelse af indsættelse (efter)",
-        "description": "Forsinkelse (i millisekunder) efter tastetrykket for indsætning, før din tidligere udklipsholder gendannes. Øg, hvis dit gamle udklipsholderindhold bliver indsat i stedet for transskriptionen."
-      },
-      "holdThreshold": {
-        "title": "Holdetærskel",
-        "description": "Kun i automatisk tilstand: hvor længe (i millisekunder) genvejen skal holdes nede, før det tæller som et hold i stedet for et tryk. Sænk værdien, hvis korte hold lader optagelsen køre videre; hæv den, hvis bevidste tryk behandles som hold."
-      },
-      "reliablePaste": {
-        "title": "Pålidelig indsættelse (Beta)",
-        "description": "Gendan først din udklipsholder, når målappen faktisk har læst transskriptionen, i stedet for efter en fast forsinkelse. Skal afhjælpe, at gammelt udklipsholderindhold indsættes, når systemet er belastet. Kræver en indsætningsmetode via udklipsholderen; kun macOS og Windows."
-      },
-      "recordingBuffer": {
-        "title": "Ekstra optagelsesbuffer",
-        "description": "Ekstra tid (i millisekunder) til at fortsætte optagelsen, efter du slipper tasten, for at fange efterfølgende lyd. 0 = ingen ekstra buffer."
-      },
-      "keyboardDiagnostic": {
-        "title": "Tastaturdiagnostik",
-        "description": "Kontrollerer, om tastaturhændelser når frem til Handy. Kun antallet af hændelser registreres — aldrig hvilke taster du trykker på.",
-        "run": "Kør 10 s diagnostik",
-        "running": "Lytter… tryk på din genvej et par gange (f.eks. Option+Space)",
-        "secureInputLabel": "Secure Input",
-        "enabled": "aktiveret",
-        "disabled": "deaktiveret",
-        "holder": "holdes af {{name}} (pid {{pid}})",
-        "holderUnknown": "ingen synlig indehaver",
-        "keyDown": "Tast ned",
-        "keyUp": "Tast op",
-        "flagsChanged": "Modifikatorer",
-        "mouse": "Mus",
-        "verdictBlocked": "Secure Input blokerer tastehændelser — genveje med en almindelig tast kan ikke fungere, før det er løst.",
-        "verdictSuspicious": "Der kom modifikatorhændelser, men ingen tastehændelser — noget undertrykker taster, selvom Secure Input rapporteres som deaktiveret. Rapportér det gerne på GitHub.",
-        "verdictOk": "Tastehændelser når frem til Handy som normalt.",
-        "verdictNoEvents": "Ingen hændelser registreret — trykkede du på nogen taster under testen?",
-        "failed": "Diagnostik mislykkedes: {{error}}"
       }
     },
     "about": {
@@ -834,11 +612,6 @@
       "enabled": {
         "label": "Meeting assistant",
         "description": "When on, every {{interval}} seconds the recent transcript, your project brief and meeting context are sent to the chosen provider so the assistant can decide whether to speak up."
-      },
-      "provider": {
-        "label": "Provider",
-        "description": "Which post-processing provider answers during meetings. Empty uses the post-processing default.",
-        "default": "Same as post-processing"
       },
       "sensitivity": {
         "label": "Sensitivity",
@@ -888,27 +661,16 @@
     "clear": "Ryd",
     "noOptionsFound": "Ingen muligheder fundet"
   },
-  "accessibility": {
-    "permissionsDescription": "Handy har brug for tilgængelighedstilladelser for at skrive den transskriberede tekst.",
-    "openSettings": "Åbn systemindstillinger"
-  },
   "errors": {
     "loadDirectory": "Fejl ved indlæsning af mappe: {{error}}",
     "micPermissionDeniedTitle": "Mikrofonadgang nægtet",
+    "meetingToggleFailedTitle": "Couldn't start the meeting",
     "micPermissionDenied": {
-      "generic": "Mikrofonadgang blev nægtet af operativsystemet. Giv venligst mikrofontilladelse i dine systemindstillinger.",
       "windows": "Aktivér mikrofonadgang under Indstillinger → Privatliv og sikkerhed → Mikrofon (inklusive adgang for skrivebordsapps).",
-      "macos": "Giv mikrofonadgang under Systemindstillinger → Privatliv og sikkerhed → Mikrofon.",
-      "linux": "Giv mikrofonadgang i dit systems lyd- eller privatlivsindstillinger."
+      "macos": "Enable microphone access for Meet Assist in System Settings → Privacy & Security → Microphone."
     },
-    "noInputDeviceTitle": "Ingen mikrofon fundet",
-    "noInputDevice": "Ingen lydinputenhed blev registreret. Tilslut en mikrofon eller et headset, og prøv igen.",
-    "recordingFailed": "Kunne ikke starte optagelse: {{error}}",
     "modelLoadFailed": "Kunne ikke indlæse model: {{model}}",
-    "modelLoadFailedUnknown": "ukendt model",
-    "pasteFailedTitle": "Kunne ikke indsætte tekst",
-    "pasteFailed": "Teksten kunne ikke indsættes i det aktive program.",
-    "transcriptionFailedTitle": "Transskription mislykkedes"
+    "modelLoadFailedUnknown": "ukendt model"
   },
   "appLanguage": {
     "title": "Applikationssprog",
@@ -923,20 +685,8 @@
       "dark": "Mørk"
     }
   },
-  "overlay": {
-    "transcribing": "Transskriberer...",
-    "processing": "Behandler...",
-    "loadingModel": "Indlæser model..."
-  },
   "secureInput": {
-    "blockedWithCulprit_one": "{{name}} blokerer muligvis 1 genvej",
-    "blockedWithCulprit_other": "{{name}} blokerer muligvis {{count}} genveje",
-    "blockedNoCulprit_one": "macOS blokerer midlertidigt 1 genvej",
-    "blockedNoCulprit_other": "macOS blokerer midlertidigt {{count}} genveje",
-    "recorderBlockedWithCulprit": "{{name}} blokerer muligvis ændringer af genveje",
-    "recorderBlockedNoCulprit": "macOS blokerer midlertidigt ændringer af genveje",
     "learnMore": "Sådan løser du det",
-    "recorderBlocked": "Genveje kan ikke optages lige nu — macOS Secure Input blokerer tastehændelser. Løs advarslen om Secure Input først.",
-    "dismiss": "Afvis"
+    "recorderBlocked": "Genveje kan ikke optages lige nu — macOS Secure Input blokerer tastehændelser. Løs advarslen om Secure Input først."
   }
 }

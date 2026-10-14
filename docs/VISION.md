@@ -2,7 +2,7 @@
 
 Meet Assist is a private meeting copilot. It sits on your machine, listens to the call you are on, and speaks up only to you when it has something worth saying.
 
-It is a fork of [Handy](https://github.com/cjpais/Handy), the open source offline dictation app. Handy supplies the audio capture, voice activity detection, and local speech-to-text pipeline. Meet Assist builds the meeting layer on top.
+It is a fork of [Handy](https://github.com/cjpais/Handy), the open source offline dictation app. Handy supplies the audio capture, voice activity detection, and local speech-to-text engine. Meet Assist is meeting-only: the dictation features were removed.
 
 ## The problem
 
@@ -24,7 +24,7 @@ Meeting bots that join the call as a participant are intrusive, record everyone,
 1. **Private by default.** Nothing leaves the machine unless you point the assistant at a cloud model. Local models through Ollama or LM Studio are first-class.
 2. **Speak only when useful.** Silence is the default answer. A nudge that interrupts flow is worse than none.
 3. **Only you hear it.** The assistant never speaks into the call. You decide whether to say it out loud.
-4. **Reuse Handy.** Dictation keeps working. Models, settings, providers, and the overlay pattern are shared, not duplicated.
+4. **Reuse Handy's engine.** Transcription, models, and audio capture come from Handy. Dictation output (paste, post-processing, history) was removed; the global shortcut starts and ends meetings.
 5. **Same look.** Meet Assist keeps Handy's design language and components. New screens use the existing primitives.
 
 ## Non-goals for v1

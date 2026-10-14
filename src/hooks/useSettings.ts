@@ -3,7 +3,7 @@ import { useSettingsStore } from "../stores/settingsStore";
 import type {
   AppSettings as Settings,
   AudioDevice,
-  PostProcessApiFormat,
+  LlmApiFormat,
 } from "@/bindings";
 
 interface UseSettingsReturn {
@@ -14,7 +14,7 @@ interface UseSettingsReturn {
   audioDevices: AudioDevice[];
   outputDevices: AudioDevice[];
   audioFeedbackEnabled: boolean;
-  postProcessModelOptions: Record<string, string[]>;
+  llmModelOptions: Record<string, string[]>;
   updateChecksLocked: boolean | null;
 
   // Actions
@@ -35,21 +35,15 @@ interface UseSettingsReturn {
   getSetting: <K extends keyof Settings>(key: K) => Settings[K] | undefined;
 
   // Post-processing helpers
-  setPostProcessProvider: (providerId: string) => Promise<void>;
-  updatePostProcessBaseUrl: (
+  setLlmProvider: (providerId: string) => Promise<void>;
+  updateLlmBaseUrl: (providerId: string, baseUrl: string) => Promise<void>;
+  updateLlmApiFormat: (
     providerId: string,
-    baseUrl: string,
+    apiFormat: LlmApiFormat,
   ) => Promise<void>;
-  updatePostProcessApiFormat: (
-    providerId: string,
-    apiFormat: PostProcessApiFormat,
-  ) => Promise<void>;
-  updatePostProcessApiKey: (
-    providerId: string,
-    apiKey: string,
-  ) => Promise<void>;
-  updatePostProcessModel: (providerId: string, model: string) => Promise<void>;
-  fetchPostProcessModels: (providerId: string) => Promise<string[]>;
+  updateLlmApiKey: (providerId: string, apiKey: string) => Promise<void>;
+  updateLlmModel: (providerId: string, model: string) => Promise<void>;
+  fetchLlmModels: (providerId: string) => Promise<string[]>;
 }
 
 export const useSettings = (): UseSettingsReturn => {
@@ -69,7 +63,7 @@ export const useSettings = (): UseSettingsReturn => {
     audioDevices: store.audioDevices,
     outputDevices: store.outputDevices,
     audioFeedbackEnabled: store.settings?.audio_feedback || false,
-    postProcessModelOptions: store.postProcessModelOptions,
+    llmModelOptions: store.llmModelOptions,
     updateChecksLocked: store.updateChecksLocked,
     updateSetting: store.updateSetting,
     resetSetting: store.resetSetting,
@@ -79,11 +73,11 @@ export const useSettings = (): UseSettingsReturn => {
     updateBinding: store.updateBinding,
     resetBinding: store.resetBinding,
     getSetting: store.getSetting,
-    setPostProcessProvider: store.setPostProcessProvider,
-    updatePostProcessBaseUrl: store.updatePostProcessBaseUrl,
-    updatePostProcessApiFormat: store.updatePostProcessApiFormat,
-    updatePostProcessApiKey: store.updatePostProcessApiKey,
-    updatePostProcessModel: store.updatePostProcessModel,
-    fetchPostProcessModels: store.fetchPostProcessModels,
+    setLlmProvider: store.setLlmProvider,
+    updateLlmBaseUrl: store.updateLlmBaseUrl,
+    updateLlmApiFormat: store.updateLlmApiFormat,
+    updateLlmApiKey: store.updateLlmApiKey,
+    updateLlmModel: store.updateLlmModel,
+    fetchLlmModels: store.fetchLlmModels,
   };
 };

@@ -12,17 +12,9 @@ pub struct CliArgs {
     #[arg(long)]
     pub no_tray: bool,
 
-    /// Toggle transcription on/off (sent to running instance)
+    /// Start a meeting, or end the running one, on a running instance
     #[arg(long)]
-    pub toggle_transcription: bool,
-
-    /// Toggle transcription with post-processing on/off (sent to running instance)
-    #[arg(long)]
-    pub toggle_post_process: bool,
-
-    /// Cancel the current operation (sent to running instance)
-    #[arg(long)]
-    pub cancel: bool,
+    pub toggle_meeting: bool,
 
     /// Enable debug mode with verbose logging
     #[arg(long)]

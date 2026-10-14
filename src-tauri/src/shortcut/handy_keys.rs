@@ -87,14 +87,31 @@ pub struct FrontendKeyEvent {
 
 impl HandyKeysState {
     /// Create a new HandyKeysState
+    ///
+    /// Waits for the manager thread to create its `HotkeyManager`, so a
+    /// failure (e.g. Accessibility not granted on macOS) is returned here and
+    /// callers can fall back to the Tauri implementation.
     pub fn new(app: AppHandle) -> Result<Self, String> {
         let (cmd_tx, cmd_rx) = mpsc::channel::<ManagerCommand>();
+        let (ready_tx, ready_rx) = mpsc::channel::<Result<(), String>>();
 
         // Start the manager thread
         let app_clone = app.clone();
         let thread_handle = thread::spawn(move || {
-            Self::manager_thread(cmd_rx, app_clone);
+            Self::manager_thread(cmd_rx, ready_tx, app_clone);
         });
+
+        match ready_rx.recv() {
+            Ok(Ok(())) => {}
+            Ok(Err(e)) => {
+                let _ = thread_handle.join();
+                return Err(e);
+            }
+            Err(_) => {
+                let _ = thread_handle.join();
+                return Err("handy-keys manager thread exited during startup".into());
+            }
+        }
 
         Ok(Self {
             command_sender: Mutex::new(cmd_tx),
@@ -107,7 +124,11 @@ impl HandyKeysState {
     }
 
     /// The main manager thread - owns the HotkeyManager and processes commands
-    fn manager_thread(cmd_rx: Receiver<ManagerCommand>, app: AppHandle) {
+    fn manager_thread(
+        cmd_rx: Receiver<ManagerCommand>,
+        ready_tx: Sender<Result<(), String>>,
+        app: AppHandle,
+    ) {
         info!("handy-keys manager thread started");
 
         // Create the HotkeyManager in this thread
@@ -115,9 +136,11 @@ impl HandyKeysState {
             Ok(m) => m,
             Err(e) => {
                 error!("Failed to create HotkeyManager: {}", e);
+                let _ = ready_tx.send(Err(format!("Failed to create HotkeyManager: {}", e)));
                 return;
             }
         };
+        let _ = ready_tx.send(Ok(()));
 
         // Maps binding IDs to HotkeyIds and hotkey strings
         let mut binding_to_hotkey: HashMap<String, HotkeyId> = HashMap::new();
@@ -423,21 +446,19 @@ pub fn validate_shortcut(raw: &str) -> Result<(), String> {
 
 /// Initialize handy-keys shortcuts
 pub fn init_shortcuts(app: &AppHandle) -> Result<(), String> {
+    // handy-keys taps keyboard events, which macOS only allows with
+    // Accessibility. Fail fast so the caller falls back to Tauri.
+    #[cfg(target_os = "macos")]
+    if !handy_keys::check_accessibility() {
+        return Err("Accessibility permission is not granted".into());
+    }
+
     let state = HandyKeysState::new(app.clone())?;
 
     let default_bindings = settings::get_default_settings().bindings;
     let user_settings = settings::load_or_create_app_settings(app);
 
-    // Register all bindings except cancel (which is dynamic)
     for (id, default_binding) in default_bindings {
-        if id == "cancel" {
-            continue;
-        }
-        // Skip post-processing shortcut when the feature is disabled
-        if id == "transcribe_with_post_process" && !user_settings.post_process_enabled {
-            continue;
-        }
-
         let binding = user_settings
             .bindings
             .get(&id)
@@ -480,16 +501,6 @@ pub fn start_handy_keys_recording(app: AppHandle, binding_id: String) -> Result<
     let settings = get_settings(&app);
     if settings.keyboard_implementation != settings::KeyboardImplementation::HandyKeys {
         return Err("handy-keys is not the active keyboard implementation".into());
-    }
-
-    // While Secure Input is active the tap receives no KeyDown/KeyUp, so the
-    // recorder would silently capture just the modifier and overwrite the
-    // binding with it (issue #1578). Refuse instead; the frontend maps this
-    // marker to a localized explanation, and the noted impact makes the
-    // warning banner appear with the full story.
-    if crate::secure_input::is_enabled_now() {
-        crate::secure_input::note_recorder_blocked(&app);
-        return Err("secure-input-active".into());
     }
 
     let state = app

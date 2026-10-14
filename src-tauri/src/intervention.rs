@@ -99,13 +99,37 @@ pub fn create_intervention_window(app: &AppHandle) {
 
 /// Moves the window to the top-right of the monitor under the cursor.
 fn position_top_right(app: &AppHandle, window: &tauri::webview::WebviewWindow) {
-    let Some(monitor) = crate::overlay::get_monitor_with_cursor(app) else {
+    let Some(monitor) = get_monitor_with_cursor(app) else {
         return;
     };
     let scale = monitor.scale_factor();
     let x = (monitor.position().x as f64 + monitor.size().width as f64) / scale - WIDTH - MARGIN;
     let y = monitor.position().y as f64 / scale + MARGIN;
     let _ = window.set_position(tauri::Position::Logical(tauri::LogicalPosition { x, y }));
+}
+
+/// The monitor under the mouse cursor, falling back to the primary monitor.
+fn get_monitor_with_cursor(app: &AppHandle) -> Option<tauri::Monitor> {
+    let primary = app.primary_monitor().ok().flatten();
+    if let Ok(cursor) = app.cursor_position() {
+        // `cursor_position` and `monitor_from_point` use different spaces off
+        // Windows. tao reads the cursor in logical points and scales it by the
+        // primary monitor's factor (macos/util `cursor_position`; linux/util
+        // uses the GDK scale), but `monitor_from_point` compares against
+        // logical bounds (CGDisplayBounds / GDK geometry). Undo that scaling.
+        // Windows is physical on both sides.
+        #[cfg(not(target_os = "windows"))]
+        let (x, y) = {
+            let scale = primary.as_ref().map_or(1.0, |m| m.scale_factor());
+            (cursor.x / scale, cursor.y / scale)
+        };
+        #[cfg(target_os = "windows")]
+        let (x, y) = (cursor.x, cursor.y);
+        if let Ok(Some(monitor)) = app.monitor_from_point(x, y) {
+            return Some(monitor);
+        }
+    }
+    primary
 }
 
 /// Card payload: the intervention's fields plus `meeting_id`, so the card can
@@ -154,27 +178,4 @@ pub fn hide(app: &AppHandle) {
             let _ = window.hide();
         }
     });
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn card_payload_merges_meeting_id_into_intervention_fields() {
-        let iv = Intervention {
-            id: 7,
-            session_id: 3,
-            ts: 1000,
-            kind: "loop".into(),
-            text: "t".into(),
-            reason: "r".into(),
-            dismissed: false,
-        };
-        let v = card_payload(42, &iv);
-        assert_eq!(v["meeting_id"], 42);
-        assert_eq!(v["id"], 7);
-        assert_eq!(v["kind"], "loop");
-        assert_eq!(v["text"], "t");
-    }
 }

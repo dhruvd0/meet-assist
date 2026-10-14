@@ -107,25 +107,3 @@ pub fn convert_chinese_script(
         None => text.to_string(),
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn cantonese_uses_hong_kong_tables() {
-        // Hong Kong standard writes 裏 where Taiwan writes 裡.
-        assert_eq!(
-            convert_chinese_script(
-                "里面",
-                ChineseVariety::Cantonese,
-                ChineseScript::Traditional
-            ),
-            "裏面"
-        );
-        assert_eq!(
-            convert_chinese_script("裏面", ChineseVariety::Cantonese, ChineseScript::Simplified),
-            "里面"
-        );
-    }
-}

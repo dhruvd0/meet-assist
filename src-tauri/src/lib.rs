@@ -1,30 +1,20 @@
-mod actions;
-#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
-mod apple_intelligence;
 mod audio_feedback;
 pub mod audio_toolkit;
 mod autostart;
 mod catalog;
 mod chinese_script;
 pub mod cli;
-mod clipboard;
 mod commands;
 pub mod engine_supervisor;
-mod helpers;
-mod input;
 mod intervention;
 mod llm_client;
 mod managers;
 mod meeting;
 mod memory;
-mod overlay;
-mod paste_tx;
 pub mod portable;
-mod secure_input;
 mod settings;
 mod shortcut;
 mod signal_handle;
-mod transcription_coordinator;
 mod tray;
 mod tray_i18n;
 mod utils;
@@ -36,14 +26,11 @@ use tauri_specta::{collect_commands, collect_events, Builder};
 pub use utils::env_flag_enabled;
 
 use env_filter::Builder as EnvFilterBuilder;
-use managers::audio::AudioRecordingManager;
-use managers::history::HistoryManager;
 use managers::model::ModelManager;
 use managers::transcription::TranscriptionManager;
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::Arc;
 use tauri::image::Image;
-pub use transcription_coordinator::TranscriptionCoordinator;
 
 use tauri::tray::TrayIconBuilder;
 use tauri::{AppHandle, Emitter, Listener, Manager};
@@ -98,7 +85,7 @@ fn build_console_filter() -> env_filter::Filter {
     builder.build()
 }
 
-fn show_main_window(app: &AppHandle) {
+pub(crate) fn show_main_window(app: &AppHandle) {
     if let Some(main_window) = app.get_webview_window("main") {
         if let Err(e) = main_window.unminimize() {
             log::error!("Failed to unminimize webview window: {}", e);
@@ -188,35 +175,19 @@ fn should_force_show_permissions_window(app: &AppHandle) -> bool {
 }
 
 fn initialize_core_logic(app_handle: &AppHandle) {
-    // Note: Enigo (keyboard/mouse simulation) is NOT initialized here.
-    // The frontend is responsible for calling the `initialize_enigo` command
-    // after onboarding completes. This avoids triggering permission dialogs
-    // on macOS before the user is ready.
-
-    // Initialize the managers. The audio recorder receives the streaming router
-    // explicitly, so always-on microphone startup can wire live-preview frames
-    // even before Tauri state is populated.
     let model_manager =
         Arc::new(ModelManager::new(app_handle).expect("Failed to initialize model manager"));
     let transcription_manager = Arc::new(
         TranscriptionManager::new(app_handle, model_manager.clone())
             .expect("Failed to initialize transcription manager"),
     );
-    let recording_manager = Arc::new(
-        AudioRecordingManager::new(app_handle, transcription_manager.stream_router())
-            .expect("Failed to initialize recording manager"),
-    );
-    let history_manager =
-        Arc::new(HistoryManager::new(app_handle).expect("Failed to initialize history manager"));
 
     // Apply accelerator preferences before any model loads
     managers::transcription::apply_accelerator_settings(app_handle);
 
     // Add managers to Tauri's managed state
-    app_handle.manage(recording_manager.clone());
     app_handle.manage(model_manager.clone());
     app_handle.manage(transcription_manager.clone());
-    app_handle.manage(history_manager.clone());
 
     let project_manager = Arc::new(
         meeting::manager::ProjectManager::new(app_handle)
@@ -233,7 +204,6 @@ fn initialize_core_logic(app_handle: &AppHandle) {
         app_handle,
         meeting_store.clone(),
         transcription_manager.clone(),
-        recording_manager.clone(),
     ));
     app_handle.manage(meeting_manager.clone());
     meeting::observer::spawn_observer(
@@ -246,12 +216,9 @@ fn initialize_core_logic(app_handle: &AppHandle) {
 
     // Note: Shortcuts are NOT initialized here.
     // The frontend is responsible for calling the `initialize_shortcuts` command
-    // after permissions are confirmed (on macOS) or after onboarding completes.
-    // This matches the pattern used for Enigo initialization.
+    // after onboarding completes.
 
-    // Set up signal handlers for toggling transcription. On Linux, SIGUSR1 is
-    // deliberately not handled — it belongs to WebKitGTK's garbage collector
-    // (#1660) — see signal_handle.rs.
+    // SIGUSR2 toggles a meeting; see signal_handle.rs.
     #[cfg(unix)]
     signal_handle::setup_signal_handler(app_handle.clone());
 
@@ -264,7 +231,7 @@ fn initialize_core_logic(app_handle: &AppHandle) {
     let initial_theme = tray::get_current_theme(app_handle);
 
     // Choose the appropriate initial icon based on theme
-    let initial_icon_path = tray::get_icon_path(initial_theme, tray::TrayIconState::Idle, false);
+    let initial_icon_path = tray::get_icon_path(initial_theme, tray::TrayIconState::Idle);
 
     let mut tray_builder = TrayIconBuilder::new()
         .icon(
@@ -313,19 +280,12 @@ fn initialize_core_logic(app_handle: &AppHandle) {
             "settings" => {
                 show_main_window(app);
             }
-            "secure_input_warning" => {
-                // Full explanation lives in the settings-window banner
-                show_main_window(app);
-            }
             "check_updates" => {
                 let settings = settings::get_settings(app);
                 if settings::update_checks_effectively_enabled(&settings) {
                     show_main_window(app);
                     let _ = app.emit("check-for-updates", ());
                 }
-            }
-            "copy_last_transcript" => {
-                tray::copy_last_transcript(app);
             }
             "unload_model" => {
                 let transcription_manager = app.state::<Arc<TranscriptionManager>>();
@@ -336,11 +296,8 @@ fn initialize_core_logic(app_handle: &AppHandle) {
                 transcription_manager.request_unload();
                 log::info!("Model unloaded via tray.");
             }
-            "cancel" => {
-                use crate::utils::cancel_current_operation;
-
-                // Use centralized cancellation that handles all operations
-                cancel_current_operation(app);
+            "start_meeting" | "end_meeting" => {
+                crate::meeting::toggle::toggle_meeting(app);
             }
             "quit" => {
                 app.exit(0);
@@ -389,9 +346,6 @@ fn initialize_core_logic(app_handle: &AppHandle) {
     // tauri-plugin-autostart elsewhere)
     autostart::apply_autostart(app_handle, settings.autostart_enabled);
 
-    // Create the recording overlay window (hidden by default)
-    utils::create_recording_overlay(app_handle);
-
     // Create the meeting intervention card window (hidden by default)
     intervention::create_intervention_window(app_handle);
 }
@@ -435,21 +389,6 @@ where
             eprintln!("error: headless transcription panicked: {message}");
             1
         }
-    }
-}
-
-#[cfg(test)]
-mod headless_guard_tests {
-    use super::run_headless_guarded;
-
-    #[test]
-    fn preserves_normal_exit_codes() {
-        assert_eq!(run_headless_guarded(|| 2), 2);
-    }
-
-    #[test]
-    fn converts_worker_panics_to_runtime_failures() {
-        assert_eq!(run_headless_guarded(|| panic!("simulated failure")), 1);
     }
 }
 
@@ -683,8 +622,6 @@ pub fn run(cli_args: CliArgs) {
         .commands(collect_commands![
             shortcut::change_binding,
             shortcut::reset_binding,
-            shortcut::change_shortcut_activation_setting,
-            shortcut::change_hold_threshold_ms_setting,
             shortcut::change_audio_feedback_setting,
             shortcut::change_audio_feedback_volume_setting,
             shortcut::change_sound_theme_setting,
@@ -693,46 +630,24 @@ pub fn run(cli_args: CliArgs) {
             shortcut::change_autostart_setting,
             shortcut::change_translate_to_english_setting,
             shortcut::change_selected_language_setting,
-            shortcut::change_overlay_position_setting,
-            shortcut::change_overlay_style_setting,
             shortcut::change_debug_mode_setting,
             shortcut::change_word_correction_threshold_setting,
-            shortcut::change_extra_recording_buffer_setting,
-            shortcut::change_paste_delay_ms_setting,
-            shortcut::change_paste_delay_after_ms_setting,
-            shortcut::change_reliable_paste_setting,
-            shortcut::change_paste_method_setting,
-            shortcut::get_available_typing_tools,
-            shortcut::change_typing_tool_setting,
-            shortcut::change_external_script_path_setting,
-            shortcut::change_clipboard_handling_setting,
-            shortcut::change_auto_submit_setting,
-            shortcut::change_auto_submit_key_setting,
-            shortcut::change_post_process_enabled_setting,
             shortcut::change_meeting_assistant_setting,
             shortcut::change_meeting_system_audio_setting,
             shortcut::change_meeting_vision_setting,
-            shortcut::change_meeting_provider_setting,
             shortcut::change_meeting_sensitivity_setting,
             shortcut::change_meeting_observer_interval_setting,
             shortcut::change_meeting_beep_setting,
             shortcut::change_experimental_enabled_setting,
-            shortcut::change_post_process_base_url_setting,
-            shortcut::change_post_process_api_format_setting,
-            shortcut::change_post_process_api_key_setting,
-            shortcut::change_post_process_model_setting,
-            shortcut::set_post_process_provider,
-            shortcut::fetch_post_process_models,
-            shortcut::add_post_process_prompt,
-            shortcut::update_post_process_prompt,
-            shortcut::delete_post_process_prompt,
-            shortcut::set_post_process_selected_prompt,
+            shortcut::change_llm_base_url_setting,
+            shortcut::change_llm_api_format_setting,
+            shortcut::change_llm_api_key_setting,
+            shortcut::change_llm_model_setting,
+            shortcut::set_llm_provider,
+            shortcut::fetch_llm_models,
             shortcut::update_custom_words,
             shortcut::suspend_all_bindings,
             shortcut::resume_all_bindings,
-            shortcut::change_mute_while_recording_setting,
-            shortcut::change_append_trailing_space_setting,
-            shortcut::change_lazy_stream_close_setting,
             shortcut::change_vad_enabled_setting,
             shortcut::change_vad_backend_setting,
             shortcut::change_filler_word_removal_enabled_setting,
@@ -750,11 +665,8 @@ pub fn run(cli_args: CliArgs) {
             shortcut::get_available_accelerators,
             shortcut::handy_keys::start_handy_keys_recording,
             shortcut::handy_keys::stop_handy_keys_recording,
-            secure_input::get_secure_input_status,
-            secure_input::run_keyboard_diagnostic,
             trigger_update_check,
             show_main_window_command,
-            commands::cancel_operation,
             commands::is_portable,
             commands::is_update_checks_locked,
             commands::get_app_dir_path,
@@ -762,11 +674,8 @@ pub fn run(cli_args: CliArgs) {
             commands::get_default_settings,
             commands::get_log_dir_path,
             commands::set_log_level,
-            commands::open_recordings_folder,
             commands::open_log_dir,
             commands::open_app_data_dir,
-            commands::check_apple_intelligence_available,
-            commands::initialize_enigo,
             commands::initialize_shortcuts,
             commands::models::get_available_models,
             commands::models::get_model_info,
@@ -778,8 +687,6 @@ pub fn run(cli_args: CliArgs) {
             commands::models::get_transcription_model_status,
             commands::models::is_model_loading,
             commands::models::rescan_local_models,
-            commands::audio::update_microphone_mode,
-            commands::audio::get_microphone_mode,
             commands::audio::get_windows_microphone_permission_status,
             commands::audio::open_microphone_privacy_settings,
             commands::audio::get_available_microphones,
@@ -790,22 +697,11 @@ pub fn run(cli_args: CliArgs) {
             commands::audio::get_selected_output_device,
             commands::audio::play_test_sound,
             commands::audio::check_custom_sounds,
-            commands::audio::set_clamshell_microphone,
-            commands::audio::get_clamshell_microphone,
-            commands::audio::is_recording,
             commands::audio::get_microphone_channels,
             commands::audio::set_selected_channel,
             commands::transcription::set_model_unload_timeout,
             commands::transcription::get_model_load_status,
             commands::transcription::unload_model_manually,
-            commands::history::get_history_entries,
-            commands::history::toggle_history_entry_saved,
-            commands::history::get_audio_file_path,
-            commands::history::delete_history_entry,
-            commands::history::retry_history_entry_transcription,
-            commands::history::update_history_limit,
-            commands::history::update_recording_retention_period,
-            helpers::clamshell::is_laptop,
             commands::project::list_projects,
             commands::project::get_project,
             commands::project::create_project,
@@ -837,9 +733,6 @@ pub fn run(cli_args: CliArgs) {
             commands::meeting::summarize_session,
         ])
         .events(collect_events![
-            managers::history::HistoryUpdatePayload,
-            managers::transcription::StreamTextEvent,
-            managers::transcription::StreamPhaseEvent,
             meeting::manager::SourceStatusPayload,
             meeting::session::MeetingStatePayload,
             meeting::session::TranscriptLinePayload,
@@ -929,12 +822,8 @@ pub fn run(cli_args: CliArgs) {
     // instance instead.
     if !headless_mode {
         builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
-            if args.iter().any(|a| a == "--toggle-transcription") {
-                signal_handle::send_transcription_input(app, "transcribe", "CLI");
-            } else if args.iter().any(|a| a == "--toggle-post-process") {
-                signal_handle::send_transcription_input(app, "transcribe_with_post_process", "CLI");
-            } else if args.iter().any(|a| a == "--cancel") {
-                crate::utils::cancel_current_operation(app);
+            if args.iter().any(|a| a == "--toggle-meeting") {
+                crate::meeting::toggle::toggle_meeting(app);
             } else {
                 // A second process was launched without remote-control flags
                 // (e.g. the binary run from a shell). On macOS, relaunching the
@@ -955,7 +844,6 @@ pub fn run(cli_args: CliArgs) {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_os::init())
-        .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_macos_permissions::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_store::Builder::default().build())
@@ -979,9 +867,9 @@ pub fn run(cli_args: CliArgs) {
             // `--list-models`): initialize only what transcription needs — the
             // store/paths plugins, the model + transcription managers, and the
             // transcribe-cpp backend + accelerator settings — then run on a worker
-            // thread and exit. Deliberately skips the window, tray, overlay, audio
-            // recorder (so it never opens the mic, even with always_on_microphone),
-            // signal handlers, and autostart that initialize_core_logic sets up.
+            // thread and exit. Deliberately skips the window, tray, meeting
+            // managers, signal handlers, and autostart that
+            // initialize_core_logic sets up.
             if headless_mode {
                 let app_handle = app.handle().clone();
                 let model_manager = Arc::new(
@@ -1083,22 +971,8 @@ pub fn run(cli_args: CliArgs) {
             // honors the runtime `--debug` override applied to `settings` above.
             WEBVIEW_LOG_STREAMING.store(settings.debug_mode, Ordering::Relaxed);
             let app_handle = app.handle().clone();
-            app.manage(TranscriptionCoordinator::new(app_handle.clone()));
 
             initialize_core_logic(&app_handle);
-
-            // Secure Input monitor (macOS): detects stuck secure input that
-            // silently blocks keyed shortcuts, warns the user, and activates
-            // the Carbon fallback. See secure_input.rs and issue #1578.
-            secure_input::init(&app_handle);
-
-            // Populate the overlay-enabled cache from initial settings so the
-            // audio path (overlay::emit_levels, called ~24 Hz during recording)
-            // can do a single atomic load instead of reading the Tauri store.
-            // Kept in sync by shortcut::change_overlay_style_setting.
-            overlay::update_overlay_enabled_cache(
-                settings.overlay_style != settings::OverlayStyle::None,
-            );
 
             // Pre-warm GPU/accelerator enumeration on a background thread. The first
             // device listing opens the GPU, which on macOS loads ggml's Metal library

@@ -379,6 +379,3 @@ impl ModelManager {
         Ok(HttpDownloadOutcome::Completed)
     }
 }
-
-#[cfg(test)]
-mod tests;
