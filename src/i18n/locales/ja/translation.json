@@ -664,8 +664,10 @@
   "errors": {
     "loadDirectory": "ディレクトリの読み込みエラー: {{error}}",
     "micPermissionDeniedTitle": "マイクへのアクセスが拒否されました",
+    "meetingToggleFailedTitle": "Couldn't start the meeting",
     "micPermissionDenied": {
-      "windows": "設定 → プライバシーとセキュリティ → マイク(デスクトップアプリのアクセスを含む)でマイクへのアクセスを有効にしてください。"
+      "windows": "設定 → プライバシーとセキュリティ → マイク(デスクトップアプリのアクセスを含む)でマイクへのアクセスを有効にしてください。",
+      "macos": "Enable microphone access for Meet Assist in System Settings → Privacy & Security → Microphone."
     },
     "modelLoadFailed": "モデルの読み込みに失敗しました: {{model}}",
     "modelLoadFailedUnknown": "不明なモデル"

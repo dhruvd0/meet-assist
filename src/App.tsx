@@ -32,6 +32,10 @@ import { getLanguageDirection, initializeRTL } from "@/lib/utils/rtl";
 
 type OnboardingStep = "model" | "assistant" | "done";
 
+// How long to wait for an answer to the macOS microphone prompt before
+// warning that access is denied.
+const MIC_PERMISSION_WAIT_MS = 20_000;
+
 // Stable identity so preview effects do not re-run due to callback changes.
 const NOOP = () => {};
 
@@ -156,6 +160,18 @@ function App() {
     };
   }, []);
 
+  // A shortcut, tray, or CLI start that failed opens the window; say why.
+  useEffect(() => {
+    const unlisten = listen<string>("meeting-toggle-error", (e) => {
+      toast.error(t("errors.meetingToggleFailedTitle"), {
+        description: e.payload,
+      });
+    });
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, [t]);
+
   // Listen for model loading failures and show a toast
   useEffect(() => {
     const unlisten = listen<ModelStateEvent>("model-state-changed", (event) => {
@@ -183,7 +199,20 @@ function App() {
     try {
       if (currentPlatform === "macos") {
         if (!(await checkMicrophonePermission())) {
+          // Returns before the user answers (and at once if access was
+          // already denied), so poll for the outcome before warning.
           await requestMicrophonePermission();
+          const deadline = Date.now() + MIC_PERMISSION_WAIT_MS;
+          let granted = false;
+          while (!granted && Date.now() < deadline) {
+            await new Promise((r) => setTimeout(r, 500));
+            granted = await checkMicrophonePermission();
+          }
+          if (!granted) {
+            toast.error(t("errors.micPermissionDeniedTitle"), {
+              description: t("errors.micPermissionDenied.macos"),
+            });
+          }
         }
       } else if (currentPlatform === "windows") {
         const status = await commands.getWindowsMicrophonePermissionStatus();

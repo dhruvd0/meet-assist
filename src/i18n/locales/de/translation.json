@@ -664,8 +664,10 @@
   "errors": {
     "loadDirectory": "Fehler beim Laden des Verzeichnisses: {{error}}",
     "micPermissionDeniedTitle": "Mikrofonzugriff verweigert",
+    "meetingToggleFailedTitle": "Couldn't start the meeting",
     "micPermissionDenied": {
-      "windows": "Aktiviere den Mikrofonzugriff unter Einstellungen → Datenschutz und Sicherheit → Mikrofon (einschließlich Desktop-App-Zugriff)."
+      "windows": "Aktiviere den Mikrofonzugriff unter Einstellungen → Datenschutz und Sicherheit → Mikrofon (einschließlich Desktop-App-Zugriff).",
+      "macos": "Enable microphone access for Meet Assist in System Settings → Privacy & Security → Microphone."
     },
     "modelLoadFailed": "Modell konnte nicht geladen werden: {{model}}",
     "modelLoadFailedUnknown": "unbekanntes Modell"

@@ -664,8 +664,10 @@
   "errors": {
     "loadDirectory": "डाइरेक्टरी लोड गर्दा त्रुटि: {{error}}",
     "micPermissionDeniedTitle": "माइक्रोफोन पहुँच अस्वीकृत गरियो",
+    "meetingToggleFailedTitle": "Couldn't start the meeting",
     "micPermissionDenied": {
-      "windows": "Settings → Privacy & security → Microphone मा माइक्रोफोन पहुँच अन गर्नुहोस् (डेस्कटप एप पहुँचसहित)।"
+      "windows": "Settings → Privacy & security → Microphone मा माइक्रोफोन पहुँच अन गर्नुहोस् (डेस्कटप एप पहुँचसहित)।",
+      "macos": "Enable microphone access for Meet Assist in System Settings → Privacy & Security → Microphone."
     },
     "modelLoadFailed": "मोडेल लोड गर्न सकिएन: {{model}}",
     "modelLoadFailedUnknown": "अज्ञात मोडेल"

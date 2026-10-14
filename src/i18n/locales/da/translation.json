@@ -664,8 +664,10 @@
   "errors": {
     "loadDirectory": "Fejl ved indlæsning af mappe: {{error}}",
     "micPermissionDeniedTitle": "Mikrofonadgang nægtet",
+    "meetingToggleFailedTitle": "Couldn't start the meeting",
     "micPermissionDenied": {
-      "windows": "Aktivér mikrofonadgang under Indstillinger → Privatliv og sikkerhed → Mikrofon (inklusive adgang for skrivebordsapps)."
+      "windows": "Aktivér mikrofonadgang under Indstillinger → Privatliv og sikkerhed → Mikrofon (inklusive adgang for skrivebordsapps).",
+      "macos": "Enable microphone access for Meet Assist in System Settings → Privacy & Security → Microphone."
     },
     "modelLoadFailed": "Kunne ikke indlæse model: {{model}}",
     "modelLoadFailedUnknown": "ukendt model"

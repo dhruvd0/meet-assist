@@ -664,8 +664,10 @@
   "errors": {
     "loadDirectory": "Dizin yüklenirken hata oluştu: {{error}}",
     "micPermissionDeniedTitle": "Mikrofon erişimi reddedildi",
+    "meetingToggleFailedTitle": "Couldn't start the meeting",
     "micPermissionDenied": {
-      "windows": "Ayarlar → Gizlilik ve güvenlik → Mikrofon (masaüstü uygulama erişimi dahil) bölümünden mikrofon erişimini etkinleştirin."
+      "windows": "Ayarlar → Gizlilik ve güvenlik → Mikrofon (masaüstü uygulama erişimi dahil) bölümünden mikrofon erişimini etkinleştirin.",
+      "macos": "Enable microphone access for Meet Assist in System Settings → Privacy & Security → Microphone."
     },
     "modelLoadFailed": "Model yüklenemedi: {{model}}",
     "modelLoadFailedUnknown": "bilinmeyen model"

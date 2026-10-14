@@ -664,8 +664,10 @@
   "errors": {
     "loadDirectory": "שגיאה בטעינת תיקייה: {{error}}",
     "micPermissionDeniedTitle": "הגישה למיקרופון נדחתה",
+    "meetingToggleFailedTitle": "Couldn't start the meeting",
     "micPermissionDenied": {
-      "windows": "הפעל גישה למיקרופון ב-Settings > Privacy & security > Microphone, כולל גישה לאפליקציות שולחן עבודה."
+      "windows": "הפעל גישה למיקרופון ב-Settings > Privacy & security > Microphone, כולל גישה לאפליקציות שולחן עבודה.",
+      "macos": "Enable microphone access for Meet Assist in System Settings → Privacy & Security → Microphone."
     },
     "modelLoadFailed": "טעינת המודל נכשלה: {{model}}",
     "modelLoadFailedUnknown": "מודל לא ידוע"

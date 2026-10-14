@@ -664,8 +664,10 @@
   "errors": {
     "loadDirectory": "Kesalahan saat memuat direktori: {{error}}",
     "micPermissionDeniedTitle": "Akses Mikrofon Ditolak",
+    "meetingToggleFailedTitle": "Couldn't start the meeting",
     "micPermissionDenied": {
-      "windows": "Aktifkan akses mikrofon di Settings → Privacy & security → Microphone (termasuk akses aplikasi desktop)."
+      "windows": "Aktifkan akses mikrofon di Settings → Privacy & security → Microphone (termasuk akses aplikasi desktop).",
+      "macos": "Enable microphone access for Meet Assist in System Settings → Privacy & Security → Microphone."
     },
     "modelLoadFailed": "Gagal memuat model: {{model}}",
     "modelLoadFailedUnknown": "model tidak dikenal"

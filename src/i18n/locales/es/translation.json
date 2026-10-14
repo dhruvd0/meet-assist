@@ -664,8 +664,10 @@
   "errors": {
     "loadDirectory": "Error al cargar el directorio: {{error}}",
     "micPermissionDeniedTitle": "Acceso al micrófono denegado",
+    "meetingToggleFailedTitle": "Couldn't start the meeting",
     "micPermissionDenied": {
-      "windows": "Active el acceso al micrófono en Configuración → Privacidad y seguridad → Micrófono (incluido el acceso de aplicaciones de escritorio)."
+      "windows": "Active el acceso al micrófono en Configuración → Privacidad y seguridad → Micrófono (incluido el acceso de aplicaciones de escritorio).",
+      "macos": "Enable microphone access for Meet Assist in System Settings → Privacy & Security → Microphone."
     },
     "modelLoadFailed": "Error al cargar el modelo: {{model}}",
     "modelLoadFailedUnknown": "modelo desconocido"

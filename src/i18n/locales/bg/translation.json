@@ -664,8 +664,10 @@
   "errors": {
     "loadDirectory": "Грешка при зареждане на папката: {{error}}",
     "micPermissionDeniedTitle": "Достъпът до микрофона е отказан",
+    "meetingToggleFailedTitle": "Couldn't start the meeting",
     "micPermissionDenied": {
-      "windows": "Включете достъп до микрофона в Настройки → Поверителност и сигурност → Микрофон (включително за настолни приложения)."
+      "windows": "Включете достъп до микрофона в Настройки → Поверителност и сигурност → Микрофон (включително за настолни приложения).",
+      "macos": "Enable microphone access for Meet Assist in System Settings → Privacy & Security → Microphone."
     },
     "modelLoadFailed": "Зареждането на модела не бе успешно: {{model}}",
     "modelLoadFailedUnknown": "неизвестен модел"

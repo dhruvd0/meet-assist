@@ -31,8 +31,15 @@ pub fn toggle_meeting(app: &AppHandle) {
             Some(project_id) => match mm.start(Some(project_id), None) {
                 Ok(m) => info!("toggle_meeting: started meeting {}", m.id),
                 Err(e) => {
+                    // A double press can race another start; the meeting the
+                    // user wanted is running, so there is nothing to report.
+                    if mm.state().meeting_id.is_some() {
+                        info!("toggle_meeting: start skipped, a meeting is already running");
+                        return;
+                    }
                     error!("toggle_meeting: start failed: {e:#}");
                     crate::show_main_window(&app);
+                    let _ = app.emit("meeting-toggle-error", format!("{e:#}"));
                 }
             },
             None => {

@@ -664,8 +664,10 @@
   "errors": {
     "loadDirectory": "Fel vid laddning av mapp: {{error}}",
     "micPermissionDeniedTitle": "Mikrofonåtkomst nekad",
+    "meetingToggleFailedTitle": "Couldn't start the meeting",
     "micPermissionDenied": {
-      "windows": "Aktivera mikrofonåtkomst i Inställningar → Integritet och säkerhet → Mikrofon (inklusive åtkomst till skrivbordsappar)."
+      "windows": "Aktivera mikrofonåtkomst i Inställningar → Integritet och säkerhet → Mikrofon (inklusive åtkomst till skrivbordsappar).",
+      "macos": "Enable microphone access for Meet Assist in System Settings → Privacy & Security → Microphone."
     },
     "modelLoadFailed": "Misslyckades med att ladda modell: {{model}}",
     "modelLoadFailedUnknown": "okänd modell"

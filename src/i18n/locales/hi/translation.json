@@ -664,8 +664,10 @@
   "errors": {
     "loadDirectory": "फ़ोल्डर लोड करने में गड़बड़ी: {{error}}",
     "micPermissionDeniedTitle": "माइक्रोफ़ोन का ऐक्सेस नहीं दिया गया",
+    "meetingToggleFailedTitle": "Couldn't start the meeting",
     "micPermissionDenied": {
-      "windows": "Settings → Privacy & security → Microphone में माइक्रोफ़ोन ऐक्सेस चालू करें (डेस्कटॉप ऐप ऐक्सेस समेत)."
+      "windows": "Settings → Privacy & security → Microphone में माइक्रोफ़ोन ऐक्सेस चालू करें (डेस्कटॉप ऐप ऐक्सेस समेत).",
+      "macos": "Enable microphone access for Meet Assist in System Settings → Privacy & Security → Microphone."
     },
     "modelLoadFailed": "मॉडल लोड नहीं हो सका: {{model}}",
     "modelLoadFailedUnknown": "अज्ञात मॉडल"

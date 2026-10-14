@@ -664,8 +664,10 @@
   "errors": {
     "loadDirectory": "Lỗi khi tải thư mục: {{error}}",
     "micPermissionDeniedTitle": "Quyền truy cập micrô bị từ chối",
+    "meetingToggleFailedTitle": "Couldn't start the meeting",
     "micPermissionDenied": {
-      "windows": "Bật quyền truy cập micrô trong Cài đặt → Quyền riêng tư & bảo mật → Micrô (bao gồm quyền truy cập ứng dụng máy tính)."
+      "windows": "Bật quyền truy cập micrô trong Cài đặt → Quyền riêng tư & bảo mật → Micrô (bao gồm quyền truy cập ứng dụng máy tính).",
+      "macos": "Enable microphone access for Meet Assist in System Settings → Privacy & Security → Microphone."
     },
     "modelLoadFailed": "Không thể tải mô hình: {{model}}",
     "modelLoadFailedUnknown": "mô hình không xác định"

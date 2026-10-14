@@ -664,8 +664,10 @@
   "errors": {
     "loadDirectory": "خطأ في تحميل المجلد: {{error}}",
     "micPermissionDeniedTitle": "تم رفض الوصول إلى الميكروفون",
+    "meetingToggleFailedTitle": "Couldn't start the meeting",
     "micPermissionDenied": {
-      "windows": "قم بتمكين الوصول إلى الميكروفون في الإعدادات ← الخصوصية والأمان ← الميكروفون (بما في ذلك وصول تطبيقات سطح المكتب)."
+      "windows": "قم بتمكين الوصول إلى الميكروفون في الإعدادات ← الخصوصية والأمان ← الميكروفون (بما في ذلك وصول تطبيقات سطح المكتب).",
+      "macos": "Enable microphone access for Meet Assist in System Settings → Privacy & Security → Microphone."
     },
     "modelLoadFailed": "فشل في تحميل النموذج: {{model}}",
     "modelLoadFailedUnknown": "نموذج غير معروف"

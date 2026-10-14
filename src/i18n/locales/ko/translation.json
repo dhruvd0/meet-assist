@@ -664,8 +664,10 @@
   "errors": {
     "loadDirectory": "디렉토리 로딩 오류: {{error}}",
     "micPermissionDeniedTitle": "마이크 접근이 거부되었습니다",
+    "meetingToggleFailedTitle": "Couldn't start the meeting",
     "micPermissionDenied": {
-      "windows": "설정 → 개인 정보 및 보안 → 마이크(데스크톱 앱 접근 포함)에서 마이크 접근을 활성화하세요."
+      "windows": "설정 → 개인 정보 및 보안 → 마이크(데스크톱 앱 접근 포함)에서 마이크 접근을 활성화하세요.",
+      "macos": "Enable microphone access for Meet Assist in System Settings → Privacy & Security → Microphone."
     },
     "modelLoadFailed": "모델을 불러오지 못했습니다: {{model}}",
     "modelLoadFailedUnknown": "알 수 없는 모델"
