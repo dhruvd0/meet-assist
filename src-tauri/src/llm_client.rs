@@ -1,4 +1,4 @@
-use crate::settings::{PostProcessApiFormat, PostProcessProvider};
+use crate::settings::{LlmApiFormat, LlmProvider};
 use log::{debug, error, info};
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE, REFERER, USER_AGENT};
 use serde::Serialize;
@@ -37,7 +37,7 @@ impl ReasoningParams {
 /// Pick the reasoning-disable request fields an endpoint understands.
 /// Unknown endpoints get the common OpenAI-style field; if they reject it,
 /// the request is retried without it (see `send_chat_completion_with_schema`).
-fn reasoning_disable_params(provider: &PostProcessProvider) -> ReasoningParams {
+fn reasoning_disable_params(provider: &LlmProvider) -> ReasoningParams {
     let base_url = provider.base_url.to_lowercase();
     if base_url.contains("api.deepseek.com") {
         // DeepSeek rejects reasoning_effort "none" and uses its own field:
@@ -72,7 +72,7 @@ fn reasoning_rejections() -> &'static Mutex<HashSet<String>> {
     REJECTED.get_or_init(|| Mutex::new(HashSet::new()))
 }
 
-fn endpoint_key(provider: &PostProcessProvider, model: &str) -> String {
+fn endpoint_key(provider: &LlmProvider, model: &str) -> String {
     format!("{}|{}", provider.base_url.trim_end_matches('/'), model)
 }
 
@@ -94,7 +94,7 @@ fn remember_rejection(key: String) {
 const ANTHROPIC_MAX_TOKENS: u32 = 4096;
 
 /// Build headers for API requests based on provider type
-fn build_headers(provider: &PostProcessProvider, api_key: &str) -> Result<HeaderMap, String> {
+fn build_headers(provider: &LlmProvider, api_key: &str) -> Result<HeaderMap, String> {
     let mut headers = HeaderMap::new();
 
     // Common headers
@@ -111,7 +111,7 @@ fn build_headers(provider: &PostProcessProvider, api_key: &str) -> Result<Header
 
     // Provider-specific auth headers
     if !api_key.is_empty() {
-        if provider.api_format == PostProcessApiFormat::Anthropic {
+        if provider.api_format == LlmApiFormat::Anthropic {
             headers.insert(
                 "x-api-key",
                 HeaderValue::from_str(api_key)
@@ -131,7 +131,7 @@ fn build_headers(provider: &PostProcessProvider, api_key: &str) -> Result<Header
 }
 
 /// Create an HTTP client with provider-specific headers
-fn create_client(provider: &PostProcessProvider, api_key: &str) -> Result<reqwest::Client, String> {
+fn create_client(provider: &LlmProvider, api_key: &str) -> Result<reqwest::Client, String> {
     let headers = build_headers(provider, api_key)?;
     reqwest::Client::builder()
         .default_headers(headers)
@@ -254,10 +254,7 @@ fn report_reqwest_error(context: &str, error: &reqwest::Error) -> String {
 
 /// Fetch available models from an OpenAI-compatible API
 /// Returns a list of model IDs
-pub async fn fetch_models(
-    provider: &PostProcessProvider,
-    api_key: String,
-) -> Result<Vec<String>, String> {
+pub async fn fetch_models(provider: &LlmProvider, api_key: String) -> Result<Vec<String>, String> {
     let base_url = provider.base_url.trim_end_matches('/');
     let url = format!("{}/models", base_url);
 
@@ -538,7 +535,7 @@ fn merge_reasoning(body: &mut Value, reasoning: &ReasoningParams) {
 /// `send_with_tools_with_client`.
 #[allow(clippy::too_many_arguments)] // mirrors the request shape; a params struct adds no clarity
 pub async fn send_with_tools(
-    provider: &PostProcessProvider,
+    provider: &LlmProvider,
     api_key: String,
     model: &str,
     system_prompt: String,
@@ -565,7 +562,7 @@ pub async fn send_with_tools(
 
 /// Build the HTTP client `send_with_tools_with_client` expects for a provider.
 pub fn create_tool_client(
-    provider: &PostProcessProvider,
+    provider: &LlmProvider,
     api_key: &str,
 ) -> Result<reqwest::Client, String> {
     create_client(provider, api_key)
@@ -576,7 +573,7 @@ pub fn create_tool_client(
 #[allow(clippy::too_many_arguments)] // mirrors the request shape; a params struct adds no clarity
 pub async fn send_with_tools_with_client(
     client: &reqwest::Client,
-    provider: &PostProcessProvider,
+    provider: &LlmProvider,
     model: &str,
     system_prompt: String,
     user_content: String,
@@ -586,7 +583,7 @@ pub async fn send_with_tools_with_client(
     handler: &(dyn Fn(&ToolCall) -> String + Sync),
 ) -> Result<String, ToolLoopError> {
     let base = provider.base_url.trim_end_matches('/');
-    let anthropic = provider.api_format == PostProcessApiFormat::Anthropic;
+    let anthropic = provider.api_format == LlmApiFormat::Anthropic;
     let url = if anthropic {
         format!("{base}/messages")
     } else {
@@ -733,7 +730,7 @@ pub fn strip_json_fences(text: &str) -> &str {
 /// support); fences/prose are stripped from the answer before parsing.
 #[allow(dead_code)] // consumed by the summary/digest lanes
 pub async fn complete_json(
-    provider: &PostProcessProvider,
+    provider: &LlmProvider,
     api_key: String,
     model: &str,
     system_prompt: String,
@@ -798,7 +795,7 @@ pub fn anthropic_image_message(prompt: &str, mime: &str, b64: &str) -> Value {
 /// when the provider/model rejects image input so callers can fall back.
 #[allow(dead_code)] // consumed by the attachment indexing lane
 pub async fn describe_image(
-    provider: &PostProcessProvider,
+    provider: &LlmProvider,
     api_key: String,
     model: &str,
     prompt: String,
@@ -809,7 +806,7 @@ pub async fn describe_image(
     let b64 = base64::engine::general_purpose::STANDARD.encode(bytes);
     let client = create_client(provider, &api_key)?;
     let base = provider.base_url.trim_end_matches('/');
-    let anthropic = provider.api_format == PostProcessApiFormat::Anthropic;
+    let anthropic = provider.api_format == LlmApiFormat::Anthropic;
     let (url, body) = if anthropic {
         (
             format!("{base}/messages"),

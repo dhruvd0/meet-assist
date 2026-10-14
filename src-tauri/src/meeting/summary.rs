@@ -135,13 +135,13 @@ impl LlmSummarizer {
     fn call(&self, system: String, user: String, schema: Value) -> Result<Value> {
         let settings = crate::settings::get_settings(&self.app);
         let provider = settings
-            .meeting_provider()
+            .llm_provider()
             .cloned()
             .ok_or_else(|| anyhow!("no provider configured"))?;
         let model = settings
-            .meeting_model()
+            .llm_model()
             .ok_or_else(|| anyhow!("no model configured"))?;
-        let api_key = settings.meeting_api_key();
+        let api_key = settings.llm_api_key();
         let fut = async move {
             llm_client::complete_json(&provider, api_key, &model, system, user, schema).await
         };

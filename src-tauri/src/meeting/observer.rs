@@ -7,7 +7,7 @@ use crate::llm_client::{self, ToolLoopError};
 use crate::meeting::session::MeetingManager;
 use crate::meeting::store::{Intervention, ProjectStore, TranscriptLine};
 use crate::meeting::tools::{handle_tool, tool_defs, ToolContext};
-use crate::settings::{AppSettings, MeetingSensitivity, PostProcessProvider};
+use crate::settings::{AppSettings, LlmProvider, MeetingSensitivity};
 use anyhow::Result;
 use log::{info, warn};
 use serde::{Deserialize, Serialize};
@@ -116,7 +116,7 @@ impl Readiness {
     }
 }
 
-fn is_local(provider: &PostProcessProvider) -> bool {
+fn is_local(provider: &LlmProvider) -> bool {
     let u = provider.base_url.to_ascii_lowercase();
     u.contains("localhost") || u.contains("127.0.0.1")
 }
@@ -125,20 +125,18 @@ pub fn readiness(settings: &AppSettings) -> Readiness {
     if !settings.meeting_assistant_enabled {
         return Readiness::Disabled;
     }
-    let Some(provider) = settings.meeting_provider() else {
+    let Some(provider) = settings.llm_provider() else {
         return Readiness::NoProvider;
     };
     let label = provider.label.clone();
-    if provider.id == crate::settings::APPLE_INTELLIGENCE_PROVIDER_ID
-        || !provider.base_url.trim().starts_with("http")
-    {
+    if !provider.base_url.trim().starts_with("http") {
         return Readiness::UnsupportedProvider(label);
     }
-    if settings.meeting_api_key().trim().is_empty() && !is_local(provider) {
+    if settings.llm_api_key().trim().is_empty() && !is_local(provider) {
         return Readiness::MissingApiKey(label);
     }
     if settings
-        .meeting_model()
+        .llm_model()
         .map(|m| m.trim().is_empty())
         .unwrap_or(true)
     {
@@ -185,11 +183,7 @@ impl LlmJudge {
         }
     }
 
-    fn client_for(
-        &self,
-        provider: &PostProcessProvider,
-        api_key: &str,
-    ) -> Result<reqwest::Client, String> {
+    fn client_for(&self, provider: &LlmProvider, api_key: &str) -> Result<reqwest::Client, String> {
         use std::hash::{Hash, Hasher};
         let mut h = std::collections::hash_map::DefaultHasher::new();
         api_key.hash(&mut h);
@@ -215,13 +209,13 @@ impl Judge for LlmJudge {
     ) -> Result<Verdict, JudgeError> {
         let settings = crate::settings::get_settings(&self.app);
         let provider = settings
-            .meeting_provider()
+            .llm_provider()
             .cloned()
             .ok_or_else(|| JudgeError::Other("no provider configured".into()))?;
         let model = settings
-            .meeting_model()
+            .llm_model()
             .ok_or_else(|| JudgeError::Other("no model configured".into()))?;
-        let api_key = settings.meeting_api_key();
+        let api_key = settings.llm_api_key();
         let client = self
             .client_for(&provider, &api_key)
             .map_err(JudgeError::Other)?;

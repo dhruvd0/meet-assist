@@ -35,13 +35,13 @@ impl Describer for LlmDescriber {
     fn describe(&self, mime: &str, bytes: &[u8]) -> Result<String, String> {
         let settings = crate::settings::get_settings(&self.app);
         let provider = settings
-            .meeting_provider()
+            .llm_provider()
             .ok_or_else(|| "no provider".to_string())?
             .clone();
         let model = settings
-            .meeting_model()
+            .llm_model()
             .ok_or_else(|| "no provider".to_string())?;
-        let key = settings.meeting_api_key();
+        let key = settings.llm_api_key();
         let fut = async {
             tokio::time::timeout(
                 DESCRIBE_TIMEOUT,

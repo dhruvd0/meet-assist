@@ -18,11 +18,9 @@ use serde::Serialize;
 use specta::Type;
 use tauri::{AppHandle, Emitter, Manager};
 
-#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
-use crate::settings::APPLE_INTELLIGENCE_DEFAULT_MODEL_ID;
 use crate::settings::{
     self, get_settings, ChineseScript, KeyboardImplementation, ShortcutBinding, SoundTheme, Theme,
-    VadBackend, APPLE_INTELLIGENCE_PROVIDER_ID,
+    VadBackend,
 };
 use crate::tray;
 
@@ -701,15 +699,6 @@ pub fn change_word_correction_threshold_setting(
 
 #[tauri::command]
 #[specta::specta]
-pub fn change_meeting_provider_setting(app: AppHandle, provider_id: String) -> Result<(), String> {
-    let mut settings = settings::get_settings(&app);
-    settings.meeting_provider_id = provider_id;
-    settings::write_settings(&app, settings);
-    Ok(())
-}
-
-#[tauri::command]
-#[specta::specta]
 pub fn change_meeting_sensitivity_setting(
     app: AppHandle,
     sensitivity: settings::MeetingSensitivity,
@@ -776,19 +765,19 @@ pub fn change_experimental_enabled_setting(app: AppHandle, enabled: bool) -> Res
 
 #[tauri::command]
 #[specta::specta]
-pub fn change_post_process_base_url_setting(
+pub fn change_llm_base_url_setting(
     app: AppHandle,
     provider_id: String,
     base_url: String,
 ) -> Result<(), String> {
     let mut settings = settings::get_settings(&app);
     let label = settings
-        .post_process_provider(&provider_id)
+        .llm_provider_by_id(&provider_id)
         .map(|provider| provider.label.clone())
         .ok_or_else(|| format!("Provider '{}' not found", provider_id))?;
 
     let provider = settings
-        .post_process_provider_mut(&provider_id)
+        .llm_provider_mut(&provider_id)
         .expect("Provider looked up above must exist");
 
     if provider.id != "custom" {
@@ -805,14 +794,14 @@ pub fn change_post_process_base_url_setting(
 
 #[tauri::command]
 #[specta::specta]
-pub fn change_post_process_api_format_setting(
+pub fn change_llm_api_format_setting(
     app: AppHandle,
     provider_id: String,
-    api_format: settings::PostProcessApiFormat,
+    api_format: settings::LlmApiFormat,
 ) -> Result<(), String> {
     let mut settings = settings::get_settings(&app);
     let provider = settings
-        .post_process_provider_mut(&provider_id)
+        .llm_provider_mut(&provider_id)
         .ok_or_else(|| format!("Provider '{}' not found", provider_id))?;
 
     if provider.id != "custom" {
@@ -833,7 +822,7 @@ fn validate_provider_exists(
     provider_id: &str,
 ) -> Result<(), String> {
     if !settings
-        .post_process_providers
+        .llm_providers
         .iter()
         .any(|provider| provider.id == provider_id)
     {
@@ -844,72 +833,57 @@ fn validate_provider_exists(
 
 #[tauri::command]
 #[specta::specta]
-pub fn change_post_process_api_key_setting(
+pub fn change_llm_api_key_setting(
     app: AppHandle,
     provider_id: String,
     api_key: String,
 ) -> Result<(), String> {
     let mut settings = settings::get_settings(&app);
     validate_provider_exists(&settings, &provider_id)?;
-    settings.post_process_api_keys.insert(provider_id, api_key);
+    settings.llm_api_keys.insert(provider_id, api_key);
     settings::write_settings(&app, settings);
     Ok(())
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn change_post_process_model_setting(
+pub fn change_llm_model_setting(
     app: AppHandle,
     provider_id: String,
     model: String,
 ) -> Result<(), String> {
     let mut settings = settings::get_settings(&app);
     validate_provider_exists(&settings, &provider_id)?;
-    settings.post_process_models.insert(provider_id, model);
+    settings.llm_models.insert(provider_id, model);
     settings::write_settings(&app, settings);
     Ok(())
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn set_post_process_provider(app: AppHandle, provider_id: String) -> Result<(), String> {
+pub fn set_llm_provider(app: AppHandle, provider_id: String) -> Result<(), String> {
     let mut settings = settings::get_settings(&app);
     validate_provider_exists(&settings, &provider_id)?;
-    settings.post_process_provider_id = provider_id;
+    settings.llm_provider_id = provider_id;
     settings::write_settings(&app, settings);
     Ok(())
 }
 
 #[tauri::command]
 #[specta::specta]
-pub async fn fetch_post_process_models(
-    app: AppHandle,
-    provider_id: String,
-) -> Result<Vec<String>, String> {
+pub async fn fetch_llm_models(app: AppHandle, provider_id: String) -> Result<Vec<String>, String> {
     let settings = settings::get_settings(&app);
 
     // Find the provider
     let provider = settings
-        .post_process_providers
+        .llm_providers
         .iter()
         .find(|p| p.id == provider_id)
         .ok_or_else(|| format!("Provider '{}' not found", provider_id))?;
 
-    if provider.id == APPLE_INTELLIGENCE_PROVIDER_ID {
-        #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
-        {
-            return Ok(vec![APPLE_INTELLIGENCE_DEFAULT_MODEL_ID.to_string()]);
-        }
-
-        #[cfg(not(all(target_os = "macos", target_arch = "aarch64")))]
-        {
-            return Err("Apple Intelligence is only available on Apple silicon Macs running macOS 15 or later.".to_string());
-        }
-    }
-
     // Get API key
     let api_key = settings
-        .post_process_api_keys
+        .llm_api_keys
         .get(&provider_id)
         .cloned()
         .unwrap_or_default();
