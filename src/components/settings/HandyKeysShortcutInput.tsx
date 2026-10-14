@@ -9,7 +9,9 @@ import { useOsType } from "../../hooks/useOsType";
 import { commands } from "@/bindings";
 import { toast } from "sonner";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { SECURE_INPUT_HELP_URL } from "../SecureInputWarning";
+
+const SECURE_INPUT_HELP_URL =
+  "https://handy.computer/docs/troubleshooting#shortcuts-stopped-working-on-macos-secure-input";
 
 interface HandyKeysShortcutInputProps {
   descriptionMode?: "inline" | "tooltip";

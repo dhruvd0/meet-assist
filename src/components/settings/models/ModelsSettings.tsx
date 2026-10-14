@@ -18,6 +18,12 @@ import {
   supportsLanguageCode,
 } from "@/lib/constants/languages.ts";
 import type { ModelInfo } from "@/bindings";
+import { SettingsGroup } from "../../ui/SettingsGroup";
+import { VoiceActivityDetection } from "../VoiceActivityDetection";
+import { FillerWordRemoval } from "../FillerWordRemoval";
+import { ChineseScriptSetting } from "../ChineseScript";
+import { CustomWords } from "../CustomWords";
+import { ModelSettingsCard } from "./ModelSettingsCard";
 
 // check if model supports a language based on its supported_languages list
 const modelSupportsLanguage = (model: ModelInfo, langCode: string): boolean => {
@@ -247,6 +253,14 @@ export const ModelsSettings: React.FC = () => {
           {t("settings.models.description")}
         </p>
       </div>
+
+      <ModelSettingsCard />
+      <SettingsGroup title={t("settings.advanced.groups.transcription")}>
+        <VoiceActivityDetection descriptionMode="tooltip" grouped={true} />
+        <FillerWordRemoval descriptionMode="tooltip" grouped={true} />
+        <ChineseScriptSetting descriptionMode="tooltip" grouped={true} />
+        <CustomWords descriptionMode="tooltip" grouped />
+      </SettingsGroup>
 
       {/* Search bar — filter the catalog by name or description */}
       <div className="relative">

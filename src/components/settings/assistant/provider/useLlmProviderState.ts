@@ -1,25 +1,19 @@
-import { useCallback, useMemo, useState } from "react";
-import { useSettings } from "../../../hooks/useSettings";
-import {
-  commands,
-  type PostProcessApiFormat,
-  type PostProcessProvider,
-} from "@/bindings";
+import { useCallback, useMemo } from "react";
+import { useSettings } from "../../../../hooks/useSettings";
+import type { LlmApiFormat, LlmProvider } from "@/bindings";
 import type { ModelOption } from "./types";
-import type { DropdownOption } from "../../ui/Dropdown";
+import type { DropdownOption } from "../../../ui/Dropdown";
 
-type PostProcessProviderState = {
+type LlmProviderState = {
   providerOptions: DropdownOption[];
   selectedProviderId: string;
-  selectedProvider: PostProcessProvider | undefined;
+  selectedProvider: LlmProvider | undefined;
   isCustomProvider: boolean;
-  isAppleProvider: boolean;
-  appleIntelligenceUnavailable: boolean;
   baseUrl: string;
   handleBaseUrlChange: (value: string) => void;
   isBaseUrlUpdating: boolean;
-  apiFormat: PostProcessApiFormat;
-  handleApiFormatChange: (value: PostProcessApiFormat) => void;
+  apiFormat: LlmApiFormat;
+  handleApiFormatChange: (value: LlmApiFormat) => void;
   isApiFormatUpdating: boolean;
   apiKey: string;
   handleApiKeyChange: (value: string) => void;
@@ -35,27 +29,25 @@ type PostProcessProviderState = {
   handleRefreshModels: () => void;
 };
 
-const APPLE_PROVIDER_ID = "apple_intelligence";
-
-export const usePostProcessProviderState = (): PostProcessProviderState => {
+export const useLlmProviderState = (): LlmProviderState => {
   const {
     settings,
     isUpdating,
-    setPostProcessProvider,
-    updatePostProcessBaseUrl,
-    updatePostProcessApiFormat,
-    updatePostProcessApiKey,
-    updatePostProcessModel,
-    fetchPostProcessModels,
-    postProcessModelOptions,
+    setLlmProvider,
+    updateLlmBaseUrl,
+    updateLlmApiFormat,
+    updateLlmApiKey,
+    updateLlmModel,
+    fetchLlmModels,
+    llmModelOptions,
   } = useSettings();
 
   // Settings are guaranteed to have providers after migration
-  const providers = settings?.post_process_providers || [];
+  const providers = settings?.llm_providers || [];
 
   const selectedProviderId = useMemo(() => {
-    return settings?.post_process_provider_id || providers[0]?.id || "openai";
-  }, [providers, settings?.post_process_provider_id]);
+    return settings?.llm_provider_id || providers[0]?.id || "openai";
+  }, [providers, settings?.llm_provider_id]);
 
   const selectedProvider = useMemo(() => {
     return (
@@ -64,15 +56,11 @@ export const usePostProcessProviderState = (): PostProcessProviderState => {
     );
   }, [providers, selectedProviderId]);
 
-  const isAppleProvider = selectedProvider?.id === APPLE_PROVIDER_ID;
-  const [appleIntelligenceUnavailable, setAppleIntelligenceUnavailable] =
-    useState(false);
-
   // Use settings directly as single source of truth
   const baseUrl = selectedProvider?.base_url ?? "";
   const apiFormat = selectedProvider?.api_format ?? "openai";
-  const apiKey = settings?.post_process_api_keys?.[selectedProviderId] ?? "";
-  const model = settings?.post_process_models?.[selectedProviderId] ?? "";
+  const apiKey = settings?.llm_api_keys?.[selectedProviderId] ?? "";
+  const model = settings?.llm_models?.[selectedProviderId] ?? "";
 
   const providerOptions = useMemo<DropdownOption[]>(() => {
     return providers.map((provider) => ({
@@ -83,46 +71,25 @@ export const usePostProcessProviderState = (): PostProcessProviderState => {
 
   const handleProviderSelect = useCallback(
     async (providerId: string) => {
-      // Clear error state on any selection attempt (allows dismissing the error)
-      setAppleIntelligenceUnavailable(false);
-
       if (providerId === selectedProviderId) return;
 
-      // Check Apple Intelligence availability before selecting
-      if (providerId === APPLE_PROVIDER_ID) {
-        const available = await commands.checkAppleIntelligenceAvailable();
-        if (!available) {
-          setAppleIntelligenceUnavailable(true);
-          // Don't return - still set the provider so dropdown shows the selection
-          // The backend gracefully handles unavailable Apple Intelligence
-        }
-      }
-
-      await setPostProcessProvider(providerId);
+      await setLlmProvider(providerId);
 
       // Auto-fetch available models for the new provider so the model dropdown
       // reflects what's actually valid. Without this, a stale model value from
       // a previous provider/base_url can persist and silently 404 at runtime.
       // Skip when the provider isn't configured yet (no API key / empty base URL)
       // to avoid unnecessary backend errors.
-      if (providerId !== APPLE_PROVIDER_ID) {
-        const provider = providers.find((p) => p.id === providerId);
-        const apiKey = settings?.post_process_api_keys?.[providerId] ?? "";
-        const hasBaseUrl = (provider?.base_url ?? "").trim() !== "";
-        const hasApiKey = apiKey.trim() !== "";
+      const provider = providers.find((p) => p.id === providerId);
+      const apiKey = settings?.llm_api_keys?.[providerId] ?? "";
+      const hasBaseUrl = (provider?.base_url ?? "").trim() !== "";
+      const hasApiKey = apiKey.trim() !== "";
 
-        if (provider?.id === "custom" ? hasBaseUrl : hasApiKey) {
-          void fetchPostProcessModels(providerId);
-        }
+      if (provider?.id === "custom" ? hasBaseUrl : hasApiKey) {
+        void fetchLlmModels(providerId);
       }
     },
-    [
-      selectedProviderId,
-      setPostProcessProvider,
-      fetchPostProcessModels,
-      providers,
-      settings,
-    ],
+    [selectedProviderId, setLlmProvider, fetchLlmModels, providers, settings],
   );
 
   const handleBaseUrlChange = useCallback(
@@ -132,61 +99,60 @@ export const usePostProcessProviderState = (): PostProcessProviderState => {
       }
       const trimmed = value.trim();
       if (trimmed && trimmed !== baseUrl) {
-        void updatePostProcessBaseUrl(selectedProvider.id, trimmed);
+        void updateLlmBaseUrl(selectedProvider.id, trimmed);
       }
     },
-    [selectedProvider, baseUrl, updatePostProcessBaseUrl],
+    [selectedProvider, baseUrl, updateLlmBaseUrl],
   );
 
   const handleApiFormatChange = useCallback(
-    (value: PostProcessApiFormat) => {
+    (value: LlmApiFormat) => {
       if (value !== apiFormat) {
-        void updatePostProcessApiFormat(selectedProviderId, value);
+        void updateLlmApiFormat(selectedProviderId, value);
       }
     },
-    [apiFormat, selectedProviderId, updatePostProcessApiFormat],
+    [apiFormat, selectedProviderId, updateLlmApiFormat],
   );
 
   const handleApiKeyChange = useCallback(
     (value: string) => {
       const trimmed = value.trim();
       if (trimmed !== apiKey) {
-        void updatePostProcessApiKey(selectedProviderId, trimmed);
+        void updateLlmApiKey(selectedProviderId, trimmed);
       }
     },
-    [apiKey, selectedProviderId, updatePostProcessApiKey],
+    [apiKey, selectedProviderId, updateLlmApiKey],
   );
 
   const handleModelChange = useCallback(
     (value: string) => {
       const trimmed = value.trim();
       if (trimmed !== model) {
-        void updatePostProcessModel(selectedProviderId, trimmed);
+        void updateLlmModel(selectedProviderId, trimmed);
       }
     },
-    [model, selectedProviderId, updatePostProcessModel],
+    [model, selectedProviderId, updateLlmModel],
   );
 
   const handleModelSelect = useCallback(
     (value: string) => {
-      void updatePostProcessModel(selectedProviderId, value.trim());
+      void updateLlmModel(selectedProviderId, value.trim());
     },
-    [selectedProviderId, updatePostProcessModel],
+    [selectedProviderId, updateLlmModel],
   );
 
   const handleModelCreate = useCallback(
     (value: string) => {
-      void updatePostProcessModel(selectedProviderId, value);
+      void updateLlmModel(selectedProviderId, value);
     },
-    [selectedProviderId, updatePostProcessModel],
+    [selectedProviderId, updateLlmModel],
   );
 
   const handleRefreshModels = useCallback(() => {
-    if (isAppleProvider) return;
-    void fetchPostProcessModels(selectedProviderId);
-  }, [fetchPostProcessModels, isAppleProvider, selectedProviderId]);
+    void fetchLlmModels(selectedProviderId);
+  }, [fetchLlmModels, selectedProviderId]);
 
-  const availableModelsRaw = postProcessModelOptions[selectedProviderId] || [];
+  const availableModelsRaw = llmModelOptions[selectedProviderId] || [];
 
   const modelOptions = useMemo<ModelOption[]>(() => {
     const seen = new Set<string>();
@@ -210,21 +176,13 @@ export const usePostProcessProviderState = (): PostProcessProviderState => {
     return options;
   }, [availableModelsRaw, model]);
 
-  const isBaseUrlUpdating = isUpdating(
-    `post_process_base_url:${selectedProviderId}`,
-  );
+  const isBaseUrlUpdating = isUpdating(`llm_base_url:${selectedProviderId}`);
   const isApiFormatUpdating = isUpdating(
-    `post_process_api_format:${selectedProviderId}`,
+    `llm_api_format:${selectedProviderId}`,
   );
-  const isApiKeyUpdating = isUpdating(
-    `post_process_api_key:${selectedProviderId}`,
-  );
-  const isModelUpdating = isUpdating(
-    `post_process_model:${selectedProviderId}`,
-  );
-  const isFetchingModels = isUpdating(
-    `post_process_models_fetch:${selectedProviderId}`,
-  );
+  const isApiKeyUpdating = isUpdating(`llm_api_key:${selectedProviderId}`);
+  const isModelUpdating = isUpdating(`llm_model:${selectedProviderId}`);
+  const isFetchingModels = isUpdating(`llm_models_fetch:${selectedProviderId}`);
 
   const isCustomProvider = selectedProvider?.id === "custom";
 
@@ -235,8 +193,6 @@ export const usePostProcessProviderState = (): PostProcessProviderState => {
     selectedProviderId,
     selectedProvider,
     isCustomProvider,
-    isAppleProvider,
-    appleIntelligenceUnavailable,
     baseUrl,
     handleBaseUrlChange,
     isBaseUrlUpdating,

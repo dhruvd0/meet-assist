@@ -12,23 +12,16 @@ const MIN_INTERVAL = 10;
 const MAX_INTERVAL = 120;
 const DEFAULT_INTERVAL_SECS = 20;
 
-export const MeetingAssistantSettings: React.FC = () => {
+/** When and how loudly the assistant speaks up during a meeting. */
+export const AssistantBehaviour: React.FC = () => {
   const { t } = useTranslation();
-  const { settings, getSetting, updateSetting, isUpdating } = useSettings();
+  const { getSetting, updateSetting, isUpdating } = useSettings();
 
   const interval =
     getSetting("meeting_observer_interval_secs") ?? DEFAULT_INTERVAL_SECS;
   const [draft, setDraft] = useState(String(interval));
   const enabled = getSetting("meeting_assistant_enabled") ?? false;
   useEffect(() => setDraft(String(interval)), [interval]);
-
-  const providerOptions = [
-    { value: "", label: t("settings.meeting.provider.default") },
-    ...(settings?.post_process_providers ?? []).map((p) => ({
-      value: p.id,
-      label: p.label,
-    })),
-  ];
 
   const sensitivityOptions = (["low", "medium", "high"] as const).map((v) => ({
     value: v,
@@ -61,19 +54,6 @@ export const MeetingAssistantSettings: React.FC = () => {
         descriptionMode="inline"
         grouped={true}
       />
-      <SettingContainer
-        title={t("settings.meeting.provider.label")}
-        description={t("settings.meeting.provider.description")}
-        descriptionMode="tooltip"
-        grouped={true}
-      >
-        <Dropdown
-          options={providerOptions}
-          selectedValue={getSetting("meeting_provider_id") ?? ""}
-          onSelect={(v) => updateSetting("meeting_provider_id", v)}
-          disabled={!enabled || isUpdating("meeting_provider_id")}
-        />
-      </SettingContainer>
       <SettingContainer
         title={t("settings.meeting.sensitivity.label")}
         description={t("settings.meeting.sensitivity.description")}
@@ -110,15 +90,6 @@ export const MeetingAssistantSettings: React.FC = () => {
           disabled={!enabled || isUpdating("meeting_observer_interval_secs")}
         />
       </SettingContainer>
-      <ToggleSwitch
-        checked={getSetting("meeting_system_audio_enabled") ?? true}
-        onChange={(v) => updateSetting("meeting_system_audio_enabled", v)}
-        isUpdating={isUpdating("meeting_system_audio_enabled")}
-        label={t("settings.meeting.systemAudio.label")}
-        description={t("settings.meeting.systemAudio.description")}
-        descriptionMode="tooltip"
-        grouped={true}
-      />
       <ToggleSwitch
         checked={getSetting("meeting_beep_enabled") ?? true}
         onChange={(v) => updateSetting("meeting_beep_enabled", v)}

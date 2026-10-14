@@ -1,5 +1,5 @@
 import React from "react";
-import { Dropdown, type DropdownOption } from "../../ui/Dropdown";
+import { Dropdown, type DropdownOption } from "../../../ui/Dropdown";
 
 interface ProviderSelectProps {
   options: DropdownOption[];

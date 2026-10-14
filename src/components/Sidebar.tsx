@@ -1,10 +1,10 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
 import {
+  AudioLines,
   Cog,
   FlaskConical,
   FolderKanban,
-  History,
   Info,
   Mic,
   Sparkles,
@@ -16,12 +16,12 @@ import HandyTextLogo from "./icons/HandyTextLogo";
 import HandyHand from "./icons/HandyHand";
 import { useSettings } from "../hooks/useSettings";
 import {
+  AssistantSettings,
+  AudioSettings,
   GeneralSettings,
   AdvancedSettings,
-  HistorySettings,
   DebugSettings,
   AboutSettings,
-  PostProcessingSettings,
   ModelsSettings,
 } from "./settings";
 
@@ -55,16 +55,16 @@ export const SECTIONS_CONFIG = {
     component: MeetingsSection,
     enabled: () => true,
   },
-  general: {
-    labelKey: "sidebar.general",
-    icon: HandyHand,
-    component: GeneralSettings,
+  assistant: {
+    labelKey: "sidebar.assistant",
+    icon: Sparkles,
+    component: AssistantSettings,
     enabled: () => true,
   },
-  history: {
-    labelKey: "sidebar.history",
-    icon: History,
-    component: HistorySettings,
+  audio: {
+    labelKey: "sidebar.audio",
+    icon: AudioLines,
+    component: AudioSettings,
     enabled: () => true,
   },
   models: {
@@ -73,17 +73,17 @@ export const SECTIONS_CONFIG = {
     component: ModelsSettings,
     enabled: () => true,
   },
+  general: {
+    labelKey: "sidebar.general",
+    icon: HandyHand,
+    component: GeneralSettings,
+    enabled: () => true,
+  },
   advanced: {
     labelKey: "sidebar.advanced",
     icon: Cog,
     component: AdvancedSettings,
     enabled: () => true,
-  },
-  postprocessing: {
-    labelKey: "sidebar.postProcessing",
-    icon: Sparkles,
-    component: PostProcessingSettings,
-    enabled: (settings) => settings?.post_process_enabled ?? false,
   },
   debug: {
     labelKey: "sidebar.debug",
