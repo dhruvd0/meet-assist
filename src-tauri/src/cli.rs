@@ -16,6 +16,10 @@ pub struct CliArgs {
     #[arg(long)]
     pub toggle_transcription: bool,
 
+    /// Start a meeting, or end the running one, on a running instance
+    #[arg(long)]
+    pub toggle_meeting: bool,
+
     /// Toggle transcription with post-processing on/off (sent to running instance)
     #[arg(long)]
     pub toggle_post_process: bool,

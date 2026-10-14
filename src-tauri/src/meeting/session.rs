@@ -367,6 +367,15 @@ impl MeetingManager {
             if let Err(e) = self.state().emit(app) {
                 error!("emit meeting state: {e}");
             }
+            let busy = self.state().meeting_id.is_some();
+            crate::tray::set_tray_state(
+                app,
+                if busy {
+                    crate::tray::TrayIconState::Recording
+                } else {
+                    crate::tray::TrayIconState::Idle
+                },
+            );
         }
     }
 

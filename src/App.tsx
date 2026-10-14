@@ -183,6 +183,18 @@ function App() {
     };
   }, []);
 
+  // Rust asks the window to jump to a section (e.g. toggle with no projects).
+  useEffect(() => {
+    const unlisten = listen<string>("navigate-section", (e) => {
+      if (e.payload in SECTIONS_CONFIG) {
+        setCurrentSection(e.payload as SidebarSection);
+      }
+    });
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, []);
+
   // Listen for paste failures and show a toast.
   // The technical error detail is logged to handy.log on the Rust side
   // (see actions.rs `error!("Failed to paste transcription: ...")`),

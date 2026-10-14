@@ -1011,6 +1011,21 @@ pub fn get_default_settings() -> AppSettings {
         },
     );
 
+    #[cfg(target_os = "macos")]
+    let default_meeting_shortcut = "option+shift+m";
+    #[cfg(not(target_os = "macos"))]
+    let default_meeting_shortcut = "ctrl+shift+m";
+    bindings.insert(
+        "toggle_meeting".to_string(),
+        ShortcutBinding {
+            id: "toggle_meeting".to_string(),
+            name: "Start or end meeting".to_string(),
+            description: "Starts a meeting, or ends the running one.".to_string(),
+            default_binding: default_meeting_shortcut.to_string(),
+            current_binding: default_meeting_shortcut.to_string(),
+        },
+    );
+
     AppSettings {
         settings_schema_version: default_settings_schema_version(),
         bindings,

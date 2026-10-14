@@ -512,12 +512,26 @@ fn build_menu(app: &AppHandle, inputs: &MenuInputs) -> tauri::Result<(Menu<tauri
     let quit_i = MenuItem::with_id(app, "quit", &strings.quit, true, quit_accelerator)?;
     let separator = || PredefinedMenuItem::separator(app);
 
+    let meeting_i = if inputs.busy {
+        MenuItem::with_id(app, "end_meeting", &strings.end_meeting, true, None::<&str>)?
+    } else {
+        MenuItem::with_id(
+            app,
+            "start_meeting",
+            &strings.start_meeting,
+            true,
+            None::<&str>,
+        )?
+    };
+
     let menu = if inputs.busy {
         let cancel_i = MenuItem::with_id(app, "cancel", &strings.cancel, true, None::<&str>)?;
         Menu::with_items(
             app,
             &[
                 &version_i,
+                &separator()?,
+                &meeting_i,
                 &separator()?,
                 &cancel_i,
                 &separator()?,
@@ -558,6 +572,8 @@ fn build_menu(app: &AppHandle, inputs: &MenuInputs) -> tauri::Result<(Menu<tauri
             app,
             &[
                 &version_i,
+                &separator()?,
+                &meeting_i,
                 &separator()?,
                 &copy_last_transcript_i,
                 &separator()?,

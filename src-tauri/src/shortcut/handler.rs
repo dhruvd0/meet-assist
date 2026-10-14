@@ -32,6 +32,13 @@ pub fn handle_shortcut_event(
     hotkey_string: &str,
     is_pressed: bool,
 ) {
+    if binding_id == "toggle_meeting" {
+        if is_pressed {
+            crate::meeting::toggle::toggle_meeting(app);
+        }
+        return;
+    }
+
     let settings = get_settings(app);
 
     // Transcribe bindings are handled by the coordinator.

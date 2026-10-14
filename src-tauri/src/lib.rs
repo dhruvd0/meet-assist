@@ -98,7 +98,7 @@ fn build_console_filter() -> env_filter::Filter {
     builder.build()
 }
 
-fn show_main_window(app: &AppHandle) {
+pub(crate) fn show_main_window(app: &AppHandle) {
     if let Some(main_window) = app.get_webview_window("main") {
         if let Err(e) = main_window.unminimize() {
             log::error!("Failed to unminimize webview window: {}", e);
@@ -335,6 +335,9 @@ fn initialize_core_logic(app_handle: &AppHandle) {
                 }
                 transcription_manager.request_unload();
                 log::info!("Model unloaded via tray.");
+            }
+            "start_meeting" | "end_meeting" => {
+                crate::meeting::toggle::toggle_meeting(app);
             }
             "cancel" => {
                 use crate::utils::cancel_current_operation;
@@ -914,7 +917,9 @@ pub fn run(cli_args: CliArgs) {
     // instance instead.
     if !headless_mode {
         builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
-            if args.iter().any(|a| a == "--toggle-transcription") {
+            if args.iter().any(|a| a == "--toggle-meeting") {
+                crate::meeting::toggle::toggle_meeting(app);
+            } else if args.iter().any(|a| a == "--toggle-transcription") {
                 signal_handle::send_transcription_input(app, "transcribe", "CLI");
             } else if args.iter().any(|a| a == "--toggle-post-process") {
                 signal_handle::send_transcription_input(app, "transcribe_with_post_process", "CLI");
