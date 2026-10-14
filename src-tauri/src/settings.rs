@@ -155,10 +155,13 @@ pub enum KeyboardImplementation {
 }
 
 impl Default for KeyboardImplementation {
+    /// Tauri on macOS and Linux: on macOS handy-keys needs Accessibility,
+    /// which onboarding no longer asks for, while Tauri's Carbon hotkeys need
+    /// no permission.
     fn default() -> Self {
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "macos"))]
         return KeyboardImplementation::Tauri;
-        #[cfg(not(target_os = "linux"))]
+        #[cfg(not(any(target_os = "linux", target_os = "macos")))]
         return KeyboardImplementation::HandyKeys;
     }
 }

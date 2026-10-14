@@ -46,7 +46,10 @@ pub fn init_shortcuts(app: &AppHandle) {
                 settings.keyboard_implementation = KeyboardImplementation::Tauri;
                 settings::write_settings(app, settings);
 
-                tauri_impl::init_shortcuts(app);
+                // Validate as well as register: a combo only handy-keys can
+                // express (e.g. `fn`) is reset to the default instead of
+                // leaving the meeting shortcut unregistered.
+                register_all_shortcuts_for_implementation(app, KeyboardImplementation::Tauri);
             }
         }
     }

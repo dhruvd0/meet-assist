@@ -102,7 +102,9 @@ pub fn open_app_data_dir(app: AppHandle) -> Result<(), String> {
 pub struct ShortcutsInitialized;
 
 /// Initialize keyboard shortcuts.
-/// On macOS, this should be called after accessibility permissions are granted.
+/// The frontend calls this once onboarding is done. If the optional handy-keys
+/// backend can't start (on macOS it needs Accessibility), this falls back to
+/// the Tauri global shortcut, which needs no permission.
 /// This is idempotent - calling it multiple times is safe.
 #[specta::specta]
 #[tauri::command]

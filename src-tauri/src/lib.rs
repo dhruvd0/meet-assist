@@ -216,7 +216,7 @@ fn initialize_core_logic(app_handle: &AppHandle) {
 
     // Note: Shortcuts are NOT initialized here.
     // The frontend is responsible for calling the `initialize_shortcuts` command
-    // after permissions are confirmed (on macOS) or after onboarding completes.
+    // after onboarding completes.
 
     // SIGUSR2 toggles a meeting; see signal_handle.rs.
     #[cfg(unix)]
