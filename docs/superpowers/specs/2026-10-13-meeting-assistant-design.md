@@ -210,3 +210,5 @@ Session summary prompt: decisions, open questions, action items, three-line reca
 4. Tool calling in `llm_client`, observer loop, intervention window, beep.
 5. System audio capture, macOS first, then Windows, Linux.
 6. Summaries, image digests, continue flow polish, onboarding step.
+
+Status (2026-10-14): all six delivered and merged to `main`. Plans live in `docs/superpowers/plans/`. Deviations: summaries run without tools; the onboarding step checks the provider only, system-audio permission is requested at the first meeting. Windows and Linux system audio are built but unverified on hardware.

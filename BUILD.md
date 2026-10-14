@@ -1,6 +1,6 @@
 # Build Instructions
 
-This guide covers how to set up the development environment and build Handy from source across different platforms.
+This guide covers how to set up the development environment and build Meet Assist from source across different platforms. Meet Assist is a fork of [Handy](https://github.com/cjpais/Handy); the build steps are inherited and the binary is still named `handy`.
 
 ## Prerequisites
 
@@ -92,8 +92,8 @@ ORT_LIB_LOCATION=$(brew --prefix onnxruntime)/lib ORT_PREFER_DYNAMIC_LINK=1 bun 
 ### 1. Clone the Repository
 
 ```bash
-git clone git@github.com:cjpais/Handy.git
-cd Handy
+git clone https://github.com/dhruvd0/meet-assist.git
+cd meet-assist
 ```
 
 ### 2. Install Dependencies

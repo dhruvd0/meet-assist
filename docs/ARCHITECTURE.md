@@ -2,7 +2,7 @@
 
 Meet Assist is a Tauri 2 desktop app: Rust backend, React/TypeScript frontend. It inherits [Handy](https://github.com/cjpais/Handy)'s dictation pipeline unchanged and adds a meeting subsystem beside it.
 
-Status legend: **existing** means it ships today. **planned** means it is specified in [the design spec](superpowers/specs/2026-10-13-meeting-assistant-design.md) and not yet built.
+Everything below ships today. The meeting subsystem was built in six plans from [the design spec](superpowers/specs/2026-10-13-meeting-assistant-design.md); all six are merged as of 2026-10-14.
 
 ## Two pipelines, one engine
 
