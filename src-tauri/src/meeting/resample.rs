@@ -4,6 +4,9 @@ use anyhow::Result;
 use rubato::audioadapter_buffers::direct::InterleavedSlice;
 use rubato::{Fft, FixedSync, Resampler, WindowFunction};
 
+// Only the macOS/Windows loopback path resamples; Linux reads a 16 kHz
+// PulseAudio monitor through handy-recorder.
+#[cfg_attr(not(any(target_os = "macos", target_os = "windows")), allow(dead_code))]
 const CHUNK: usize = 1024;
 
 /// Converts interleaved multi-channel audio to mono at a target sample rate.
@@ -13,6 +16,7 @@ pub struct MonoResampler {
     buf: Vec<f32>,
 }
 
+#[cfg_attr(not(any(target_os = "macos", target_os = "windows")), allow(dead_code))]
 impl MonoResampler {
     pub fn new(in_rate: u32, out_rate: u32, in_channels: u16) -> Result<Self> {
         let inner = if in_rate == out_rate {
