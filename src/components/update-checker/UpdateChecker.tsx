@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
+import { toastError } from "@/lib/result";
 import { check } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { listen } from "@tauri-apps/api/event";
@@ -106,7 +107,7 @@ const UpdateChecker: React.FC<UpdateCheckerProps> = ({ className = "" }) => {
         }
       }
     } catch (error) {
-      console.error("Failed to check for updates:", error);
+      toastError("errors.updateCheckFailed", error);
     } finally {
       setIsChecking(false);
       isManualCheckRef.current = false;
@@ -161,7 +162,7 @@ const UpdateChecker: React.FC<UpdateCheckerProps> = ({ className = "" }) => {
       });
       await relaunch();
     } catch (error) {
-      console.error("Failed to install update:", error);
+      toastError("errors.updateInstallFailed", error);
     } finally {
       setIsInstalling(false);
       setDownloadProgress(0);

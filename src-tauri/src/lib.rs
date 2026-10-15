@@ -7,6 +7,7 @@ pub mod cli;
 mod commands;
 pub mod engine_supervisor;
 mod intervention;
+mod live_pill;
 mod llm_client;
 mod managers;
 mod meeting;
@@ -344,10 +345,12 @@ fn initialize_core_logic(app_handle: &AppHandle) {
 
     // Apply the autostart preference (SMAppService login item on macOS 13+,
     // tauri-plugin-autostart elsewhere)
-    autostart::apply_autostart(app_handle, settings.autostart_enabled);
+    // Failures are logged; the toggle reports them when the user changes it.
+    let _ = autostart::apply_autostart(app_handle, settings.autostart_enabled);
 
     // Create the meeting intervention card window (hidden by default)
     intervention::create_intervention_window(app_handle);
+    live_pill::create_window(app_handle);
 }
 
 #[tauri::command]
@@ -637,6 +640,7 @@ pub fn run(cli_args: CliArgs) {
             shortcut::change_meeting_vision_setting,
             shortcut::change_meeting_sensitivity_setting,
             shortcut::change_meeting_observer_interval_setting,
+            shortcut::change_meeting_max_line_setting,
             shortcut::change_meeting_beep_setting,
             shortcut::change_experimental_enabled_setting,
             shortcut::change_llm_base_url_setting,
@@ -645,6 +649,7 @@ pub fn run(cli_args: CliArgs) {
             shortcut::change_llm_model_setting,
             shortcut::set_llm_provider,
             shortcut::fetch_llm_models,
+            shortcut::ping_llm_model,
             shortcut::update_custom_words,
             shortcut::suspend_all_bindings,
             shortcut::resume_all_bindings,
@@ -741,9 +746,11 @@ pub fn run(cli_args: CliArgs) {
             meeting::session::TranscriptLinePayload,
             meeting::session::MeetingCaptureWarningPayload,
             meeting::summary::SessionSummaryPayload,
+            meeting::summary::SessionSummaryStatusPayload,
             meeting::observer::InterventionPayload,
             meeting::observer::ObserverStatusPayload,
             meeting::filing::MeetingFiledPayload,
+            meeting::filing::MeetingTitledPayload,
             commands::meeting::OpenMeetingPayload,
         ]);
 
@@ -1045,6 +1052,9 @@ pub fn run(cli_args: CliArgs) {
                     }
                     // No tray: keep the dock icon visible so the user can reopen
                 }
+            }
+            tauri::WindowEvent::Focused(focused) if window.label() == "main" => {
+                live_pill::main_focus_changed(window.app_handle(), *focused);
             }
             tauri::WindowEvent::ThemeChanged(theme) => {
                 log::info!("Theme changed to: {:?}", theme);

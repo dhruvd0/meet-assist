@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ask } from "@tauri-apps/plugin-dialog";
-import { Mic, Trash2 } from "lucide-react";
+import { Loader2, Mic, Trash2 } from "lucide-react";
 import { useProjectStore } from "@/stores/projectStore";
 import { useMeetingStore } from "@/stores/meetingStore";
 import { Button } from "../ui/Button";
@@ -23,10 +23,27 @@ export const ProjectDetail: React.FC<{ onDeleted: () => void }> = ({
   const meetings = useMeetingStore((s) => s.meetings);
   const live = useMeetingStore((s) => s.live);
   const startMeeting = useMeetingStore((s) => s.startMeeting);
+  const pending = useMeetingStore((s) => s.controlPending);
+  const projectsLoading = useProjectStore((s) => s.loading);
+  const projectsError = useProjectStore((s) => s.projectsError);
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
-  if (!project) return null;
+  if (!project)
+    return projectsLoading ? (
+      <p
+        role="status"
+        className="p-8 flex items-center justify-center gap-2 text-sm text-faint"
+      >
+        <Loader2 className="w-4 h-4 animate-spin" />
+        {t("common.loading")}
+      </p>
+    ) : (
+      <p role="alert" className="p-8 text-center text-sm text-error">
+        {projectsError ?? t("projects.errors.notFound")}
+      </p>
+    );
 
   const commit = () => {
     const next = title.trim();
@@ -70,24 +87,36 @@ export const ProjectDetail: React.FC<{ onDeleted: () => void }> = ({
             title={t("projects.delete")}
             aria-label={t("projects.delete")}
             className="w-8 h-8 inline-flex items-center justify-center rounded-lg text-faint hover:text-error hover:bg-error/10 transition-colors cursor-pointer"
+            disabled={deleting}
             onClick={async () => {
               const ok = await ask(t("projects.deleteConfirm"), {
                 title: t("projects.delete"),
                 kind: "warning",
               });
-              if (ok) {
-                await deleteProject(project.id);
-                onDeleted();
+              if (!ok) return;
+              setDeleting(true);
+              try {
+                if (await deleteProject(project.id)) onDeleted();
+              } finally {
+                setDeleting(false);
               }
             }}
           >
-            <Trash2 className="w-4 h-4" />
+            {deleting ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Trash2 className="w-4 h-4" />
+            )}
           </button>
           <Button
-            disabled={live.meeting_id !== null}
+            disabled={live.meeting_id !== null || pending !== null}
             onClick={() => startMeeting(project.id, null)}
           >
-            <Mic className="w-3.5 h-3.5" />
+            {pending === "start" ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Mic className="w-3.5 h-3.5" />
+            )}
             {t("meetings.newInProject")}
           </Button>
         </div>

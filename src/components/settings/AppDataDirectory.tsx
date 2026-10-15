@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
+import { ok, toastError } from "@/lib/result";
 import { commands } from "@/bindings";
 import { SettingContainer } from "../ui/SettingContainer";
 import { PathDisplay } from "../ui/PathDisplay";
@@ -42,9 +43,9 @@ export const AppDataDirectory: React.FC<AppDataDirectoryProps> = ({
   const handleOpen = async () => {
     if (!appDirPath) return;
     try {
-      await commands.openAppDataDir();
+      await ok(commands.openAppDataDir());
     } catch (openError) {
-      console.error("Failed to open app data directory:", openError);
+      toastError("errors.openFolderFailed", openError);
     }
   };
 

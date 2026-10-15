@@ -224,11 +224,14 @@ pub fn get_observer_readiness(app: tauri::AppHandle) -> ObserverReadiness {
     }
 }
 
-/// Summarize a session in the background (also the UI's Retry). The result
-/// arrives as a `SessionSummaryPayload` event.
+/// Summarize a session (the UI's Retry) and resolve when it is done, so the
+/// UI can show progress. The summary itself arrives as a
+/// `SessionSummaryPayload` event.
 #[tauri::command]
 #[specta::specta]
-pub fn summarize_session(mm: Mm<'_>, session_id: i64) -> Result<(), String> {
-    mm.spawn_summary(session_id);
-    Ok(())
+pub async fn summarize_session(mm: Mm<'_>, session_id: i64) -> Result<(), String> {
+    let mm = Arc::clone(&mm);
+    tauri::async_runtime::spawn_blocking(move || mm.summarize_session_now(session_id))
+        .await
+        .map_err(|e| e.to_string())?
 }

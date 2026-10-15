@@ -1,44 +1,22 @@
-import React, { useState } from "react";
+import React from "react";
 import { useTranslation } from "react-i18next";
 import { RefreshCcw } from "lucide-react";
-import { toast } from "sonner";
-import { commands, type LlmApiFormat } from "@/bindings";
+import { type LlmApiFormat } from "@/bindings";
 import { Dropdown } from "../../../ui/Dropdown";
 import { SettingContainer } from "../../../ui/SettingContainer";
 import { SettingsGroup } from "../../../ui/SettingsGroup";
-import { Button } from "../../../ui/Button";
 import { ResetButton } from "../../../ui/ResetButton";
 import { ProviderSelect } from "./ProviderSelect";
 import { BaseUrlField } from "./BaseUrlField";
 import { ApiKeyField } from "./ApiKeyField";
 import { ModelSelect } from "./ModelSelect";
+import { ModelPingButton } from "./ModelPingButton";
 import { useLlmProviderState } from "./useLlmProviderState";
 
 /** The one LLM provider behind nudges, summaries, and image digests. */
 export const ProviderSettings: React.FC = () => {
   const { t } = useTranslation();
   const state = useLlmProviderState();
-  const [isTesting, setIsTesting] = useState(false);
-
-  const testConnection = async () => {
-    setIsTesting(true);
-    try {
-      const result = await commands.fetchLlmModels(state.selectedProviderId);
-      if (result.status === "ok") {
-        toast.success(
-          t("settings.assistant.provider.test.ok", {
-            count: result.data.length,
-          }),
-        );
-      } else {
-        toast.error(result.error);
-      }
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : String(e));
-    } finally {
-      setIsTesting(false);
-    }
-  };
 
   return (
     <SettingsGroup
@@ -130,7 +108,11 @@ export const ProviderSettings: React.FC = () => {
           <ApiKeyField
             value={state.apiKey}
             onBlur={state.handleApiKeyChange}
-            placeholder={t("settings.assistant.provider.apiKey.placeholder")}
+            placeholder={t(
+              state.selectedProviderId === "openrouter"
+                ? "settings.assistant.provider.apiKey.bundledPlaceholder"
+                : "settings.assistant.provider.apiKey.placeholder",
+            )}
             disabled={state.isApiKeyUpdating}
             className="min-w-[320px]"
           />
@@ -174,14 +156,9 @@ export const ProviderSettings: React.FC = () => {
               className={`h-4 w-4 ${state.isFetchingModels ? "animate-spin" : ""}`}
             />
           </ResetButton>
-          <Button
-            variant="secondary"
-            size="md"
-            onClick={testConnection}
-            disabled={isTesting}
-          >
-            {t("settings.assistant.provider.test.button")}
-          </Button>
+        </div>
+        <div className="mt-2">
+          <ModelPingButton />
         </div>
       </SettingContainer>
     </SettingsGroup>

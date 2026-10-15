@@ -13,7 +13,12 @@ interface ProjectStore {
   projects: Project[];
   activeProjectId: number | null;
   sources: Source[];
+  /** Loading state of `sources` for the open project. */
+  sourcesState: "loading" | "ready" | "error";
+  sourcesError: string | null;
   loading: boolean;
+  /** Why `projects` failed to load, when it did. */
+  projectsError: string | null;
 
   loadProjects: () => Promise<void>;
   createProject: (title: string) => Promise<Project | null>;
@@ -21,7 +26,8 @@ interface ProjectStore {
   closeProject: () => void;
   renameProject: (id: number, title: string) => Promise<void>;
   saveBrief: (id: number, brief: string) => Promise<void>;
-  deleteProject: (id: number) => Promise<void>;
+  /** True when the project was deleted. */
+  deleteProject: (id: number) => Promise<boolean>;
   loadSources: (projectId: number) => Promise<void>;
   addSource: (
     projectId: number,
@@ -31,7 +37,8 @@ interface ProjectStore {
   ) => Promise<Source | null>;
   removeSource: (id: number) => Promise<void>;
   reindexSource: (id: number) => Promise<void>;
-  setCaption: (id: number, caption: string) => Promise<void>;
+  /** True when the caption was saved. */
+  setCaption: (id: number, caption: string) => Promise<boolean>;
   subscribe: () => Promise<() => void>;
 }
 
@@ -41,16 +48,20 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   projects: [],
   activeProjectId: null,
   sources: [],
+  sourcesState: "loading",
+  sourcesError: null,
   loading: false,
+  projectsError: null,
 
   loadProjects: async () => {
-    set({ loading: true });
+    set({ loading: true, projectsError: null });
     try {
       const res = await commands.listProjects();
       if (res.status === "ok") {
         set({ projects: res.data });
       } else {
-        toast.error(t("projects.errors.load"));
+        set({ projectsError: `${t("projects.errors.load")} ${res.error}` });
+        toast.error(`${t("projects.errors.load")} ${res.error}`);
       }
     } finally {
       set({ loading: false });
@@ -60,7 +71,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   createProject: async (title) => {
     const res = await commands.createProject(title);
     if (res.status !== "ok") {
-      toast.error(t("projects.errors.create"));
+      toast.error(`${t("projects.errors.create")} ${res.error}`);
       return null;
     }
     set((s) => ({ projects: [res.data, ...s.projects] }));
@@ -68,7 +79,12 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
 
   openProject: async (id) => {
-    set({ activeProjectId: id, sources: [] });
+    set({
+      activeProjectId: id,
+      sources: [],
+      sourcesState: "loading",
+      sourcesError: null,
+    });
     await get().loadSources(id);
   },
 
@@ -77,7 +93,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   renameProject: async (id, title) => {
     const res = await commands.updateProjectTitle(id, title);
     if (res.status !== "ok") {
-      toast.error(t("projects.errors.save"));
+      toast.error(`${t("projects.errors.save")} ${res.error}`);
       return;
     }
     set((s) => ({
@@ -88,7 +104,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   saveBrief: async (id, brief) => {
     const res = await commands.updateProjectBrief(id, brief);
     if (res.status !== "ok") {
-      toast.error(t("projects.errors.save"));
+      toast.error(`${t("projects.errors.save")} ${res.error}`);
       return;
     }
     set((s) => ({
@@ -99,27 +115,34 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   deleteProject: async (id) => {
     const res = await commands.deleteProject(id);
     if (res.status !== "ok") {
-      toast.error(t("projects.errors.delete"));
-      return;
+      toast.error(`${t("projects.errors.delete")} ${res.error}`);
+      return false;
     }
     set((s) => ({
       projects: s.projects.filter((p) => p.id !== id),
       activeProjectId: s.activeProjectId === id ? null : s.activeProjectId,
       sources: s.activeProjectId === id ? [] : s.sources,
     }));
+    return true;
   },
 
   loadSources: async (projectId) => {
+    if (get().activeProjectId === projectId)
+      set({ sourcesState: "loading", sourcesError: null });
     const res = await commands.listSources(projectId);
-    if (res.status === "ok" && get().activeProjectId === projectId) {
-      set({ sources: res.data });
-    }
+    if (get().activeProjectId !== projectId) return;
+    if (res.status === "ok") set({ sources: res.data, sourcesState: "ready" });
+    else
+      set({
+        sourcesState: "error",
+        sourcesError: `${t("projects.sources.errors.load")} ${res.error}`,
+      });
   },
 
   addSource: async (projectId, kind, title, locator) => {
     const res = await commands.addSource(projectId, kind, title, locator);
     if (res.status !== "ok") {
-      toast.error(t("projects.sources.errors.add"));
+      toast.error(`${t("projects.sources.errors.add")} ${res.error}`);
       return null;
     }
     set((s) => {
@@ -133,7 +156,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   removeSource: async (id) => {
     const res = await commands.removeSource(id);
     if (res.status !== "ok") {
-      toast.error(t("projects.sources.errors.remove"));
+      toast.error(`${t("projects.sources.errors.remove")} ${res.error}`);
       return;
     }
     set((s) => ({ sources: s.sources.filter((x) => x.id !== id) }));
@@ -142,21 +165,22 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   reindexSource: async (id) => {
     const res = await commands.reindexSource(id);
     if (res.status !== "ok") {
-      toast.error(t("projects.sources.errors.reindex"));
+      toast.error(`${t("projects.sources.errors.reindex")} ${res.error}`);
     }
   },
 
   setCaption: async (id, caption) => {
     const res = await commands.setSourceCaption(id, caption);
     if (res.status !== "ok") {
-      toast.error(t("projects.errors.save"));
-      return;
+      toast.error(`${t("projects.errors.save")} ${res.error}`);
+      return false;
     }
     set((s) => ({
       sources: s.sources.map((x) =>
         x.id === id ? { ...x, digest: caption } : x,
       ),
     }));
+    return true;
   },
 
   subscribe: async () => {

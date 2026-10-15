@@ -1,6 +1,9 @@
 //! Turns the VAD's per-frame speech/noise stream into utterances. Pure and
 //! unit-tested; knows nothing about microphones or models.
 
+/// How far back from the cap a capped utterance looks for a word gap.
+const SPLIT_WINDOW_MS: u64 = 2_000;
+
 pub struct SegmenterConfig {
     pub sample_rate: usize,
     pub frame_samples: usize,
@@ -34,6 +37,8 @@ pub struct Segmenter {
     end_silence_frames: usize,
     min_samples: usize,
     max_samples: usize,
+    /// Tail of a capped utterance searched for a gap between words.
+    split_window: usize,
     buffer: Vec<f32>,
     silence_run: usize,
 }
@@ -46,6 +51,7 @@ impl Segmenter {
             max_samples: cfg
                 .ms_to_samples(cfg.max_utterance_ms)
                 .max(cfg.frame_samples),
+            split_window: cfg.ms_to_samples(SPLIT_WINDOW_MS),
             buffer: Vec::new(),
             silence_run: 0,
         }
@@ -59,7 +65,7 @@ impl Segmenter {
                 self.silence_run = 0;
                 self.buffer.extend_from_slice(samples);
                 if self.buffer.len() >= self.max_samples {
-                    return self.take();
+                    return self.split();
                 }
                 None
             }
@@ -74,6 +80,32 @@ impl Segmenter {
                 None
             }
         }
+    }
+
+    /// Samples already held for the next utterance (a capped utterance's
+    /// carried tail).
+    pub fn pending_samples(&self) -> usize {
+        self.buffer.len()
+    }
+
+    /// End a capped utterance at its quietest 20 ms in the last
+    /// `SPLIT_WINDOW_MS`, usually a gap between words, and keep the rest as
+    /// the start of the next one, so non-stop speech is not cut mid-word.
+    fn split(&mut self) -> Option<Vec<f32>> {
+        const STEP: usize = 160; // 10 ms
+        const WIDTH: usize = 320; // 20 ms
+        let len = self.buffer.len();
+        let from = len.saturating_sub(self.split_window).max(self.min_samples);
+        let energy = |i: usize| self.buffer[i..i + WIDTH].iter().map(|x| x * x).sum::<f32>();
+        let quietest = (from..len.saturating_sub(WIDTH))
+            .step_by(STEP)
+            .min_by(|&a, &b| energy(a).total_cmp(&energy(b)));
+        let Some(at) = quietest.map(|i| i + WIDTH / 2) else {
+            return self.take();
+        };
+        self.silence_run = 0;
+        let tail = self.buffer.split_off(at);
+        Some(std::mem::replace(&mut self.buffer, tail))
     }
 
     /// True when no utterance is in progress.

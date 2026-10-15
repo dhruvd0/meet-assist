@@ -7,6 +7,7 @@ import {
   type Meeting,
   type MeetingDetail,
   type MeetingStatePayload,
+  type ObserverThought,
 } from "@/bindings";
 import { useProjectStore } from "./projectStore";
 
@@ -22,14 +23,33 @@ interface ObserverView {
   tools_unavailable: boolean;
   consecutive_failures: number;
   last_error: string | null;
+  thoughts: ObserverThought[];
   readiness: ObserverReadinessCode;
   detail: string | null;
 }
+
+/** A start/pause/resume/end request still waiting on the backend. */
+export type MeetingControl = "start" | "pause" | "resume" | "end";
+
+/** A session summary that is not stored yet. */
+export type SummaryProgress =
+  | { status: "generating" }
+  | { status: "failed"; error: string };
 
 interface MeetingStore {
   meetings: Meeting[];
   activeMeetingId: number | null;
   detail: MeetingDetail | null;
+  /** Why the open meeting could not be shown, when it could not. */
+  detailError: string | null;
+  controlPending: MeetingControl | null;
+  /** The last start/pause/resume/end failure, for surfaces without toasts
+   * (the floating bar). Cleared when the next control starts. */
+  controlError: string | null;
+  /** Why the meeting list failed to load, when it did. */
+  meetingsError: string | null;
+  /** Per session id; cleared once the summary is stored. */
+  summaryProgress: Record<number, SummaryProgress>;
   live: MeetingStatePayload;
   observer: ObserverView;
   loading: boolean;
@@ -55,6 +75,7 @@ interface MeetingStore {
   saveContext: (id: number, context: string) => Promise<void>;
   deleteMeeting: (id: number) => Promise<void>;
   dismiss: (id: number) => Promise<void>;
+  /** Resolves once the summary is stored or has failed (see summaryProgress). */
   summarize: (sessionId: number) => Promise<void>;
   subscribe: () => Promise<() => void>;
 }
@@ -64,6 +85,7 @@ const idleCounters = {
   tools_unavailable: false,
   consecutive_failures: 0,
   last_error: null,
+  thoughts: [] as ObserverThought[],
 };
 const idleObserver: ObserverView = {
   ...idleCounters,
@@ -76,21 +98,63 @@ const idle: MeetingStatePayload = {
   status: null,
 };
 
+type Set = (
+  partial: Partial<MeetingStore> | ((s: MeetingStore) => Partial<MeetingStore>),
+) => void;
+
+const setProgress = (
+  set: Set,
+  sessionId: number,
+  progress: SummaryProgress | null,
+) =>
+  set((s) => {
+    const next = { ...s.summaryProgress };
+    if (progress) next[sessionId] = progress;
+    else delete next[sessionId];
+    return { summaryProgress: next };
+  });
+
+const controlFailed = (set: Set, message: string) => {
+  toast.error(message);
+  set({ controlError: message });
+};
+
+/** Run one meeting control at a time, marking it pending while it runs. */
+const control = async (
+  set: Set,
+  get: () => MeetingStore,
+  kind: MeetingControl,
+  run: () => Promise<void>,
+) => {
+  if (get().controlPending) return;
+  set({ controlPending: kind, controlError: null });
+  try {
+    await run();
+  } finally {
+    set({ controlPending: null });
+  }
+};
+
 export const useMeetingStore = create<MeetingStore>((set, get) => ({
   meetings: [],
   activeMeetingId: null,
   detail: null,
+  detailError: null,
+  controlPending: null,
+  controlError: null,
+  meetingsError: null,
+  summaryProgress: {},
   live: idle,
   observer: idleObserver,
   loading: false,
   captureWarning: null,
 
   loadMeetings: async (projectId = null) => {
-    set({ loading: true });
+    set({ loading: true, meetingsError: null });
     try {
       const res = await commands.listMeetings(projectId);
       if (res.status === "ok") set({ meetings: res.data });
-      else toast.error(t("meetings.errors.load"));
+      else set({ meetingsError: `${t("meetings.errors.load")} ${res.error}` });
     } finally {
       set({ loading: false });
     }
@@ -100,60 +164,75 @@ export const useMeetingStore = create<MeetingStore>((set, get) => ({
     set((s) => ({
       activeMeetingId: id,
       detail: null,
+      detailError: null,
       captureWarning:
         s.captureWarning?.meeting_id === id ? s.captureWarning : null,
       observer: { ...s.observer, ...idleCounters },
     }));
     const res = await commands.getMeetingDetail(id);
+    if (get().activeMeetingId !== id) return;
     if (res.status !== "ok") {
-      toast.error(`${t("meetings.errors.load")} ${res.error}`);
+      set({ detailError: `${t("meetings.errors.load")} ${res.error}` });
       return;
     }
-    if (get().activeMeetingId === id) set({ detail: res.data });
+    if (!res.data) {
+      set({ detailError: t("meetings.errors.notFound") });
+      return;
+    }
+    set({ detail: res.data });
   },
 
   closeMeeting: () =>
     set((s) => ({
       activeMeetingId: null,
       detail: null,
+      detailError: null,
       captureWarning: null,
       observer: { ...s.observer, ...idleCounters },
     })),
 
   startMeeting: async (projectId, meetingId) => {
-    set({ captureWarning: null });
-    const res = await commands.startMeeting(projectId, meetingId);
-    if (res.status !== "ok") {
-      toast.error(`${t("meetings.errors.start")} ${res.error}`);
-      return null;
+    if (get().controlPending) return null;
+    set({ captureWarning: null, controlPending: "start", controlError: null });
+    try {
+      const res = await commands.startMeeting(projectId, meetingId);
+      if (res.status !== "ok") {
+        controlFailed(set, `${t("meetings.errors.start")} ${res.error}`);
+        return null;
+      }
+      await get().refreshLive();
+      await get().openMeeting(res.data.id);
+      return res.data;
+    } finally {
+      set({ controlPending: null });
     }
-    await get().refreshLive();
-    await get().openMeeting(res.data.id);
-    return res.data;
   },
 
-  pause: async () => {
-    const res = await commands.pauseMeeting();
-    if (res.status !== "ok")
-      toast.error(`${t("meetings.errors.control")} ${res.error}`);
-    await get().refreshLive();
-  },
+  pause: () =>
+    control(set, get, "pause", async () => {
+      const res = await commands.pauseMeeting();
+      if (res.status !== "ok")
+        controlFailed(set, `${t("meetings.errors.control")} ${res.error}`);
+      await get().refreshLive();
+    }),
 
-  resume: async () => {
-    const res = await commands.resumeMeeting();
-    if (res.status !== "ok")
-      toast.error(`${t("meetings.errors.control")} ${res.error}`);
-    await get().refreshLive();
-  },
+  resume: () =>
+    control(set, get, "resume", async () => {
+      const res = await commands.resumeMeeting();
+      if (res.status !== "ok")
+        controlFailed(set, `${t("meetings.errors.control")} ${res.error}`);
+      await get().refreshLive();
+    }),
 
-  end: async (meetingId) => {
-    const res = await commands.endMeeting(meetingId);
-    if (res.status !== "ok")
-      toast.error(`${t("meetings.errors.control")} ${res.error}`);
-    await get().refreshLive();
-    const id = get().activeMeetingId;
-    if (id !== null) await get().openMeeting(id);
-  },
+  end: (meetingId) =>
+    control(set, get, "end", async () => {
+      const res = await commands.endMeeting(meetingId);
+      if (res.status !== "ok")
+        controlFailed(set, `${t("meetings.errors.control")} ${res.error}`);
+      await get().refreshLive();
+      const id = get().activeMeetingId;
+      if (id !== null) await get().openMeeting(id);
+    }),
 
   refreshLive: async () => {
     const [live, ready] = await Promise.all([
@@ -186,7 +265,7 @@ export const useMeetingStore = create<MeetingStore>((set, get) => ({
   renameMeeting: async (id, title) => {
     const res = await commands.updateMeetingTitle(id, title);
     if (res.status !== "ok") {
-      toast.error(t("meetings.errors.save"));
+      toast.error(`${t("meetings.errors.save")} ${res.error}`);
       return;
     }
     set((s) => ({
@@ -207,7 +286,8 @@ export const useMeetingStore = create<MeetingStore>((set, get) => ({
 
   saveContext: async (id, context) => {
     const res = await commands.updateMeetingContext(id, context);
-    if (res.status !== "ok") toast.error(t("meetings.errors.save"));
+    if (res.status !== "ok")
+      toast.error(`${t("meetings.errors.save")} ${res.error}`);
   },
 
   deleteMeeting: async (id) => {
@@ -226,7 +306,7 @@ export const useMeetingStore = create<MeetingStore>((set, get) => ({
   dismiss: async (id) => {
     const res = await commands.dismissIntervention(id);
     if (res.status !== "ok") {
-      toast.error(t("meetings.errors.save"));
+      toast.error(`${t("meetings.errors.save")} ${res.error}`);
       return;
     }
     set((s) =>
@@ -244,9 +324,11 @@ export const useMeetingStore = create<MeetingStore>((set, get) => ({
   },
 
   summarize: async (sessionId) => {
+    setProgress(set, sessionId, { status: "generating" });
     const res = await commands.summarizeSession(sessionId);
+    // Success clears the progress through the summary event.
     if (res.status !== "ok")
-      toast.error(`${t("meetings.summary.failed")} ${res.error}`);
+      setProgress(set, sessionId, { status: "failed", error: res.error });
   },
 
   subscribe: async () => {
@@ -307,11 +389,12 @@ export const useMeetingStore = create<MeetingStore>((set, get) => ({
         last_error,
         readiness,
         detail,
+        thoughts,
       } = e.payload;
       // Readiness is global; the counters belong to one meeting.
       const counters =
         meeting_id === null || meeting_id === get().activeMeetingId
-          ? { tools_unavailable, consecutive_failures, last_error }
+          ? { tools_unavailable, consecutive_failures, last_error, thoughts }
           : {};
       set((s) => ({
         observer: {
@@ -325,8 +408,19 @@ export const useMeetingStore = create<MeetingStore>((set, get) => ({
     const un6 = await events.openMeetingPayload.listen((e) => {
       get().openMeeting(e.payload.meeting_id);
     });
+    const un9 = await events.sessionSummaryStatusPayload.listen((e) => {
+      const { session_id, status, error } = e.payload;
+      setProgress(
+        set,
+        session_id,
+        status === "failed"
+          ? { status: "failed", error: error ?? "" }
+          : { status: "generating" },
+      );
+    });
     const un7 = await events.sessionSummaryPayload.listen((e) => {
       const { meeting_id, session_id, summary, rolling_summary } = e.payload;
+      setProgress(set, session_id, null);
       set((s) => ({
         meetings: s.meetings.map((m) =>
           m.id === meeting_id ? { ...m, rolling_summary } : m,
@@ -342,6 +436,18 @@ export const useMeetingStore = create<MeetingStore>((set, get) => ({
                     : x,
                 ),
               }
+            : s.detail,
+      }));
+    });
+    const un10 = await events.meetingTitledPayload.listen((e) => {
+      const { meeting_id, title } = e.payload;
+      set((s) => ({
+        meetings: s.meetings.map((m) =>
+          m.id === meeting_id ? { ...m, title } : m,
+        ),
+        detail:
+          s.detail && s.detail.meeting.id === meeting_id
+            ? { ...s.detail, meeting: { ...s.detail.meeting, title } }
             : s.detail,
       }));
     });
@@ -361,6 +467,8 @@ export const useMeetingStore = create<MeetingStore>((set, get) => ({
       useProjectStore.getState().loadProjects();
     });
     return () => {
+      un10();
+      un9();
       un7();
       un8();
       un1();

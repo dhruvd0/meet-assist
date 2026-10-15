@@ -38,6 +38,8 @@ pub const BACKOFF_AFTER_FAILURES: u32 = 5;
 /// Interval multiplier while backing off.
 pub const BACKOFF_FACTOR: u64 = 4;
 const VALID_KINDS: [&str; 4] = ["loop", "stuck", "info", "idea"];
+/// Recent verdicts kept for the "AI is listening" panel.
+pub const THOUGHTS_KEPT: usize = 3;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Verdict {
@@ -261,18 +263,18 @@ pub fn build_prompt(
         "No tools are available this turn. Do not assert project facts you cannot see in the prompt."
     };
     let system = format!(
-        "You are a silent meeting copilot for one participant. You read their live transcript and answer ONE question: should you speak up right now? Silence is the default answer; most checks end in silence.\n\
-         Speakers: `me` is the user you assist; `them` is everyone else on the call.\n\
+        "You are a silent copilot for one person following a live conversation. It can be a meeting or call, an interview, a debate, a class or talk, or a broadcast they are only listening to. You read the live transcript and answer ONE question: should you speak up right now? Silence is the default answer; most checks end in silence.\n\
+         Speakers: `me` is the user's own microphone; `them` is everything else they hear (other people on a call, or audio playing on their computer). The user may only be listening, so `me` can be silent throughout.\n\
          The transcript is raw speech-to-text: it has fragments, misheard words, mixed languages (for example Hindi and English), and the same sentence sometimes appears twice. None of that is a reason to speak, and never comment on the conversation being unclear.\n\
          Signals:\n\
-         - kind \"loop\": the same open question comes back in at least two separate exchanges at least two minutes apart, still without a decision. Repeated or echoed lines are not a loop.\n\
+         - kind \"loop\": the same open question, claim, or dispute comes back in at least two separate exchanges at least two minutes apart, still unresolved. Repeated or echoed lines are not a loop, and neither is agreement: acknowledging or confirming a point (\"that makes sense\", \"yeah\", restating it to confirm) settles it.\n\
          - kind \"stuck\": someone says they do not know how to proceed, and nobody offers a way forward.\n\
          - kind \"info\": a factual question nobody answers that you can answer.\n\
          - kind \"idea\": the discussion is converging while a specific alternative is clearly untried.\n\
          {sensitivity_rule}\n{tools_rule}\n\
-         Never give generic process advice (summarize, document, align, clarify, take notes, ask for feedback). Only speak about a concrete point from this meeting.\n\
+         Never give generic process advice (summarize, document, align, clarify, take notes, ask for feedback). Only speak about a concrete point from this conversation.\n\
          Answer with JSON only, exactly this shape: {{\"intervene\": boolean, \"kind\": \"loop\"|\"stuck\"|\"info\"|\"idea\"|null, \"text\": string|null, \"reason\": string}}. \
-         \"text\" is null when silent. For kind \"loop\", \"text\" is a checklist of up to four lines separated by \"\\n\", each starting with its label and at most 8 words after it. The first line is always \"Circle: <the topic or pain point the talk keeps circling, in 2 to 4 words>\", a name the room would recognize, like \"Launch market\" or \"Onboarding drop-off\". Then only the lines that apply: \"Decided: <what the meeting already agreed>\", \"Decide now: <the open point to settle>\", \"Park: <a point to take up later>\". Include at least a \"Decide now\" or a \"Park\" line, and a \"Decided\" line only for something actually agreed; when tools are available, you must call read_transcript for this meeting before answering kind \"loop\", to find what was already decided and which side topics could be parked; the transcript below is only the last three minutes. For every other kind, \"text\" is one short line of at most 12 words naming the concrete point, like a note passed under the table. Never repeat a recent intervention."
+         \"text\" is null when silent. For kind \"loop\", \"text\" is a checklist of up to four lines separated by \"\\n\", each starting with its label and at most 8 words after it. The first line is always \"Circle: <the topic or pain point the talk keeps circling, in 2 to 4 words>\", a name the room would recognize, like \"Launch market\" or \"Onboarding drop-off\". Then only the lines that apply: \"Decided: <what was already settled>\", \"Decide now: <the open point to settle>\", \"Park: <a point to take up later>\". Include at least a \"Decide now\" or a \"Park\" line, and a \"Decided\" line only for something actually agreed; when tools are available, you must call read_transcript for this conversation before answering kind \"loop\", to find what was already decided and which side topics could be parked; the transcript below is only the last three minutes. For every other kind, \"text\" is one short line of at most 12 words naming the concrete point, like a note passed under the table. Never repeat a recent intervention."
     );
     let mut user = String::new();
     user.push_str("## Project brief\n");
@@ -281,13 +283,13 @@ pub fn build_prompt(
     } else {
         brief
     });
-    user.push_str("\n\n## Previous meeting in this project\n");
+    user.push_str("\n\n## Previous conversation in this project\n");
     match prev_meeting {
         Some((title, Some(summary))) => user.push_str(&format!("{title}: {summary}")),
         Some((title, None)) => user.push_str(&format!("{title}: (no summary yet)")),
         None => user.push_str("(none)"),
     }
-    user.push_str("\n\n## This meeting's context\n");
+    user.push_str("\n\n## This conversation's context\n");
     if context.trim().is_empty() {
         user.push_str("(none)");
     } else {
@@ -322,6 +324,29 @@ pub struct ObserverState {
     pub tools_unavailable: bool,
     /// Short description of the most recent judge failure, cleared on success.
     pub last_error: Option<String>,
+    /// The last `THOUGHTS_KEPT` verdicts, oldest first.
+    pub thoughts: Vec<ObserverThought>,
+}
+
+/// One judged window: the model's reason, and whether it nudged.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Type)]
+pub struct ObserverThought {
+    pub ts: i64,
+    pub text: String,
+    pub nudged: bool,
+}
+
+impl ObserverState {
+    fn remember(&mut self, ts: i64, text: &str, nudged: bool) {
+        if self.thoughts.len() == THOUGHTS_KEPT {
+            self.thoughts.remove(0);
+        }
+        self.thoughts.push(ObserverThought {
+            ts,
+            text: text.trim().to_string(),
+            nudged,
+        });
+    }
 }
 
 /// Trim a provider error to one short line for the status banner.
@@ -473,12 +498,14 @@ pub fn tick(
     state.last_seen_line_id = latest;
     if !should_emit(&verdict, now_ms, state, &recent) {
         info!("observer: no intervention ({})", verdict.reason);
+        state.remember(now_ms, &verdict.reason, false);
         return Ok(None);
     }
     let kind = verdict.kind.unwrap_or_default();
     let text = card_text(&kind, &verdict.text.unwrap_or_default());
     let iv = store.add_intervention(session_id, &kind, &text, &verdict.reason)?;
     state.last_intervention_ts = now_ms;
+    state.remember(now_ms, &verdict.reason, true);
     Ok(Some(iv))
 }
 
@@ -499,6 +526,8 @@ pub struct ObserverStatusPayload {
     pub readiness: String,
     /// Provider label for readiness states that name one.
     pub detail: Option<String>,
+    /// The observer's last few verdicts for this meeting, oldest first.
+    pub thoughts: Vec<ObserverThought>,
 }
 
 /// Sleep between ticks: the interval, or `BACKOFF_FACTOR` times it after
@@ -544,6 +573,7 @@ pub fn spawn_observer(
                         last_error: state.last_error.clone(),
                         readiness: ready.code().to_string(),
                         detail: ready.detail(),
+                        thoughts: state.thoughts.clone(),
                     };
                     if last_status.as_ref() != Some(&payload) {
                         let _ = payload.clone().emit(&app);

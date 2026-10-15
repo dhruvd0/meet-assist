@@ -35,50 +35,49 @@ tauri_panel! {
 }
 
 /// Creates the intervention window, hidden by default.
-#[cfg(not(target_os = "macos"))]
 pub fn create_intervention_window(app: &AppHandle) {
-    let mut builder = WebviewWindowBuilder::new(
-        app,
-        LABEL,
-        tauri::WebviewUrl::App("src/intervention/index.html".into()),
-    )
-    .title("Meet Assist")
-    .resizable(false)
-    .inner_size(WIDTH, HEIGHT)
-    .shadow(true)
-    .maximizable(false)
-    .minimizable(false)
-    .accept_first_mouse(true)
-    .decorations(false)
-    .always_on_top(true)
-    .skip_taskbar(true)
-    .transparent(true)
-    .focusable(false)
-    .focused(false)
-    .visible(false);
+    create_floating(app, LABEL, "src/intervention/index.html", WIDTH, HEIGHT);
+}
+
+/// Creates a small always-on-top window that never takes focus, hidden by
+/// default. Shared by the intervention card and the floating meeting bar.
+#[cfg(not(target_os = "macos"))]
+pub(crate) fn create_floating(app: &AppHandle, label: &str, url: &str, width: f64, height: f64) {
+    let mut builder = WebviewWindowBuilder::new(app, label, tauri::WebviewUrl::App(url.into()))
+        .title("Meet Assist")
+        .resizable(false)
+        .inner_size(width, height)
+        .shadow(true)
+        .maximizable(false)
+        .minimizable(false)
+        .accept_first_mouse(true)
+        .decorations(false)
+        .always_on_top(true)
+        .skip_taskbar(true)
+        .transparent(true)
+        .focusable(false)
+        .focused(false)
+        .visible(false);
 
     if let Some(data_dir) = crate::portable::data_dir() {
         builder = builder.data_directory(data_dir.join("webview"));
     }
 
     match builder.build() {
-        Ok(_) => log::debug!("Intervention window created (hidden)"),
-        Err(e) => log::error!("Failed to create intervention window: {e}"),
+        Ok(_) => log::debug!("Floating window {label} created (hidden)"),
+        Err(e) => log::error!("Failed to create floating window {label}: {e}"),
     }
 }
 
-/// Creates the intervention panel, hidden by default (macOS). A non-activating
-/// floating NSPanel so showing the card never activates the app.
+/// macOS: a non-activating floating NSPanel, so showing or clicking it never
+/// activates the app.
 #[cfg(target_os = "macos")]
-pub fn create_intervention_window(app: &AppHandle) {
-    match PanelBuilder::<_, InterventionPanel>::new(app, LABEL)
-        .url(WebviewUrl::App("src/intervention/index.html".into()))
+pub(crate) fn create_floating(app: &AppHandle, label: &str, url: &str, width: f64, height: f64) {
+    match PanelBuilder::<_, InterventionPanel>::new(app, label)
+        .url(WebviewUrl::App(url.into()))
         .title("Meet Assist")
         .level(PanelLevel::Floating)
-        .size(tauri::Size::Logical(tauri::LogicalSize {
-            width: WIDTH,
-            height: HEIGHT,
-        }))
+        .size(tauri::Size::Logical(tauri::LogicalSize { width, height }))
         .has_shadow(true)
         .transparent(true)
         .no_activate(true)
@@ -93,7 +92,23 @@ pub fn create_intervention_window(app: &AppHandle) {
         .build()
     {
         Ok(panel) => panel.hide(),
-        Err(e) => log::error!("Failed to create intervention panel: {e}"),
+        Err(e) => log::error!("Failed to create floating panel {label}: {e}"),
+    }
+}
+
+/// Shows a floating window without taking focus.
+pub(crate) fn show_floating(app: &AppHandle, window: &tauri::webview::WebviewWindow) {
+    #[cfg(target_os = "macos")]
+    match app.get_webview_panel(window.label()) {
+        Ok(panel) => panel.show(),
+        Err(_) => {
+            let _ = window.show();
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = app;
+        let _ = window.show();
     }
 }
 
@@ -109,7 +124,7 @@ fn position_top_right(app: &AppHandle, window: &tauri::webview::WebviewWindow) {
 }
 
 /// The monitor under the mouse cursor, falling back to the primary monitor.
-fn get_monitor_with_cursor(app: &AppHandle) -> Option<tauri::Monitor> {
+pub(crate) fn get_monitor_with_cursor(app: &AppHandle) -> Option<tauri::Monitor> {
     let primary = app.primary_monitor().ok().flatten();
     if let Ok(cursor) = app.cursor_position() {
         // `cursor_position` and `monitor_from_point` use different spaces off
@@ -164,15 +179,7 @@ fn present(app: &AppHandle, event: &'static str, payload: serde_json::Value) {
         };
         position_top_right(&handle, &window);
         let _ = window.emit(event, &payload);
-        #[cfg(target_os = "macos")]
-        match handle.get_webview_panel(LABEL) {
-            Ok(panel) => panel.show(),
-            Err(_) => {
-                let _ = window.show();
-            }
-        }
-        #[cfg(not(target_os = "macos"))]
-        let _ = window.show();
+        show_floating(&handle, &window);
     });
 }
 

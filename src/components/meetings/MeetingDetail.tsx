@@ -1,6 +1,13 @@
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { CalendarDays, ChevronRight, Pause, Play, Square } from "lucide-react";
+import {
+  CalendarDays,
+  ChevronRight,
+  Loader2,
+  Pause,
+  Play,
+  Square,
+} from "lucide-react";
 import { useMeetingStore } from "@/stores/meetingStore";
 import { Alert } from "../ui/Alert";
 import Badge from "../ui/Badge";
@@ -8,10 +15,12 @@ import { Button } from "../ui/Button";
 import { DocSection } from "../shared";
 import { ContextEditor } from "./ContextEditor";
 import { InterventionTimeline } from "./InterventionTimeline";
+import { EfficiencyReports, sessionReports } from "./EfficiencyReport";
 import { SessionSummary } from "./SessionSummary";
 import { MeetingProjectPicker } from "./MeetingProjectPicker";
 import { TranscriptThread } from "./TranscriptThread";
 import { NotesMarkdown } from "./NotesMarkdown";
+import { ObserverStatus } from "./ObserverStatus";
 import { useTranscriptPlayer } from "./useTranscriptPlayer";
 
 /** One meeting as a page of notes: summary first, transcript last. */
@@ -24,6 +33,8 @@ export const MeetingDetail: React.FC = () => {
   const summarize = useMeetingStore((s) => s.summarize);
   const renameMeeting = useMeetingStore((s) => s.renameMeeting);
   const startMeeting = useMeetingStore((s) => s.startMeeting);
+  const pending = useMeetingStore((s) => s.controlPending);
+  const detailError = useMeetingStore((s) => s.detailError);
   const end = useMeetingStore((s) => s.end);
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState("");
@@ -38,8 +49,16 @@ export const MeetingDetail: React.FC = () => {
   }, [isLive, meetingId]);
 
   if (!detail)
-    return (
-      <p className="p-8 text-center text-sm text-faint">
+    return detailError ? (
+      <p role="alert" className="p-8 text-center text-sm text-error">
+        {detailError}
+      </p>
+    ) : (
+      <p
+        role="status"
+        className="p-8 flex items-center justify-center gap-2 text-sm text-faint"
+      >
+        <Loader2 className="w-4 h-4 animate-spin" />
         {t("common.loading")}
       </p>
     );
@@ -70,12 +89,20 @@ export const MeetingDetail: React.FC = () => {
     );
 
   const nudgesTitle = t("meetings.intervention.timeline");
+  const reportTitle = t("meetings.summary.efficiency.title");
+  const reports = sessionReports(detail.sessions);
+  const reportsView = reports.length > 0 && (
+    <EfficiencyReports
+      reports={reports}
+      labelled={detail.sessions.length > 1}
+    />
+  );
 
   return (
     // Nudges sit in a right rail when the window has room, inline otherwise.
     <div
       key={m.id}
-      className="w-full max-w-[1100px] mx-auto px-8 pt-2 pb-32 page-in @min-[960px]:grid @min-[960px]:grid-cols-[minmax(0,1fr)_288px] @min-[960px]:gap-12"
+      className="w-full max-w-[1100px] mx-auto px-8 pt-2 pb-32 page-in select-text cursor-auto @min-[960px]:grid @min-[960px]:grid-cols-[minmax(0,1fr)_288px] @min-[960px]:gap-12"
     >
       <article className="w-full max-w-[720px] min-w-0 mx-auto @min-[960px]:mx-0 @min-[960px]:justify-self-end">
         {editing ? (
@@ -124,17 +151,29 @@ export const MeetingDetail: React.FC = () => {
           {!isLive && (
             <div className="ms-auto flex items-center gap-2">
               {status === "paused" && (
-                <Button variant="ghost" onClick={() => end(m.id)}>
-                  <Square className="w-3 h-3" />
+                <Button
+                  variant="ghost"
+                  disabled={pending !== null}
+                  onClick={() => end(m.id)}
+                >
+                  {pending === "end" ? (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <Square className="w-3 h-3" />
+                  )}
                   {t("meetings.controls.end")}
                 </Button>
               )}
               <Button
                 variant="secondary"
-                disabled={otherRunning}
+                disabled={otherRunning || pending !== null}
                 onClick={() => startMeeting(m.project_id, m.id)}
               >
-                <Play className="w-3.5 h-3.5" />
+                {pending === "start" ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Play className="w-3.5 h-3.5" />
+                )}
                 {t("meetings.continue")}
               </Button>
             </div>
@@ -142,6 +181,9 @@ export const MeetingDetail: React.FC = () => {
         </div>
 
         <div className="mt-6 space-y-2 empty:hidden">
+          {isLive && observer.readiness === "ready" && (
+            <ObserverStatus recording={live.status === "live"} />
+          )}
           {captureWarning?.source === "system_audio" &&
             captureWarning.meeting_id === m.id && (
               <Alert variant="warning">
@@ -204,6 +246,12 @@ export const MeetingDetail: React.FC = () => {
 
         <ContextEditor meetingId={m.id} context={m.context} />
 
+        {reportsView && (
+          <DocSection title={reportTitle} className="@min-[960px]:hidden">
+            {reportsView}
+          </DocSection>
+        )}
+
         <DocSection title={nudgesTitle} className="@min-[960px]:hidden">
           <InterventionTimeline items={detail.interventions} />
         </DocSection>
@@ -261,11 +309,16 @@ export const MeetingDetail: React.FC = () => {
         </DocSection>
       </article>
 
-      <aside
-        aria-label={nudgesTitle}
-        className="hidden @min-[960px]:block min-w-0"
-      >
+      <aside className="hidden @min-[960px]:block min-w-0">
         <div className="sticky top-0 pt-[7px] max-h-[calc(100vh-3rem)] overflow-y-auto pb-24">
+          {reportsView && (
+            <section aria-label={reportTitle} className="mb-8">
+              <h2 className="flex items-center h-8 text-[13px] font-medium text-muted">
+                {reportTitle}
+              </h2>
+              <div className="mt-2">{reportsView}</div>
+            </section>
+          )}
           <h2 className="flex items-center gap-2 h-8 text-[13px] font-medium text-muted">
             {nudgesTitle}
             {detail.interventions.length > 0 && (

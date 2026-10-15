@@ -194,6 +194,20 @@ impl ProjectManager {
         }
     }
 
+    /// Mark a source pending (so the UI shows progress at once) and queue it
+    /// for indexing. Fails when the indexer is not running.
+    pub fn reindex(&self, source_id: i64) -> Result<()> {
+        let tx = self
+            .tx
+            .lock()
+            .ok()
+            .and_then(|g| g.clone())
+            .ok_or_else(|| anyhow!("The indexer is not running."))?;
+        self.set_status(source_id, SourceStatus::Pending, None)?;
+        tx.send(source_id)
+            .map_err(|_| anyhow!("The indexer has stopped."))
+    }
+
     /// Index one source synchronously. Any error marks the source failed
     /// with the error text and is also returned.
     pub fn index_source_now(&self, source_id: i64) -> Result<()> {

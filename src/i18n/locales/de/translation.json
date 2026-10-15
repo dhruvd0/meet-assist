@@ -261,11 +261,6 @@
     "assistant": {
       "title": "Set up your assistant",
       "description": "The meeting assistant and summaries use an LLM provider. Pick one, add your API key if needed, and test the connection.",
-      "test": "Test connection",
-      "testing": "Testing...",
-      "success_one": "{{count}} model available.",
-      "success_other": "{{count}} models available.",
-      "failure": "Connection failed: {{error}}",
       "continue": "Continue",
       "skip": "Skip for now",
       "hint": "You can change this later in Assistant."
@@ -343,8 +338,7 @@
         "title": "AI provider",
         "description": "The model Meet Assist uses for nudges, summaries, and image digests.",
         "test": {
-          "button": "Test connection",
-          "ok": "Connected. {{count}} models available."
+          "button": "Test connection"
         },
         "select": {
           "title": "Anbieter",

@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Pause, Play, Square } from "lucide-react";
+import { Loader2, Pause, Play, Square } from "lucide-react";
 import { commands } from "@/bindings";
 import { useMeetingStore } from "@/stores/meetingStore";
+import { ok, toastError } from "@/lib/result";
 
 /** Start time (ms) of the running session, or null when nothing runs. */
 export const useLiveSessionStart = (): number | null => {
@@ -28,7 +29,7 @@ export const useLiveSessionStart = (): number | null => {
 };
 
 /** Re-renders once a second while `active`. */
-const useNow = (active: boolean) => {
+export const useNow = (active: boolean) => {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     if (!active) return;
@@ -67,17 +68,24 @@ const Level: React.FC<{ active: boolean }> = ({ active }) => (
 /**
  * Floating control for the running meeting, on every page: what is recording,
  * for how long, and pause / end. Clicking the title opens the meeting.
+ * `floating` renders it alone in the always-on-top bar window shown while the
+ * app is in the background, where opening brings the main window forward.
  */
-export const LiveDock: React.FC = () => {
+export const LiveDock: React.FC<{ floating?: boolean }> = ({
+  floating = false,
+}) => {
   const { t } = useTranslation();
   const live = useMeetingStore((s) => s.live);
   const meetings = useMeetingStore((s) => s.meetings);
   const detail = useMeetingStore((s) => s.detail);
   const activeMeetingId = useMeetingStore((s) => s.activeMeetingId);
   const openMeeting = useMeetingStore((s) => s.openMeeting);
+  const aiReady = useMeetingStore((s) => s.observer.readiness === "ready");
   const pause = useMeetingStore((s) => s.pause);
   const resume = useMeetingStore((s) => s.resume);
   const end = useMeetingStore((s) => s.end);
+  const pending = useMeetingStore((s) => s.controlPending);
+  const controlError = useMeetingStore((s) => s.controlError);
   const start = useLiveSessionStart();
   const recording = live.status === "live";
   const now = useNow(recording && start !== null);
@@ -88,16 +96,36 @@ export const LiveDock: React.FC = () => {
     (detail?.meeting.id === live.meeting_id ? detail.meeting.title : null) ??
     meetings.find((m) => m.id === live.meeting_id)?.title ??
     "";
-  const onThisMeeting = activeMeetingId === live.meeting_id;
+  const onThisMeeting = !floating && activeMeetingId === live.meeting_id;
+  const open = async () => {
+    const id = live.meeting_id!;
+    if (!floating) return openMeeting(id);
+    try {
+      await ok(commands.focusMeeting(id));
+    } catch (e) {
+      toastError("meetings.intervention.errors.open", e);
+    }
+  };
 
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-5 flex justify-center px-6 z-20">
+    <div
+      className={
+        floating
+          ? "h-screen w-screen flex items-center justify-center px-2"
+          : "pointer-events-none absolute inset-x-0 bottom-5 flex justify-center px-6 z-20"
+      }
+    >
       <div
         role="region"
         aria-label={t("meetings.dock.label")}
-        className="pointer-events-auto flex items-center gap-1 h-12 ps-2 pe-1.5 rounded-full bg-surface/95 border border-line-strong shadow-[0_16px_40px_-12px_rgb(0_0_0/0.45),0_2px_6px_-2px_rgb(0_0_0/0.2)] backdrop-blur-md max-w-full"
+        className={`pointer-events-auto flex items-center gap-1 h-12 ps-2 pe-1.5 rounded-full bg-surface/95 border border-line-strong backdrop-blur-md max-w-full ${
+          floating
+            ? "shadow-[0_4px_12px_-4px_rgb(0_0_0/0.4)]"
+            : "shadow-[0_16px_40px_-12px_rgb(0_0_0/0.45),0_2px_6px_-2px_rgb(0_0_0/0.2)]"
+        }`}
       >
         <span
+          data-tauri-drag-region={floating || undefined}
           className={`w-9 h-9 shrink-0 rounded-full inline-flex items-center justify-center ${
             recording
               ? "bg-accent/15 text-accent"
@@ -109,28 +137,46 @@ export const LiveDock: React.FC = () => {
         <button
           type="button"
           disabled={onThisMeeting}
-          onClick={() => openMeeting(live.meeting_id!)}
+          onClick={open}
           title={onThisMeeting ? undefined : t("meetings.dock.open")}
           className="min-w-0 flex flex-col items-start px-2 text-start enabled:cursor-pointer enabled:hover:opacity-80"
         >
           <span className="text-[13px] leading-4 text-text truncate max-w-[16rem]">
             {title}
           </span>
-          <span className="text-[11.5px] leading-4 text-faint">
-            {recording
-              ? t("meetings.dock.recording")
-              : t("meetings.status.paused")}
-            {recording && start !== null && (
-              <span className="font-mono tabular ms-1.5">
-                {formatElapsed(now - start)}
-              </span>
-            )}
-          </span>
+          {floating && controlError ? (
+            <span
+              role="alert"
+              className="text-[11.5px] leading-4 text-error truncate max-w-[16rem]"
+              title={controlError}
+            >
+              {controlError}
+            </span>
+          ) : (
+            <span className="text-[11.5px] leading-4 text-faint">
+              {recording
+                ? t("meetings.dock.recording")
+                : t("meetings.status.paused")}
+              {recording && start !== null && (
+                <span className="font-mono tabular ms-1.5">
+                  {formatElapsed(now - start)}
+                </span>
+              )}
+              {recording && aiReady && (
+                <span className="text-accent">
+                  {" · "}
+                  {t("meetings.dock.aiListening")}
+                </span>
+              )}
+            </span>
+          )}
         </button>
         <span className="w-px h-6 bg-line mx-1" />
         <button
           type="button"
           onClick={recording ? pause : resume}
+          disabled={pending !== null}
+          aria-busy={pending === "pause" || pending === "resume"}
           title={
             recording
               ? t("meetings.controls.pause")
@@ -141,9 +187,11 @@ export const LiveDock: React.FC = () => {
               ? t("meetings.controls.pause")
               : t("meetings.controls.resume")
           }
-          className="w-9 h-9 inline-flex items-center justify-center rounded-full text-muted hover:text-text hover:bg-surface-hover transition-colors cursor-pointer"
+          className="w-9 h-9 inline-flex items-center justify-center rounded-full text-muted hover:text-text hover:bg-surface-hover transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          {recording ? (
+          {pending === "pause" || pending === "resume" ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : recording ? (
             <Pause className="w-4 h-4" />
           ) : (
             <Play className="w-4 h-4" />
@@ -152,9 +200,15 @@ export const LiveDock: React.FC = () => {
         <button
           type="button"
           onClick={() => end(null)}
-          className="h-9 px-3.5 inline-flex items-center gap-1.5 rounded-full bg-text text-background text-[13px] font-medium hover:bg-text/85 transition-colors cursor-pointer"
+          disabled={pending !== null}
+          aria-busy={pending === "end"}
+          className="h-9 px-3.5 inline-flex items-center gap-1.5 rounded-full bg-text text-background text-[13px] font-medium hover:bg-text/85 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
         >
-          <Square className="w-3 h-3 fill-current" />
+          {pending === "end" ? (
+            <Loader2 className="w-3 h-3 animate-spin" />
+          ) : (
+            <Square className="w-3 h-3 fill-current" />
+          )}
           {t("meetings.controls.end")}
         </button>
       </div>

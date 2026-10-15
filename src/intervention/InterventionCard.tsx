@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import {
+  Loader2,
   FolderInput,
   Lightbulb,
   MessageCircleQuestion,
@@ -51,6 +52,9 @@ export const InterventionCard: React.FC = () => {
   const { t } = useTranslation();
   const [card, setCard] = useState<Card | null>(null);
   const hovered = useRef(false);
+  /** The card action still running, and the last action's failure. */
+  const [busy, setBusy] = useState(false);
+  const [failure, setFailure] = useState<string | null>(null);
   const timer = useRef<number | null>(null);
 
   const hide = async () => {
@@ -74,6 +78,7 @@ export const InterventionCard: React.FC = () => {
   useEffect(() => {
     const show = (next: Card) => {
       hovered.current = false;
+      setFailure(null);
       setCard(next);
       arm();
     };
@@ -115,41 +120,55 @@ export const InterventionCard: React.FC = () => {
           },
         );
 
-  const onDismiss = async () => {
-    if (card.type === "nudge") {
-      try {
-        await invoke("dismiss_intervention", { id: card.iv.id });
-      } catch (err) {
-        console.error("dismiss_intervention failed", err);
-      }
+  // Runs one card action; on failure the card stays open with the reason
+  // instead of closing as if it had worked.
+  const act = async (run: () => Promise<unknown>, failKey: string) => {
+    if (busy) return;
+    setBusy(true);
+    setFailure(null);
+    hovered.current = true;
+    try {
+      await run();
+      return true;
+    } catch (err) {
+      console.error(failKey, err);
+      setFailure(t(failKey, { error: String(err) }));
+      return false;
+    } finally {
+      setBusy(false);
     }
+  };
+
+  const onDismiss = async () => {
+    // A failed dismiss still closes the card: the nudge stays visible in
+    // the meeting's timeline, where it can be dismissed again.
+    if (card.type === "nudge")
+      await act(
+        () => invoke("dismiss_intervention", { id: card.iv.id }),
+        "meetings.intervention.errors.dismiss",
+      );
     await hide();
   };
 
-  const openMeeting = async () => {
-    try {
-      await invoke("focus_meeting", { meetingId });
-    } catch (err) {
-      console.error("focus_meeting failed", err);
-      await hide();
-    }
-  };
+  const openMeeting = () =>
+    act(
+      () => invoke("focus_meeting", { meetingId }),
+      "meetings.intervention.errors.open",
+    );
 
-  const undo = async (filed: Filed) => {
-    try {
-      await invoke("undo_filing", {
-        meetingId: filed.meeting_id,
-        createdProjectId: filed.created_project ? filed.project_id : null,
-        createdBrief: filed.created_brief,
-      });
-    } catch (err) {
-      console.error("undo_filing failed", err);
-      await hide();
-    }
-  };
+  const undo = (filed: Filed) =>
+    act(
+      () =>
+        invoke("undo_filing", {
+          meetingId: filed.meeting_id,
+          createdProjectId: filed.created_project ? filed.project_id : null,
+          createdBrief: filed.created_brief,
+        }),
+      "meetings.filing.card.undoFailed",
+    );
 
   const action =
-    "text-xs font-medium text-accent hover:underline cursor-pointer";
+    "text-xs font-medium text-accent hover:underline cursor-pointer disabled:opacity-50 disabled:cursor-default";
 
   return (
     <div
@@ -173,22 +192,44 @@ export const InterventionCard: React.FC = () => {
       <p className="text-sm leading-snug flex-1 overflow-hidden whitespace-pre-line">
         {body}
       </p>
-      <div className="flex justify-end gap-3">
+      {failure && (
+        <p role="alert" className="text-xs text-error leading-snug">
+          {failure}
+        </p>
+      )}
+      <div className="flex justify-end items-center gap-3">
+        {busy && (
+          <Loader2
+            className="w-3.5 h-3.5 animate-spin text-faint"
+            aria-hidden="true"
+          />
+        )}
         {card.type === "filed" ? (
           <>
             <button
               type="button"
               className={action}
+              disabled={busy}
               onClick={() => undo(card.filed)}
             >
               {t("meetings.filing.card.undo")}
             </button>
-            <button type="button" className={action} onClick={openMeeting}>
+            <button
+              type="button"
+              className={action}
+              disabled={busy}
+              onClick={openMeeting}
+            >
               {t("meetings.filing.card.change")}
             </button>
           </>
         ) : (
-          <button type="button" className={action} onClick={openMeeting}>
+          <button
+            type="button"
+            className={action}
+            disabled={busy}
+            onClick={openMeeting}
+          >
             {t("meetings.intervention.open")}
           </button>
         )}

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
+  Loader2,
   FileText,
   Folder,
   Image as ImageIcon,
@@ -36,7 +37,17 @@ const CaptionRow: React.FC<{ source: Source }> = ({ source }) => {
   const { t } = useTranslation();
   const setCaption = useProjectStore((s) => s.setCaption);
   const [value, setValue] = useState(source.digest ?? "");
+  const [saving, setSaving] = useState(false);
   useEffect(() => setValue(source.digest ?? ""), [source.digest]);
+  const unchanged = value.trim() === (source.digest ?? "").trim();
+  const save = async () => {
+    setSaving(true);
+    try {
+      await setCaption(source.id, value);
+    } finally {
+      setSaving(false);
+    }
+  };
   return (
     <div className="mt-2 space-y-1">
       <div className="flex items-center gap-2">
@@ -50,8 +61,10 @@ const CaptionRow: React.FC<{ source: Source }> = ({ source }) => {
         <Button
           size="sm"
           variant="secondary"
-          onClick={() => setCaption(source.id, value)}
+          disabled={saving || unchanged}
+          onClick={save}
         >
+          {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
           {t("projects.sources.saveCaption")}
         </Button>
       </div>
@@ -62,6 +75,22 @@ const CaptionRow: React.FC<{ source: Source }> = ({ source }) => {
 export const SourceList: React.FC<{ projectId: number }> = ({ projectId }) => {
   const { t } = useTranslation();
   const sources = useProjectStore((s) => s.sources);
+  const sourcesState = useProjectStore((s) => s.sourcesState);
+  const sourcesError = useProjectStore((s) => s.sourcesError);
+  const loadSources = useProjectStore((s) => s.loadSources);
+  const [busy, setBusy] = useState<Record<number, "reindex" | "remove">>({});
+  const run = async (
+    id: number,
+    kind: "reindex" | "remove",
+    action: (id: number) => Promise<void>,
+  ) => {
+    setBusy((b) => ({ ...b, [id]: kind }));
+    try {
+      await action(id);
+    } finally {
+      setBusy(({ [id]: _, ...rest }) => rest);
+    }
+  };
   const removeSource = useProjectStore((s) => s.removeSource);
   const reindexSource = useProjectStore((s) => s.reindexSource);
   const [open, setOpen] = useState(false);
@@ -77,7 +106,28 @@ export const SourceList: React.FC<{ projectId: number }> = ({ projectId }) => {
         </Button>
       }
     >
-      {sources.length === 0 ? (
+      {sourcesState === "loading" && sources.length === 0 ? (
+        <p
+          role="status"
+          className="py-2 flex items-center gap-2 text-sm text-faint"
+        >
+          <Loader2 className="w-4 h-4 animate-spin" />
+          {t("common.loading")}
+        </p>
+      ) : sourcesState === "error" ? (
+        <div className="py-2 flex items-center gap-3">
+          <p role="alert" className="text-sm text-error">
+            {sourcesError}
+          </p>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => loadSources(projectId)}
+          >
+            {t("meetings.summary.retry")}
+          </Button>
+        </div>
+      ) : sources.length === 0 ? (
         <p className="py-2 text-sm text-faint">{t("projects.sources.empty")}</p>
       ) : (
         sources.map((s) => {
@@ -109,17 +159,29 @@ export const SourceList: React.FC<{ projectId: number }> = ({ projectId }) => {
                   variant="ghost"
                   size="sm"
                   title={t("projects.sources.reindex")}
-                  onClick={() => reindexSource(s.id)}
+                  disabled={s.status === "pending" || busy[s.id] !== undefined}
+                  onClick={() => run(s.id, "reindex", reindexSource)}
                 >
-                  <RefreshCw className="w-4 h-4" />
+                  <RefreshCw
+                    className={`w-4 h-4 ${
+                      s.status === "pending" || busy[s.id] === "reindex"
+                        ? "animate-spin"
+                        : ""
+                    }`}
+                  />
                 </Button>
                 <Button
                   variant="danger-ghost"
                   size="sm"
                   title={t("projects.sources.remove")}
-                  onClick={() => removeSource(s.id)}
+                  disabled={busy[s.id] !== undefined}
+                  onClick={() => run(s.id, "remove", removeSource)}
                 >
-                  <Trash2 className="w-4 h-4" />
+                  {busy[s.id] === "remove" ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="w-4 h-4" />
+                  )}
                 </Button>
               </div>
               {s.kind === "image" && <CaptionRow source={s} />}

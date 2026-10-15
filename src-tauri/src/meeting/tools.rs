@@ -31,12 +31,12 @@ pub fn tool_defs() -> Vec<ToolDef> {
         },
         ToolDef {
             name: "read_transcript".into(),
-            description: "Read transcript lines of this meeting (default) or another meeting in the project, optionally within a time range (unix ms).".into(),
+            description: "Read transcript lines of this conversation (default) or another conversation (\"meeting\") in the project, optionally within a time range (unix ms).".into(),
             input_schema: json!({"type":"object","properties":{"meeting_id":{"type":"integer"},"from_ts":{"type":"integer"},"to_ts":{"type":"integer"},"limit":{"type":"integer","minimum":1,"maximum":200}},"additionalProperties":false}),
         },
         ToolDef {
             name: "list_meetings".into(),
-            description: "List meetings in this project with dates and rolling summaries.".into(),
+            description: "List the project's recorded conversations (\"meetings\") with dates and rolling summaries.".into(),
             input_schema: json!({"type":"object","properties":{},"additionalProperties":false}),
         },
     ]

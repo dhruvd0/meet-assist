@@ -3,6 +3,7 @@
 
 pub mod capture;
 pub mod chunk;
+pub mod echo;
 pub mod filing;
 pub mod indexer;
 pub mod manager;

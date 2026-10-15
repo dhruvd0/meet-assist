@@ -17,12 +17,14 @@ export default defineConfig(async () => ({
     },
   },
 
-  // Multiple entry points for the main app and the intervention card
+  // Multiple entry points: the main app, the intervention card, and the
+  // floating meeting bar
   build: {
     rollupOptions: {
       input: {
         main: resolve(__dirname, "index.html"),
         intervention: resolve(__dirname, "src/intervention/index.html"),
+        pill: resolve(__dirname, "src/pill/index.html"),
       },
     },
   },

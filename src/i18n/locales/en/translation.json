@@ -98,7 +98,9 @@
       "errors": {
         "add": "Could not add source.",
         "remove": "Could not remove source.",
-        "reindex": "Could not re-index source."
+        "reindex": "Could not re-index source.",
+        "load": "Could not load sources.",
+        "pick": "Could not open the picker: {{error}}"
       },
       "digestLabel": "Digest",
       "digestByModel": "Summarized by {{model}}",
@@ -108,6 +110,7 @@
       "load": "Could not load projects.",
       "create": "Could not create project.",
       "delete": "Could not delete project.",
+      "notFound": "This project no longer exists.",
       "save": "Could not save."
     },
     "meetingsEmpty": "No meetings in this space yet."
@@ -160,6 +163,7 @@
       "control": "Could not change the meeting state.",
       "save": "Could not save.",
       "delete": "Could not delete the meeting.",
+      "notFound": "This meeting no longer exists.",
       "capture": "Microphone stopped delivering audio."
     },
     "intervention": {
@@ -173,7 +177,11 @@
       "open": "Open meeting",
       "timeline": "Nudges",
       "empty": "No nudges yet.",
-      "dismissed": "Dismissed"
+      "dismissed": "Dismissed",
+      "errors": {
+        "dismiss": "Couldn't dismiss: {{error}}",
+        "open": "Couldn't open the meeting: {{error}}"
+      }
     },
     "filing": {
       "project": "Space",
@@ -186,10 +194,16 @@
         "filedInto": "Filed into {{project}} as “{{title}}”",
         "created": "Created {{project}} and filed “{{title}}”",
         "change": "Change",
-        "undo": "Undo"
+        "undo": "Undo",
+        "undoFailed": "Couldn't undo: {{error}}"
       }
     },
     "observer": {
+      "listening": "AI is listening",
+      "pausedListening": "AI is paused with the meeting",
+      "lastCheck": "checked {{time}}",
+      "firstCheck": "First check runs once someone speaks.",
+      "nudged": "Nudged:",
       "toolsUnavailable": "This provider does not support tools; the assistant answers from the transcript only.",
       "failing": "The assistant has failed {{count}} times in a row. Check the provider settings.",
       "lastError": "The assistant's last check failed:",
@@ -211,7 +225,20 @@
       "none": "No summary yet.",
       "retry": "Retry",
       "generating": "Generating summary...",
-      "failed": "Summary could not be read."
+      "failedToGenerate": "The summary could not be generated.",
+      "failed": "Summary could not be read.",
+      "efficiency": {
+        "title": "How the time was used",
+        "none": "No time lost to circles, arguments or tangents.",
+        "minutes_one": "~{{count}} min",
+        "minutes_other": "~{{count}} min",
+        "kind": {
+          "circle": "Going in circles",
+          "argument": "Pointless argument",
+          "tangent": "Tangent",
+          "repetition": "Repetition"
+        }
+      }
     },
     "capture": {
       "systemAudioUnavailable": "System audio is unavailable; transcribing your microphone only. {{message}}",
@@ -221,6 +248,7 @@
     "dock": {
       "label": "Current meeting",
       "recording": "Recording",
+      "aiListening": "AI listening",
       "open": "Open meeting"
     }
   },
@@ -308,11 +336,6 @@
     "assistant": {
       "title": "Set up your assistant",
       "description": "The meeting assistant and summaries use an LLM provider. Pick one, add your API key if needed, and test the connection.",
-      "test": "Test connection",
-      "testing": "Testing...",
-      "success_one": "{{count}} model available.",
-      "success_other": "{{count}} models available.",
-      "failure": "Connection failed: {{error}}",
       "continue": "Continue",
       "skip": "Skip for now",
       "hint": "You can change this later in Assistant."
@@ -390,8 +413,10 @@
         "title": "AI provider",
         "description": "The model Meet Assist uses for nudges, summaries, and image digests.",
         "test": {
-          "button": "Test connection",
-          "ok": "Connected. {{count}} models available."
+          "button": "Test model",
+          "testing": "Testing…",
+          "ok": "Replied “{{reply}}” in {{seconds}} s.",
+          "failure": "Failed: {{error}}"
         },
         "select": {
           "title": "Provider",
@@ -414,7 +439,8 @@
         "apiKey": {
           "title": "API Key",
           "description": "API key for the selected provider.",
-          "placeholder": "sk-..."
+          "placeholder": "sk-...",
+          "bundledPlaceholder": "Using the built-in key. Paste your own to replace it."
         },
         "model": {
           "title": "Model",
@@ -669,7 +695,11 @@
       },
       "interval": {
         "label": "Check interval",
-        "description": "Seconds between checks of the live transcript."
+        "description": "Seconds between checks of the live transcript. A check runs only when a new line has arrived."
+      },
+      "maxLine": {
+        "label": "Longest transcript line",
+        "description": "Seconds of non-stop speech before it is cut into a new line. Lower values give the assistant new lines, and so checks, more often during long monologues, but may split a sentence. Takes effect when the next meeting starts."
       },
       "beep": {
         "label": "Beep on nudge",
@@ -710,6 +740,22 @@
   },
   "errors": {
     "loadDirectory": "Error loading directory: {{error}}",
+    "settingSaveFailed": "Couldn't save the setting: {{error}}",
+    "modelListFailed": "Couldn't load the provider's models: {{error}}",
+    "settingsLoadFailed": "Couldn't load settings: {{error}}",
+    "devicesLoadFailed": "Couldn't list audio devices: {{error}}",
+    "soundTestFailed": "Couldn't play the sound: {{error}}",
+    "openFolderFailed": "Couldn't open the folder: {{error}}",
+    "updateCheckFailed": "Couldn't check for updates: {{error}}",
+    "updateInstallFailed": "Couldn't install the update: {{error}}",
+    "models": {
+      "load": "Couldn't load models: {{error}}",
+      "rescan": "Couldn't rescan models: {{error}}",
+      "select": "Couldn't switch model: {{error}}",
+      "cancel": "Couldn't cancel the download: {{error}}",
+      "delete": "Couldn't delete the model: {{error}}",
+      "download": "Couldn't download the model: {{error}}"
+    },
     "micPermissionDeniedTitle": "Microphone Access Denied",
     "meetingToggleFailedTitle": "Couldn't start the meeting",
     "micPermissionDenied": {

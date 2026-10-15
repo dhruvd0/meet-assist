@@ -23,7 +23,43 @@ pub struct SessionSummary {
     pub action_items: Vec<String>,
     #[serde(default)]
     pub recap: String,
+    /// How well the talk used its time. Absent on summaries written before
+    /// the report existed.
+    #[serde(default)]
+    pub efficiency: Option<EfficiencyReport>,
 }
+
+/// End-of-session efficiency report: where the conversation lost time.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, Type)]
+pub struct EfficiencyReport {
+    /// 0–100: share of the talk that moved things forward.
+    #[serde(default)]
+    pub score: f64,
+    /// One line on how the session went.
+    #[serde(default)]
+    pub verdict: String,
+    #[serde(default)]
+    pub issues: Vec<EfficiencyIssue>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, Type)]
+pub struct EfficiencyIssue {
+    /// One of `EFFICIENCY_KINDS`.
+    #[serde(default)]
+    pub kind: String,
+    /// The subject in 2–4 words.
+    #[serde(default)]
+    pub topic: String,
+    /// What happened, in one sentence.
+    #[serde(default)]
+    pub note: String,
+    /// Rough minutes spent on it.
+    #[serde(default)]
+    pub minutes: f64,
+}
+
+/// Ways a conversation loses time, as the report names them.
+pub const EFFICIENCY_KINDS: [&str; 4] = ["circle", "argument", "tangent", "repetition"];
 
 /// Emitted when a session summary has been stored.
 #[derive(Clone, Debug, Serialize, Deserialize, Type, tauri_specta::Event)]
@@ -32,6 +68,17 @@ pub struct SessionSummaryPayload {
     pub session_id: i64,
     pub summary: SessionSummary,
     pub rolling_summary: String,
+}
+
+/// Progress of a session summary that is not done yet: `generating` while
+/// the job runs, `failed` (with `error`) when it gave up. Success arrives as
+/// `SessionSummaryPayload`.
+#[derive(Clone, Debug, Serialize, Deserialize, Type, tauri_specta::Event)]
+pub struct SessionSummaryStatusPayload {
+    pub meeting_id: i64,
+    pub session_id: i64,
+    pub status: String,
+    pub error: Option<String>,
 }
 
 pub trait Summarizer: Send + Sync {
@@ -53,9 +100,32 @@ pub fn session_summary_schema() -> Value {
             "decisions": list,
             "open_questions": list,
             "action_items": list,
-            "recap": { "type": "string" }
+            "recap": { "type": "string" },
+            "efficiency": {
+                "type": "object",
+                "properties": {
+                    "score": { "type": "integer" },
+                    "verdict": { "type": "string" },
+                    "issues": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "kind": { "type": "string", "enum": EFFICIENCY_KINDS },
+                                "topic": { "type": "string" },
+                                "note": { "type": "string" },
+                                "minutes": { "type": "integer" }
+                            },
+                            "required": ["kind", "topic", "note", "minutes"],
+                            "additionalProperties": false
+                        }
+                    }
+                },
+                "required": ["score", "verdict", "issues"],
+                "additionalProperties": false
+            }
         },
-        "required": ["decisions", "open_questions", "action_items", "recap"],
+        "required": ["decisions", "open_questions", "action_items", "recap", "efficiency"],
         "additionalProperties": false
     })
 }
@@ -71,19 +141,44 @@ fn rolling_schema() -> Value {
 
 /// (system, user) prompts for summarizing one session's transcript.
 pub fn session_prompt(title: &str, context: &str, lines: &[TranscriptLine]) -> (String, String) {
-    let system = "You summarize one session of a meeting for the person who attended it. \
-Transcript lines are labelled `me` (the user) or `them` (everyone else). Reply with JSON: \
-`decisions` (what was decided), `open_questions` (raised but unresolved), `action_items` \
-(who does what, when known), and `recap` (a three-line recap). Use only what the transcript \
+    let system = "You summarize one session of a conversation (a meeting or call, interview, \
+debate, class or talk, or a broadcast) for the user, who may have taken part or only listened. \
+Transcript lines are labelled `me` (the user's microphone) or `them` (everything else they \
+heard). Reply with JSON: `decisions` (what was decided or settled), `open_questions` (raised \
+but unresolved), `action_items` (who does what, when known), `recap` (a three-line recap \
+of what was said), and `efficiency`, a frank report on where the talk lost time: \
+`score` (0-100, the share of the talk that moved things forward: new information, \
+progress, or a settled point), `verdict` (one plain sentence), and `issues`, each with \
+`kind`, `topic` (2-4 words), `note` (one sentence naming what happened), and `minutes` \
+(rough time spent, from the timestamps). Kinds: \"circle\" (the same question or point \
+returns without progress), \"argument\" (back-and-forth disagreement that produced no \
+resolution or new information), \"tangent\" (a detour away from the subject), \
+\"repetition\" (a point restated without adding anything). List only issues the \
+transcript clearly shows, worst first; a focused session has none. Judge by the kind \
+of conversation: a debate or broadcast is not inefficient for lacking decisions. \
+None of these are issues: agreeing, acknowledging or confirming (\"that makes sense\", \
+\"yeah\", \"okay\", restating a point to confirm it) is progress, not a circle or \
+repetition; a `me` line that garbles a `them` line from the seconds before is the same \
+audio heard twice by the microphone, not repetition; misheard or garbled words are \
+speech-to-text errors and say nothing about the conversation. Score only what was \
+said; when too little is clear to judge, give no issues and a verdict that says so. Use only what the transcript \
 says; do not invent items. Use empty arrays when there is nothing to report."
         .to_string();
-    let mut user = format!("Meeting: {title}\n");
+    let mut user = format!("Conversation: {title}\n");
     if !context.trim().is_empty() {
         user.push_str(&format!("Context:\n{}\n", context.trim()));
     }
-    user.push_str("\nTranscript:\n");
+    user.push_str("\nTranscript (minutes:seconds from the start):\n");
+    let start = lines.first().map_or(0, |l| l.ts);
     for l in lines {
-        user.push_str(&format!("[{}] {}\n", l.speaker, l.text));
+        let secs = (l.ts - start).max(0) / 1000;
+        user.push_str(&format!(
+            "[{}:{:02}] {}: {}\n",
+            secs / 60,
+            secs % 60,
+            l.speaker,
+            l.text
+        ));
     }
     (system, user)
 }
@@ -111,7 +206,7 @@ pub fn format_session_summary_for_rolling(s: &SessionSummary) -> String {
 /// (system, user) prompts merging the previous rolling summary with a new
 /// session summary.
 pub fn rolling_prompt(previous: Option<&str>, new_session: &SessionSummary) -> (String, String) {
-    let system = "You maintain a running summary of a meeting that spans several sessions. \
+    let system = "You maintain a running summary of a conversation that spans several sessions. \
 Merge the previous rolling summary with the new session summary. Keep it under 300 words, \
 keep decisions and open questions, and drop questions that the new session resolved. \
 Reply with JSON: {\"rolling_summary\": string}."
@@ -159,8 +254,23 @@ impl Summarizer for LlmSummarizer {
         lines: &[TranscriptLine],
     ) -> Result<SessionSummary> {
         let (system, user) = session_prompt(title, context, lines);
-        let v = self.call(system, user, session_summary_schema())?;
-        Ok(serde_json::from_value(v)?)
+        let mut v = self.call(system, user, session_summary_schema())?;
+        // Providers without structured output only see the report's shape in
+        // the prompt. A malformed report is dropped, never the summary.
+        let report = v.get_mut("efficiency").map(Value::take);
+        let mut summary: SessionSummary = serde_json::from_value(v)?;
+        summary.efficiency = report
+            .and_then(|r| serde_json::from_value::<EfficiencyReport>(r).ok())
+            .map(|mut r| {
+                r.score = r.score.clamp(0.0, 100.0).round();
+                r.issues
+                    .retain(|i| EFFICIENCY_KINDS.contains(&i.kind.as_str()));
+                for i in &mut r.issues {
+                    i.minutes = i.minutes.max(0.0).round();
+                }
+                r
+            });
+        Ok(summary)
     }
 
     fn merge_rolling(
@@ -228,6 +338,7 @@ mod tests {
                 open_questions: vec![],
                 action_items: vec![],
                 recap: format!("{} lines", lines.len()),
+                efficiency: None,
             })
         }
         fn merge_rolling(&self, previous: Option<&str>, _n: &SessionSummary) -> Result<String> {

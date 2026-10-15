@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { ok, toastError } from "@/lib/result";
 import { commands } from "@/bindings";
 import { SettingContainer } from "../../ui/SettingContainer";
 import { PathDisplay } from "../../ui/PathDisplay";
@@ -44,9 +45,9 @@ export const LogDirectory: React.FC<LogDirectoryProps> = ({
   const handleOpen = async () => {
     if (!logDir) return;
     try {
-      await commands.openLogDir();
+      await ok(commands.openLogDir());
     } catch (openError) {
-      console.error("Failed to open log directory:", openError);
+      toastError("errors.openFolderFailed", openError);
     }
   };
 

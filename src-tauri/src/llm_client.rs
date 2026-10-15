@@ -90,7 +90,9 @@ fn remember_rejection(key: String) {
 }
 
 /// Output budget for Anthropic Messages requests, where `max_tokens` is
-/// required.
+/// required. Also sent to OpenRouter, which otherwise reserves credit for the
+/// model's full output limit (up to 128k tokens) and refuses with HTTP 402
+/// when the key can't cover that reservation.
 const ANTHROPIC_MAX_TOKENS: u32 = 4096;
 
 /// Build headers for API requests based on provider type
@@ -648,6 +650,9 @@ pub async fn send_with_tools_with_client(
                 let mut body =
                     openai_tool_request(model, &messages, tools, schema, tool_choice_none);
                 merge_reasoning(&mut body, reasoning);
+                if provider.id == "openrouter" {
+                    body["max_tokens"] = ANTHROPIC_MAX_TOKENS.into();
+                }
                 body
             }
         };
