@@ -8,6 +8,7 @@ import {
   type MeetingDetail,
   type MeetingStatePayload,
 } from "@/bindings";
+import { useProjectStore } from "./projectStore";
 
 export type ObserverReadinessCode =
   | "ready"
@@ -50,6 +51,7 @@ interface MeetingStore {
   end: (meetingId: number | null) => Promise<void>;
   refreshLive: () => Promise<void>;
   renameMeeting: (id: number, title: string) => Promise<void>;
+  moveMeeting: (id: number, projectId: number | null) => Promise<void>;
   saveContext: (id: number, context: string) => Promise<void>;
   deleteMeeting: (id: number) => Promise<void>;
   dismiss: (id: number) => Promise<void>;
@@ -196,6 +198,13 @@ export const useMeetingStore = create<MeetingStore>((set, get) => ({
     }));
   },
 
+  moveMeeting: async (id, projectId) => {
+    const res = await commands.moveMeeting(id, projectId);
+    if (res.status !== "ok")
+      toast.error(`${t("meetings.errors.save")} ${res.error}`);
+    // State updates arrive through the meetingFiledPayload event.
+  },
+
   saveContext: async (id, context) => {
     const res = await commands.updateMeetingContext(id, context);
     if (res.status !== "ok") toast.error(t("meetings.errors.save"));
@@ -336,8 +345,24 @@ export const useMeetingStore = create<MeetingStore>((set, get) => ({
             : s.detail,
       }));
     });
+    const un8 = await events.meetingFiledPayload.listen((e) => {
+      const { meeting_id, project_id, meeting_title, by } = e.payload;
+      const patch = { project_id, title: meeting_title, filed_by: by };
+      set((s) => ({
+        meetings: s.meetings.map((m) =>
+          m.id === meeting_id ? { ...m, ...patch } : m,
+        ),
+        detail:
+          s.detail && s.detail.meeting.id === meeting_id
+            ? { ...s.detail, meeting: { ...s.detail.meeting, ...patch } }
+            : s.detail,
+      }));
+      // A project may have been created or deleted.
+      useProjectStore.getState().loadProjects();
+    });
     return () => {
       un7();
+      un8();
       un1();
       un2();
       un3();

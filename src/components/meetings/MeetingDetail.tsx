@@ -10,6 +10,7 @@ import { ContextEditor } from "./ContextEditor";
 import { InterventionTimeline } from "./InterventionTimeline";
 import { SessionSummary } from "./SessionSummary";
 import { MeetingControls } from "./MeetingControls";
+import { MeetingProjectPicker } from "./MeetingProjectPicker";
 import { TranscriptThread } from "./TranscriptThread";
 
 export const MeetingDetail: React.FC<{ onBack: () => void }> = ({ onBack }) => {
@@ -94,6 +95,7 @@ export const MeetingDetail: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         </Button>
         <MeetingControls meetingId={m.id} />
       </div>
+      <MeetingProjectPicker meeting={m} />
       {observer.readiness !== "ready" && live.meeting_id === m.id && (
         <Alert variant="info">
           {t(`meetings.observer.readiness.${observer.readiness}`, {
