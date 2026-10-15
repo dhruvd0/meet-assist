@@ -2,9 +2,12 @@
 //! lifetime and the transcriber thread; emits state and transcript events.
 
 use crate::managers::transcription::TranscriptionManager;
-use crate::meeting::capture::{MeetingCapture, Utterance};
+use crate::meeting::capture::{Echo, MeetingCapture, Utterance};
+use crate::meeting::echo::EchoReference;
 use crate::meeting::store::{Meeting, MeetingStatus, ProjectStore, TranscriptLine};
-use crate::meeting::summary::{run_summary_job, SessionSummaryPayload, Summarizer};
+use crate::meeting::summary::{
+    run_summary_job, SessionSummaryPayload, SessionSummaryStatusPayload, Summarizer,
+};
 use crate::meeting::system_capture::SystemCapture;
 use anyhow::{anyhow, Result};
 use log::{debug, error, info, warn};
@@ -122,9 +125,22 @@ impl CaptureSource for CombinedCapture {
         tx: mpsc::Sender<Utterance>,
     ) -> Result<Box<dyn CaptureHandle>> {
         let settings = crate::settings::get_settings(&self.app);
-        let mic = Box::new(MeetingCapture::start(&settings, &self.app, tx.clone())?);
+        // The system stream records what the speakers play; the microphone
+        // drops utterances that are that audio coming back in.
+        let reference = EchoReference::default();
+        let mic_echo = if settings.meeting_system_audio_enabled {
+            Echo::Check(reference.clone())
+        } else {
+            Echo::None
+        };
+        let mic = Box::new(MeetingCapture::start(
+            &settings,
+            &self.app,
+            tx.clone(),
+            mic_echo,
+        )?);
         let system: Option<Box<dyn CaptureHandle>> = if settings.meeting_system_audio_enabled {
-            match SystemCapture::start(&settings, &self.app, tx) {
+            match SystemCapture::start(&settings, &self.app, tx, reference) {
                 Ok(c) => Some(Box::new(c)),
                 Err(e) => {
                     // The meeting goes on with the microphone alone.
@@ -208,6 +224,77 @@ pub fn cloud_allowed(settings: Option<&crate::settings::AppSettings>) -> bool {
     settings.is_none_or(|s| s.meeting_assistant_enabled)
 }
 
+fn emit_summary_status(
+    app: Option<&AppHandle>,
+    meeting_id: i64,
+    session_id: i64,
+    status: &str,
+    error: Option<String>,
+) {
+    let Some(app) = app else { return };
+    let payload = SessionSummaryStatusPayload {
+        meeting_id,
+        session_id,
+        status: status.into(),
+        error,
+    };
+    if let Err(e) = payload.emit(app) {
+        error!("emit session summary status: {e}");
+    }
+}
+
+/// Run one summary job under the summary lock and emit its progress and
+/// result. Returns false when the session had nothing to summarize.
+fn summarize_and_announce(
+    store: &ProjectStore,
+    summarizer: &dyn Summarizer,
+    summary_lock: &Mutex<()>,
+    app: Option<&AppHandle>,
+    session_id: i64,
+) -> anyhow::Result<bool> {
+    let Some(session) = store.get_session(session_id)? else {
+        return Ok(false);
+    };
+    let status = |status: &str, error: Option<String>| {
+        emit_summary_status(app, session.meeting_id, session_id, status, error)
+    };
+    status("generating", None);
+    let summary = {
+        let _guard = lock(summary_lock);
+        run_summary_job(store, summarizer, session_id)
+    };
+    let summary = match summary {
+        Ok(Some(summary)) => summary,
+        Ok(None) => {
+            status(
+                "failed",
+                Some("This session has no transcript to summarize.".into()),
+            );
+            return Ok(false);
+        }
+        Err(e) => {
+            status("failed", Some(format!("{e:#}")));
+            return Err(e);
+        }
+    };
+    let rolling_summary = store
+        .get_meeting(session.meeting_id)?
+        .and_then(|m| m.rolling_summary)
+        .unwrap_or_default();
+    if let Some(app) = app {
+        let payload = SessionSummaryPayload {
+            meeting_id: session.meeting_id,
+            session_id,
+            summary,
+            rolling_summary,
+        };
+        if let Err(e) = payload.emit(app) {
+            error!("emit session summary: {e}");
+        }
+    }
+    Ok(true)
+}
+
 fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
     m.lock().unwrap_or_else(|p| p.into_inner())
 }
@@ -264,10 +351,6 @@ impl MeetingManager {
 
     /// Summarize a session on a background thread and emit the result.
     /// No-op without a summarizer.
-    pub fn spawn_summary(&self, session_id: i64) {
-        self.spawn_summaries(vec![session_id], None, None);
-    }
-
     /// Summarize sessions one after another (the rolling summary is a chain,
     /// so they must not run concurrently) on one background thread.
     /// `pending` is a transcriber still finishing queued utterances; the
@@ -295,6 +378,13 @@ impl MeetingManager {
             log::debug!("meeting assistant is off; not sending sessions for summary");
             return;
         }
+        // Mark every queued session as generating now: the thread first
+        // drains the transcriber and files the meeting, which takes a while.
+        for &id in &session_ids {
+            if let Ok(Some(s)) = self.store.get_session(id) {
+                emit_summary_status(self.app.as_ref(), s.meeting_id, id, "generating", None);
+            }
+        }
         let store = Arc::clone(&self.store);
         let app = self.app.clone();
         let summary_lock = Arc::clone(&self.summary_lock);
@@ -314,40 +404,47 @@ impl MeetingManager {
                     crate::meeting::filing::final_attempt(filer, &store, &filing, app, meeting_id);
                 }
                 for session_id in session_ids {
-                    let result = {
-                        let _guard = lock(&summary_lock);
-                        run_summary_job(&store, summarizer.as_ref(), session_id)
-                    };
-                    match result {
-                        Ok(Some(summary)) => {
-                            let Ok(Some(session)) = store.get_session(session_id) else {
-                                continue;
-                            };
-                            let rolling_summary = store
-                                .get_meeting(session.meeting_id)
-                                .ok()
-                                .flatten()
-                                .and_then(|m| m.rolling_summary)
-                                .unwrap_or_default();
-                            if let Some(app) = &app {
-                                let payload = SessionSummaryPayload {
-                                    meeting_id: session.meeting_id,
-                                    session_id,
-                                    summary,
-                                    rolling_summary,
-                                };
-                                if let Err(e) = payload.emit(app) {
-                                    error!("emit session summary: {e}");
-                                }
-                            }
-                        }
-                        Ok(None) => {}
-                        Err(e) => warn!("summary for session {session_id} failed: {e:#}"),
+                    if let Err(e) = summarize_and_announce(
+                        &store,
+                        summarizer.as_ref(),
+                        &summary_lock,
+                        app.as_ref(),
+                        session_id,
+                    ) {
+                        warn!("summary for session {session_id} failed: {e:#}");
                     }
                 }
             });
         if let Err(e) = spawned {
             error!("spawn meet-summary: {e}");
+        }
+    }
+
+    /// Summarize one session on the calling thread (the UI's Retry, which
+    /// waits for the outcome). Errors are user-facing.
+    pub fn summarize_session_now(&self, session_id: i64) -> Result<(), String> {
+        let summarizer = self
+            .summarizer
+            .clone()
+            .ok_or("Summaries are not available.")?;
+        if !cloud_allowed(
+            self.app
+                .as_ref()
+                .map(crate::settings::get_settings)
+                .as_ref(),
+        ) {
+            return Err("The meeting assistant is off. Turn it on in Assistant.".into());
+        }
+        match summarize_and_announce(
+            &self.store,
+            summarizer.as_ref(),
+            &self.summary_lock,
+            self.app.as_ref(),
+            session_id,
+        ) {
+            Ok(true) => Ok(()),
+            Ok(false) => Err("This session has no transcript to summarize.".into()),
+            Err(e) => Err(format!("{e:#}")),
         }
     }
 
@@ -447,6 +544,7 @@ impl MeetingManager {
 
     fn emit_state(&self) {
         if let Some(app) = &self.app {
+            crate::live_pill::sync(app);
             if let Err(e) = self.state().emit(app) {
                 error!("emit meeting state: {e}");
             }

@@ -4,6 +4,7 @@ import { produce } from "immer";
 import { listen } from "@tauri-apps/api/event";
 import { commands, type ModelInfo } from "@/bindings";
 import { toast } from "sonner";
+import { toastError } from "@/lib/result";
 
 interface DownloadProgress {
   model_id: string;
@@ -106,10 +107,12 @@ export const useModelStore = create<ModelsStore>()(
             }),
           );
         } else {
-          set({ error: `Failed to load models: ${result.error}` });
+          set({ error: String(result.error) });
+          toastError("errors.models.load", result.error);
         }
       } catch (err) {
-        set({ error: `Failed to load models: ${err}` });
+        set({ error: String(err) });
+        toastError("errors.models.load", err);
       } finally {
         set({ loading: false });
       }
@@ -131,12 +134,14 @@ export const useModelStore = create<ModelsStore>()(
       try {
         const result = await commands.rescanLocalModels();
         if (result.status !== "ok") {
-          set({ error: `Failed to rescan models: ${result.error}` });
+          set({ error: String(result.error) });
+          toastError("errors.models.rescan", result.error);
         }
         // On success the backend emits `models-updated`, which reloads the list
         // via the listener registered in initialize().
       } catch (err) {
-        set({ error: `Failed to rescan models: ${err}` });
+        set({ error: String(err) });
+        toastError("errors.models.rescan", err);
       } finally {
         set({ isRescanning: false });
       }
@@ -150,11 +155,13 @@ export const useModelStore = create<ModelsStore>()(
           set({ currentModel: modelId });
           return true;
         } else {
-          set({ error: `Failed to switch to model: ${result.error}` });
+          set({ error: String(result.error) });
+          toastError("errors.models.select", result.error);
           return false;
         }
       } catch (err) {
-        set({ error: `Failed to switch to model: ${err}` });
+        set({ error: String(err) });
+        toastError("errors.models.select", err);
         return false;
       }
     },
@@ -187,7 +194,8 @@ export const useModelStore = create<ModelsStore>()(
           );
         }
         return result.status === "ok";
-      } catch {
+      } catch (err) {
+        toastError("errors.models.download", err);
         // model-download-failed event won't fire for JS exceptions (e.g. IPC error),
         // so clean up state here to avoid a stuck progress spinner.
         set(
@@ -218,11 +226,13 @@ export const useModelStore = create<ModelsStore>()(
           await get().loadModels();
           return true;
         } else {
-          set({ error: `Failed to cancel download: ${result.error}` });
+          set({ error: String(result.error) });
+          toastError("errors.models.cancel", result.error);
           return false;
         }
       } catch (err) {
-        set({ error: `Failed to cancel download: ${err}` });
+        set({ error: String(err) });
+        toastError("errors.models.cancel", err);
         return false;
       }
     },
@@ -236,11 +246,13 @@ export const useModelStore = create<ModelsStore>()(
           await get().loadCurrentModel();
           return true;
         } else {
-          set({ error: `Failed to delete model: ${result.error}` });
+          set({ error: String(result.error) });
+          toastError("errors.models.delete", result.error);
           return false;
         }
       } catch (err) {
-        set({ error: `Failed to delete model: ${err}` });
+        set({ error: String(err) });
+        toastError("errors.models.delete", err);
         return false;
       }
     },

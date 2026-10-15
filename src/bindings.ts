@@ -141,6 +141,14 @@ async changeMeetingObserverIntervalSetting(secs: number) : Promise<Result<null, 
     else return { status: "error", error: e  as any };
 }
 },
+async changeMeetingMaxLineSetting(secs: number) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("change_meeting_max_line_setting", { secs }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async changeMeetingBeepSetting(enabled: boolean) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("change_meeting_beep_setting", { enabled }) };
@@ -200,6 +208,18 @@ async setLlmProvider(providerId: string) : Promise<Result<null, string>> {
 async fetchLlmModels(providerId: string) : Promise<Result<string[], string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("fetch_llm_models", { providerId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Send "ping" to the saved provider and model through the same JSON path the
+ * assistant uses, so a pass means nudges and summaries can work.
+ */
+async pingLlmModel() : Promise<Result<LlmPing, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("ping_llm_model") };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -913,8 +933,9 @@ async getObserverReadiness() : Promise<ObserverReadiness> {
     return await TAURI_INVOKE("get_observer_readiness");
 },
 /**
- * Summarize a session in the background (also the UI's Retry). The result
- * arrives as a `SessionSummaryPayload` event.
+ * Summarize a session (the UI's Retry) and resolve when it is done, so the
+ * UI can show progress. The summary itself arrives as a
+ * `SessionSummaryPayload` event.
  */
 async summarizeSession(sessionId: number) : Promise<Result<null, string>> {
     try {
@@ -934,9 +955,11 @@ interventionPayload: InterventionPayload,
 meetingCaptureWarningPayload: MeetingCaptureWarningPayload,
 meetingFiledPayload: MeetingFiledPayload,
 meetingStatePayload: MeetingStatePayload,
+meetingTitledPayload: MeetingTitledPayload,
 observerStatusPayload: ObserverStatusPayload,
 openMeetingPayload: OpenMeetingPayload,
 sessionSummaryPayload: SessionSummaryPayload,
+sessionSummaryStatusPayload: SessionSummaryStatusPayload,
 sourceStatusPayload: SourceStatusPayload,
 transcriptLinePayload: TranscriptLinePayload
 }>({
@@ -944,9 +967,11 @@ interventionPayload: "intervention-payload",
 meetingCaptureWarningPayload: "meeting-capture-warning-payload",
 meetingFiledPayload: "meeting-filed-payload",
 meetingStatePayload: "meeting-state-payload",
+meetingTitledPayload: "meeting-titled-payload",
 observerStatusPayload: "observer-status-payload",
 openMeetingPayload: "open-meeting-payload",
 sessionSummaryPayload: "session-summary-payload",
+sessionSummaryStatusPayload: "session-summary-status-payload",
 sourceStatusPayload: "source-status-payload",
 transcriptLinePayload: "transcript-line-payload"
 })
@@ -1000,7 +1025,11 @@ meeting_assistant_enabled?: boolean;
 /**
  * Capture system audio (the other participants) during meetings.
  */
-meeting_system_audio_enabled?: boolean; meeting_vision_enabled?: boolean; meeting_sensitivity?: MeetingSensitivity; meeting_observer_interval_secs?: number; meeting_beep_enabled?: boolean; app_language?: string; theme?: Theme; experimental_enabled?: boolean; keyboard_implementation?: KeyboardImplementation; show_tray_icon?: boolean; filler_word_removal_enabled?: boolean; custom_filler_words?: string[] | null; 
+meeting_system_audio_enabled?: boolean; meeting_vision_enabled?: boolean; meeting_sensitivity?: MeetingSensitivity; meeting_observer_interval_secs?: number; 
+/**
+ * Seconds of non-stop speech before the segmenter cuts a new line.
+ */
+meeting_max_line_secs?: number; meeting_beep_enabled?: boolean; app_language?: string; theme?: Theme; experimental_enabled?: boolean; keyboard_implementation?: KeyboardImplementation; show_tray_icon?: boolean; filler_word_removal_enabled?: boolean; custom_filler_words?: string[] | null; 
 /**
  * Fresh installs default from the OS locale; existing stores are migrated
  * in `apply_settings_migrations`.
@@ -1029,6 +1058,35 @@ export type ChineseScript =
  */
 "as_transcribed" | "simplified" | "traditional"
 export type CustomSounds = { start: boolean; stop: boolean }
+export type EfficiencyIssue = { 
+/**
+ * One of `EFFICIENCY_KINDS`.
+ */
+kind?: string; 
+/**
+ * The subject in 2–4 words.
+ */
+topic?: string; 
+/**
+ * What happened, in one sentence.
+ */
+note?: string; 
+/**
+ * Rough minutes spent on it.
+ */
+minutes?: number }
+/**
+ * End-of-session efficiency report: where the conversation lost time.
+ */
+export type EfficiencyReport = { 
+/**
+ * 0–100: share of the talk that moved things forward.
+ */
+score?: number; 
+/**
+ * One line on how the session went.
+ */
+verdict?: string; issues?: EfficiencyIssue[] }
 export type EngineType = 
 /**
  * Any GGML/GGUF model loaded through transcribe-cpp (Whisper, Parakeet,
@@ -1061,6 +1119,10 @@ export type LlmApiFormat =
  * Anthropic Messages (`/messages`)
  */
 "anthropic"
+/**
+ * Reply to `ping_llm_model`: what the model said and how long it took.
+ */
+export type LlmPing = { model: string; reply: string; ms: number }
 export type LlmProvider = { id: string; label: string; base_url: string; allow_base_url_edit?: boolean; models_endpoint?: string | null; supports_structured_output?: boolean; api_format?: LlmApiFormat }
 export type LogLevel = "trace" | "debug" | "info" | "warn" | "error"
 export type Meeting = { id: number; project_id: number | null; title: string; created_at: number; updated_at: number; status: MeetingStatus; context: string; rolling_summary: string | null; 
@@ -1101,6 +1163,10 @@ created_brief: string | null }
 export type MeetingSensitivity = "low" | "medium" | "high"
 export type MeetingStatePayload = { meeting_id: number | null; session_id: number | null; status: MeetingStatus | null }
 export type MeetingStatus = "live" | "paused" | "ended"
+/**
+ * Emitted when the assistant names a meeting without filing it.
+ */
+export type MeetingTitledPayload = { meeting_id: number; title: string }
 export type ModelInfo = { id: string; name: string; description: string; filename: string; source: ModelSource; size_mb: number; is_downloaded: boolean; is_downloading: boolean; partial_size: number; is_directory: boolean; engine_type: EngineType; accuracy_score: number; speed_score: number; supports_translation: boolean; is_recommended: boolean; supported_languages: string[]; supports_language_selection: boolean; is_custom: boolean; supports_streaming: boolean; supports_language_detection: boolean }
 export type ModelLoadStatus = { is_loaded: boolean; current_model: string | null }
 /**
@@ -1145,7 +1211,15 @@ readiness: string;
 /**
  * Provider label for readiness states that name one.
  */
-detail: string | null }
+detail: string | null; 
+/**
+ * The observer's last few verdicts for this meeting, oldest first.
+ */
+thoughts: ObserverThought[] }
+/**
+ * One judged window: the model's reason, and whether it nudged.
+ */
+export type ObserverThought = { ts: number; text: string; nudged: boolean }
 /**
  * Asks the main window to open a meeting (sent when the user clicks
  * "Open meeting" on the intervention card).
@@ -1162,11 +1236,22 @@ export type SearchHit = { source_id: number; source_title: string; path: string;
 score: number }
 export type SecretMap = Partial<{ [key in string]: string }>
 export type Session = { id: number; meeting_id: number; started_at: number; ended_at: number | null; summary: string | null }
-export type SessionSummary = { decisions?: string[]; open_questions?: string[]; action_items?: string[]; recap?: string }
+export type SessionSummary = { decisions?: string[]; open_questions?: string[]; action_items?: string[]; recap?: string; 
+/**
+ * How well the talk used its time. Absent on summaries written before
+ * the report existed.
+ */
+efficiency?: EfficiencyReport | null }
 /**
  * Emitted when a session summary has been stored.
  */
 export type SessionSummaryPayload = { meeting_id: number; session_id: number; summary: SessionSummary; rolling_summary: string }
+/**
+ * Progress of a session summary that is not done yet: `generating` while
+ * the job runs, `failed` (with `error`) when it gave up. Success arrives as
+ * `SessionSummaryPayload`.
+ */
+export type SessionSummaryStatusPayload = { meeting_id: number; session_id: number; status: string; error: string | null }
 export type ShortcutBinding = { id: string; name: string; description: string; default_binding: string; current_binding: string }
 export type SoundTheme = "marimba" | "pop" | "custom"
 export type Source = { id: number; project_id: number; kind: SourceKind; title: string; locator: string; added_at: number; indexed_at: number | null; status: SourceStatus; error: string | null; digest: string | null }

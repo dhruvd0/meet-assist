@@ -1,6 +1,8 @@
 import React from "react";
+import { Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { Session } from "@/bindings";
+import { useMeetingStore } from "@/stores/meetingStore";
 import { Button } from "../ui/Button";
 
 interface ParsedSummary {
@@ -51,19 +53,41 @@ const List: React.FC<{ title: string; items: string[] }> = ({
 export const SessionSummary: React.FC<{
   session: Session;
   meetingEnded: boolean;
-  onRetry: () => void;
+  onRetry: () => Promise<void>;
 }> = ({ session, meetingEnded, onRetry }) => {
   const { t } = useTranslation();
+  const progress = useMeetingStore((s) => s.summaryProgress[session.id]);
   const ended = session.ended_at != null || meetingEnded;
 
   if (session.summary === null) {
+    if (progress?.status === "generating")
+      return (
+        <div
+          role="status"
+          className="flex items-center gap-2 py-1 text-sm text-faint"
+        >
+          <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+          {t("meetings.summary.generating")}
+        </div>
+      );
     if (!ended) return null;
     return (
-      <div className="flex items-center gap-3 py-1">
-        <span className="text-sm text-faint">{t("meetings.summary.none")}</span>
-        <Button size="sm" variant="secondary" onClick={onRetry}>
-          {t("meetings.summary.retry")}
-        </Button>
+      <div className="space-y-2 py-1">
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-faint">
+            {progress?.status === "failed"
+              ? t("meetings.summary.failedToGenerate")
+              : t("meetings.summary.none")}
+          </span>
+          <Button size="sm" variant="secondary" onClick={onRetry}>
+            {t("meetings.summary.retry")}
+          </Button>
+        </div>
+        {progress?.status === "failed" && progress.error && (
+          <p role="alert" className="text-sm text-error break-words">
+            {progress.error}
+          </p>
+        )}
       </div>
     );
   }

@@ -4,7 +4,7 @@
 
 use crate::llm_client::{self, ToolCall, ToolClientCache, ToolDef, ToolLoopError};
 use crate::meeting::observer::{readiness, Readiness};
-use crate::meeting::store::{Meeting, ProjectStore, TranscriptLine, FILED_BY_AI};
+use crate::meeting::store::{Meeting, ProjectStore, TranscriptLine, FILED_BY_AI, FILED_BY_USER};
 use log::{info, warn};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -47,8 +47,30 @@ pub struct MeetingFiledPayload {
 }
 
 /// Nobody has chosen this meeting's project yet.
-pub fn eligible(m: &Meeting) -> bool {
+pub fn needs_filing(m: &Meeting) -> bool {
     m.project_id.is_none() && m.filed_by.is_none()
+}
+
+/// `title` is the one stamped at creation (`created_at`), not a name anyone
+/// chose. create_meeting stamps its own time, so allow the minute before.
+fn is_auto_title(title: &str, created_at: i64) -> bool {
+    let auto = crate::meeting::session::MeetingManager::auto_title_at;
+    title == auto(created_at) || title == auto(created_at - 60_000)
+}
+
+/// The assistant still has work on this meeting: filing it, naming it, or
+/// both. A meeting started inside a project still needs a name; one the
+/// user moved by hand is theirs, title included.
+pub fn eligible(m: &Meeting) -> bool {
+    needs_filing(m)
+        || (m.filed_by.as_deref() != Some(FILED_BY_USER) && is_auto_title(&m.title, m.created_at))
+}
+
+/// Emitted when the assistant names a meeting without filing it.
+#[derive(Clone, Debug, Serialize, Deserialize, Type, tauri_specta::Event)]
+pub struct MeetingTitledPayload {
+    pub meeting_id: i64,
+    pub title: String,
 }
 
 #[derive(Default)]
@@ -102,6 +124,14 @@ impl FilingTracker {
     }
 }
 
+/// Tools for a run that only names the meeting (its project is chosen).
+pub fn title_tool_defs() -> Vec<ToolDef> {
+    tool_defs()
+        .into_iter()
+        .filter(|t| t.name == "rename_meeting")
+        .collect()
+}
+
 pub fn tool_defs() -> Vec<ToolDef> {
     vec![
         ToolDef {
@@ -136,7 +166,7 @@ pub fn final_schema() -> Value {
     json!({
         "type": "object",
         "properties": {
-            "outcome": { "type": "string", "enum": ["filed", "wait"] },
+            "outcome": { "type": "string", "enum": ["filed", "named", "wait"] },
             "reason": { "type": "string" }
         },
         "required": ["outcome", "reason"],
@@ -144,13 +174,18 @@ pub fn final_schema() -> Value {
     })
 }
 
-const SYSTEM_PROMPT: &str = "You file a meeting recording into the user's projects, using the tools.
+const SYSTEM_PROMPT: &str = "You file a recorded conversation (a meeting or call, interview, debate, class or talk, or a broadcast the user listened to) into the user's projects, using the tools.
 1. Call list_projects. Call read_project on any project that might match.
 2. If one project clearly fits, call assign_meeting with its id. Prefer an existing project.
-3. If none fits and the transcript makes the meeting's subject clear, call create_project with a short title and a one-paragraph brief describing the subject, people, and goals heard so far.
+3. If none fits and the transcript makes the conversation's subject clear, call create_project with a short title and a one-paragraph brief describing the subject, people, and goals heard so far.
 4. Call rename_meeting with a short descriptive title (under 60 characters) in the transcript's language.
-5. If the transcript does not yet show what the meeting is about, do not file or rename; answer outcome \"wait\".
+5. If the transcript does not yet show what the conversation is about, do not file or rename; answer outcome \"wait\".
 Finish with JSON {\"outcome\": \"filed\" | \"wait\", \"reason\": \"...\"}.";
+
+const TITLE_PROMPT: &str = "You name a recorded conversation (a meeting or call, interview, debate, class or talk, or a broadcast the user listened to). Its project is already chosen.
+1. If the transcript shows what the conversation is about, call rename_meeting with a short descriptive title (under 60 characters) in the transcript's language, naming the subject rather than the format (\"Chagos deal and Iran strikes\", not \"Parliament session\").
+2. If it does not yet, do not rename; answer outcome \"wait\".
+Finish with JSON {\"outcome\": \"named\" | \"wait\", \"reason\": \"...\"}.";
 
 /// User message: title, notes, and the transcript so far. Over budget, the
 /// oldest lines are dropped.
@@ -172,7 +207,7 @@ pub fn user_prompt(title: &str, context: &str, lines: &[TranscriptLine]) -> Stri
         context.trim()
     };
     format!(
-        "## Meeting title\n{title}\n\n## Meeting notes\n{notes}\n\n## Transcript so far\n{}",
+        "## Conversation title\n{title}\n\n## Conversation notes\n{notes}\n\n## Transcript so far\n{}",
         kept.join("\n")
     )
 }
@@ -321,12 +356,8 @@ impl FilingContext {
                 if st.renamed {
                     return Err("meeting already renamed".into());
                 }
-                // Only an untouched auto title may be replaced; create_meeting
-                // stamps its own time, so allow the minute before.
-                let auto = |ts| crate::meeting::session::MeetingManager::auto_title_at(ts);
-                if self.start_title != auto(self.created_at)
-                    && self.start_title != auto(self.created_at - 60_000)
-                {
+                // Only an untouched auto title may be replaced.
+                if !is_auto_title(&self.start_title, self.created_at) {
                     return Err("meeting title was set by the user".into());
                 }
                 if !self
@@ -341,6 +372,11 @@ impl FilingContext {
             }
             other => Err(format!("unknown tool: {other}")),
         }
+    }
+
+    /// Whether this run renamed the meeting.
+    fn renamed(&self) -> bool {
+        self.lock().renamed
     }
 
     /// Payload for what this run filed, if anything.
@@ -391,6 +427,21 @@ impl LlmFiler {
         }
     }
 
+    /// Tell the main window about a title the assistant set without filing.
+    fn notify_titled(&self, store: &ProjectStore, meeting_id: i64) {
+        let Ok(Some(m)) = store.get_meeting(meeting_id) else {
+            return;
+        };
+        info!("filing: named meeting {meeting_id} \"{}\"", m.title);
+        let payload = MeetingTitledPayload {
+            meeting_id,
+            title: m.title,
+        };
+        if let Err(e) = payload.emit(&self.app) {
+            warn!("emit meeting titled: {e}");
+        }
+    }
+
     /// One filing run. `Ok(Some)` when this run filed the meeting, even if
     /// the loop failed afterwards (the write is already in the store).
     pub fn run(
@@ -418,6 +469,13 @@ impl LlmFiler {
         if !eligible(&meeting) {
             return Ok(None);
         }
+        // A meeting whose project is chosen only gets named.
+        let filing = needs_filing(&meeting);
+        let (system, defs) = if filing {
+            (SYSTEM_PROMPT, tool_defs())
+        } else {
+            (TITLE_PROMPT, title_tool_defs())
+        };
         let lines = store
             .lines_in_range(meeting_id, None, None, 10_000)
             .map_err(|e| FilingError::Other(e.to_string()))?;
@@ -428,12 +486,11 @@ impl LlmFiler {
             meeting.created_at,
         );
         let handler = |c: &ToolCall| ctx.handle(c);
-        let defs = tool_defs();
         let fut = llm_client::send_with_tools_with_client(
             &client,
             &provider,
             &model,
-            SYSTEM_PROMPT.to_string(),
+            system.to_string(),
             user_prompt(&meeting.title, &meeting.context, &lines),
             &defs,
             final_schema(),
@@ -444,6 +501,9 @@ impl LlmFiler {
             tauri::async_runtime::block_on(async move { tokio::time::timeout(BUDGET, fut).await });
         if let Some(filed) = ctx.outcome() {
             return Ok(Some(filed));
+        }
+        if ctx.renamed() {
+            self.notify_titled(store, meeting_id);
         }
         match result {
             Err(_) => Err(FilingError::Other("filing timed out".into())),

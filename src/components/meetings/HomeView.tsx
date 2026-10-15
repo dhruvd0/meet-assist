@@ -1,6 +1,6 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
-import { Mic } from "lucide-react";
+import { Loader2, Mic } from "lucide-react";
 import { useMeetingStore } from "@/stores/meetingStore";
 import { useProjectStore } from "@/stores/projectStore";
 import { useSettings } from "@/hooks/useSettings";
@@ -50,6 +50,7 @@ const NowCard: React.FC = () => {
   const meetings = useMeetingStore((s) => s.meetings);
   const openMeeting = useMeetingStore((s) => s.openMeeting);
   const startMeeting = useMeetingStore((s) => s.startMeeting);
+  const pending = useMeetingStore((s) => s.controlPending);
   const projects = useProjectStore((s) => s.projects);
   const { settings } = useSettings();
   const osType = useOsType();
@@ -120,8 +121,15 @@ const NowCard: React.FC = () => {
               )}
             </p>
           </div>
-          <Button onClick={() => startMeeting(null, null)}>
-            <Mic className="w-3.5 h-3.5" />
+          <Button
+            disabled={pending !== null}
+            onClick={() => startMeeting(null, null)}
+          >
+            {pending === "start" ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Mic className="w-3.5 h-3.5" />
+            )}
             {t("meetings.start")}
           </Button>
         </>
@@ -134,6 +142,8 @@ export const HomeView: React.FC = () => {
   const { t } = useTranslation();
   const meetings = useMeetingStore((s) => s.meetings);
   const loading = useMeetingStore((s) => s.loading);
+  const meetingsError = useMeetingStore((s) => s.meetingsError);
+  const loadMeetings = useMeetingStore((s) => s.loadMeetings);
 
   return (
     <div className="w-full max-w-[720px] mx-auto px-8 pt-6 pb-32 page-in">
@@ -143,9 +153,26 @@ export const HomeView: React.FC = () => {
       <NowCard />
       <div className="mt-10">
         {loading && meetings.length === 0 ? (
-          <p className="py-10 text-center text-sm text-faint">
+          <p
+            role="status"
+            className="py-10 flex items-center justify-center gap-2 text-sm text-faint"
+          >
+            <Loader2 className="w-4 h-4 animate-spin" />
             {t("common.loading")}
           </p>
+        ) : meetingsError && meetings.length === 0 ? (
+          <div className="py-10 flex flex-col items-center gap-3">
+            <p role="alert" className="text-sm text-error">
+              {meetingsError}
+            </p>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => loadMeetings()}
+            >
+              {t("meetings.summary.retry")}
+            </Button>
+          </div>
         ) : (
           <MeetingFeed meetings={meetings} emptyText={t("home.empty")} />
         )}

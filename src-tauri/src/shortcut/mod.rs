@@ -593,12 +593,11 @@ pub fn change_start_hidden_setting(app: AppHandle, enabled: bool) -> Result<(), 
 #[tauri::command]
 #[specta::specta]
 pub fn change_autostart_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
+    // Apply first, so a refusal leaves the saved setting as it was.
+    crate::autostart::apply_autostart(&app, enabled)?;
     let mut settings = settings::get_settings(&app);
     settings.autostart_enabled = enabled;
     settings::write_settings(&app, settings);
-
-    // Apply the autostart setting immediately
-    crate::autostart::apply_autostart(&app, enabled);
 
     // Notify frontend
     let _ = app.emit(
@@ -717,6 +716,15 @@ pub fn change_meeting_sensitivity_setting(
 pub fn change_meeting_observer_interval_setting(app: AppHandle, secs: u32) -> Result<(), String> {
     let mut settings = settings::get_settings(&app);
     settings.meeting_observer_interval_secs = secs.clamp(10, 120);
+    settings::write_settings(&app, settings);
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn change_meeting_max_line_setting(app: AppHandle, secs: u32) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.meeting_max_line_secs = secs.clamp(5, 60);
     settings::write_settings(&app, settings);
     Ok(())
 }
@@ -872,6 +880,61 @@ pub fn set_llm_provider(app: AppHandle, provider_id: String) -> Result<(), Strin
     Ok(())
 }
 
+/// Reply to `ping_llm_model`: what the model said and how long it took.
+#[derive(Serialize, Type)]
+pub struct LlmPing {
+    pub model: String,
+    pub reply: String,
+    pub ms: u32,
+}
+
+/// Send "ping" to the saved provider and model through the same JSON path the
+/// assistant uses, so a pass means nudges and summaries can work.
+#[tauri::command]
+#[specta::specta]
+pub async fn ping_llm_model(app: AppHandle) -> Result<LlmPing, String> {
+    let settings = settings::get_settings(&app);
+    let provider = settings
+        .llm_provider()
+        .cloned()
+        .ok_or("No provider is selected.")?;
+    let model = settings
+        .llm_model()
+        .filter(|m| !m.trim().is_empty())
+        .ok_or("No model is selected.")?;
+    let schema = serde_json::json!({
+        "type": "object",
+        "properties": { "reply": { "type": "string" } },
+        "required": ["reply"],
+        "additionalProperties": false
+    });
+    let started = std::time::Instant::now();
+    let call = crate::llm_client::complete_json(
+        &provider,
+        settings.llm_api_key(),
+        &model,
+        "You are a connection test. Answer with JSON only.".to_string(),
+        r#"Reply with exactly {"reply": "pong"}."#.to_string(),
+        schema,
+    );
+    let value = tokio::time::timeout(std::time::Duration::from_secs(30), call)
+        .await
+        .map_err(|_| "No reply within 30 seconds.".to_string())??;
+    let reply = value["reply"]
+        .as_str()
+        .unwrap_or_default()
+        .trim()
+        .to_string();
+    if reply.is_empty() {
+        return Err(format!("Unexpected reply: {value}"));
+    }
+    Ok(LlmPing {
+        model,
+        reply,
+        ms: started.elapsed().as_millis().min(u32::MAX as u128) as u32,
+    })
+}
+
 #[tauri::command]
 #[specta::specta]
 pub async fn fetch_llm_models(app: AppHandle, provider_id: String) -> Result<Vec<String>, String> {
@@ -885,11 +948,7 @@ pub async fn fetch_llm_models(app: AppHandle, provider_id: String) -> Result<Vec
         .ok_or_else(|| format!("Provider '{}' not found", provider_id))?;
 
     // Get API key
-    let api_key = settings
-        .llm_api_keys
-        .get(&provider_id)
-        .cloned()
-        .unwrap_or_default();
+    let api_key = settings.llm_provider_api_key(&provider_id);
 
     // Skip fetching if no API key for providers that typically need one
     if api_key.trim().is_empty() && provider.id != "custom" {

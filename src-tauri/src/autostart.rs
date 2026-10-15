@@ -18,12 +18,11 @@ use tauri_plugin_autostart::ManagerExt;
 /// every launch, so a transient failure self-heals and must not block
 /// startup. This mirrors the pre-existing behavior of ignoring
 /// enable()/disable() results.
-pub fn apply_autostart(app: &AppHandle, enabled: bool) {
+pub fn apply_autostart(app: &AppHandle, enabled: bool) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     if macos::login_item_api_available() {
         macos::remove_plugin_launch_agent(app);
-        macos::set_login_item(enabled);
-        return;
+        return macos::set_login_item(enabled);
     }
 
     let manager = app.autolaunch();
@@ -32,13 +31,14 @@ pub fn apply_autostart(app: &AppHandle, enabled: bool) {
     } else {
         manager.disable()
     };
-    if let Err(e) = result {
+    result.map_err(|e| {
         log::warn!(
             "Failed to apply autostart setting (enabled={}): {}",
             enabled,
             e
         );
-    }
+        e.to_string()
+    })
 }
 
 #[cfg(target_os = "macos")]
@@ -60,29 +60,43 @@ mod macos {
     /// Register or unregister the app as a login item, skipping the call when
     /// the service is already in the requested state (unregistering a
     /// never-registered service returns an error on every launch otherwise).
-    pub fn set_login_item(enabled: bool) {
+    pub fn set_login_item(enabled: bool) -> Result<(), String> {
         let service = unsafe { SMAppService::mainAppService() };
         let status = unsafe { service.status() };
 
         if enabled {
             if status == SMAppServiceStatus::Enabled {
-                return;
+                return Ok(());
             }
             match unsafe { service.registerAndReturnError() } {
-                Ok(()) => log::info!("Registered login item via SMAppService"),
+                Ok(()) => {
+                    log::info!("Registered login item via SMAppService");
+                    Ok(())
+                }
                 // Fails in dev (no signed app bundle) and when the user has
                 // switched the item off in System Settings, which apps are
                 // not allowed to override.
-                Err(e) => log::warn!("Failed to register login item: {}", e),
+                Err(e) => {
+                    log::warn!("Failed to register login item: {}", e);
+                    Err(format!(
+                        "macOS refused to add the login item ({e}). Allow it in System Settings → General → Login Items."
+                    ))
+                }
             }
         } else {
             if status == SMAppServiceStatus::NotRegistered || status == SMAppServiceStatus::NotFound
             {
-                return;
+                return Ok(());
             }
             match unsafe { service.unregisterAndReturnError() } {
-                Ok(()) => log::info!("Unregistered login item via SMAppService"),
-                Err(e) => log::warn!("Failed to unregister login item: {}", e),
+                Ok(()) => {
+                    log::info!("Unregistered login item via SMAppService");
+                    Ok(())
+                }
+                Err(e) => {
+                    log::warn!("Failed to unregister login item: {}", e);
+                    Err(format!("macOS refused to remove the login item ({e})."))
+                }
             }
         }
     }

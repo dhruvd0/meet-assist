@@ -1,5 +1,7 @@
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Loader2 } from "lucide-react";
+import { toastError } from "@/lib/result";
 import { commands, type SourceKind } from "@/bindings";
 import { useProjectStore } from "@/stores/projectStore";
 import { Button } from "../ui/Button";
@@ -29,7 +31,11 @@ export const AddSourceDialog: React.FC<{
 
   const pick = async () => {
     const res = await commands.pickSourcePath(kind);
-    if (res.status === "ok" && res.data) {
+    if (res.status !== "ok") {
+      toastError("projects.sources.errors.pick", res.error);
+      return;
+    }
+    if (res.data) {
       setLocator(res.data);
       if (!title) setTitle(res.data.split(/[\\/]/).pop() ?? "");
     }
@@ -38,13 +44,17 @@ export const AddSourceDialog: React.FC<{
   const submit = async () => {
     if (!locator.trim()) return;
     setBusy(true);
-    const created = await addSource(
-      projectId,
-      kind,
-      title.trim() || t(`projects.sources.kind.${kind}`),
-      locator,
-    );
-    setBusy(false);
+    let created = null;
+    try {
+      created = await addSource(
+        projectId,
+        kind,
+        title.trim() || t(`projects.sources.kind.${kind}`),
+        locator,
+      );
+    } finally {
+      setBusy(false);
+    }
     if (created) {
       reset();
       onOpenChange(false);
@@ -72,6 +82,7 @@ export const AddSourceDialog: React.FC<{
             {t("projects.sources.dialog.cancel")}
           </Button>
           <Button size="sm" onClick={submit} disabled={busy || !locator.trim()}>
+            {busy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
             {t("projects.sources.dialog.add")}
           </Button>
         </div>

@@ -3,11 +3,12 @@
 
 use crate::audio_toolkit::audio::CaptureVad;
 use crate::managers::audio::{create_capture_vad, microphone_config};
+use crate::meeting::echo::{self, EchoReference};
 use crate::meeting::segment::{Segmenter, SegmenterConfig};
 use crate::settings::AppSettings;
 use anyhow::{anyhow, Context, Result};
 use handy_recorder::{AudioChunk, Recorder, Sink};
-use log::{info, warn};
+use log::{debug, info, warn};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc};
 
@@ -21,24 +22,47 @@ pub struct Utterance {
 
 const SAMPLE_RATE: usize = 16_000;
 
+/// A sink's part in the echo check (see `meeting::echo`).
+pub enum Echo {
+    None,
+    /// System audio: record what the speakers play.
+    Record(EchoReference),
+    /// Microphone: drop utterances that are the speakers playing.
+    Check(EchoReference),
+}
+
 pub struct MeetingSink {
     vad: CaptureVad,
     segmenter: Segmenter,
     tx: mpsc::Sender<Utterance>,
     started_at: Option<i64>,
     speaker: String,
+    echo: Echo,
 }
 
 impl MeetingSink {
-    pub fn new(vad: CaptureVad, tx: mpsc::Sender<Utterance>) -> Self {
-        Self::with_speaker(vad, tx, "me")
+    /// `max_line_secs` caps an utterance during non-stop speech.
+    pub fn new(
+        vad: CaptureVad,
+        tx: mpsc::Sender<Utterance>,
+        max_line_secs: u32,
+        echo: Echo,
+    ) -> Self {
+        Self::with_speaker(vad, tx, "me", max_line_secs, echo)
     }
 
     /// Like `new`, tagging every emitted utterance with `speaker`.
-    pub fn with_speaker(mut vad: CaptureVad, tx: mpsc::Sender<Utterance>, speaker: &str) -> Self {
+    pub fn with_speaker(
+        mut vad: CaptureVad,
+        tx: mpsc::Sender<Utterance>,
+        speaker: &str,
+        max_line_secs: u32,
+        echo: Echo,
+    ) -> Self {
         vad.prepare_offline();
         let frame = vad.frame_samples();
         let mut cfg = SegmenterConfig::defaults(frame);
+        cfg.max_utterance_ms = u64::from(max_line_secs.clamp(5, 60)) * 1000;
         // The detector already labels `hangover` frames after real speech as
         // speech; count them toward the end silence instead of waiting the
         // full silence again after them.
@@ -51,12 +75,22 @@ impl MeetingSink {
             tx,
             started_at: None,
             speaker: speaker.to_string(),
+            echo,
         }
     }
 
     fn emit(&mut self, samples: Vec<f32>) {
         let now = chrono::Utc::now().timestamp_millis();
         let started_at = self.started_at.take().unwrap_or(now);
+        if let Echo::Check(reference) = &self.echo {
+            if echo::is_echo(&samples, &reference.since(started_at - echo::LEAD_MS)) {
+                debug!(
+                    "dropping {} utterance: it is the speakers playing",
+                    self.speaker
+                );
+                return;
+            }
+        }
         let utt = Utterance {
             speaker: self.speaker.clone(),
             samples,
@@ -74,6 +108,9 @@ impl MeetingSink {
         let Some(frame) = frame.get(..frame_len) else {
             return;
         };
+        if let Echo::Record(reference) = &self.echo {
+            reference.push(frame, chrono::Utc::now().timestamp_millis());
+        }
         let speech = match self.vad.push_frame(frame) {
             Ok(s) => s,
             Err(e) => {
@@ -92,6 +129,12 @@ impl MeetingSink {
         }
         if let Some(samples) = self.segmenter.push(speech.as_deref()) {
             self.emit(samples);
+            // A capped utterance carries its tail into the next one.
+            let carried = self.segmenter.pending_samples();
+            if carried > 0 {
+                let carried_ms = (carried * 1000 / SAMPLE_RATE) as i64;
+                self.started_at = Some(chrono::Utc::now().timestamp_millis() - carried_ms);
+            }
         }
     }
 
@@ -126,6 +169,7 @@ impl MeetingCapture {
         settings: &AppSettings,
         app: &tauri::AppHandle,
         tx: mpsc::Sender<Utterance>,
+        echo: Echo,
     ) -> Result<Self> {
         let vad = create_capture_vad(settings.vad_backend, app).context("create VAD")?;
         let frame = vad.frame_samples();
@@ -141,7 +185,7 @@ impl MeetingCapture {
             flag.store(true, Ordering::Release);
         })
         .map_err(|e| anyhow!("open microphone: {e}"))?;
-        let sink = MeetingSink::new(vad, tx);
+        let sink = MeetingSink::new(vad, tx, settings.meeting_max_line_secs, echo);
         recorder
             .start(sink)
             .map_err(|e| anyhow!("start microphone: {}", e.error))?;

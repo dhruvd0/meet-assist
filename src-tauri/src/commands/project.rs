@@ -90,8 +90,7 @@ pub fn remove_source(pm: Pm<'_>, id: i64) -> Result<(), String> {
 #[tauri::command]
 #[specta::specta]
 pub fn reindex_source(pm: Pm<'_>, id: i64) -> Result<(), String> {
-    pm.enqueue_index(id);
-    Ok(())
+    pm.reindex(id).map_err(err)
 }
 
 #[tauri::command]
@@ -100,8 +99,7 @@ pub fn set_source_caption(pm: Pm<'_>, id: i64, caption: String) -> Result<(), St
     pm.store()
         .set_source_digest(id, caption.trim())
         .map_err(err)?;
-    pm.enqueue_index(id);
-    Ok(())
+    pm.reindex(id).map_err(err)
 }
 
 #[tauri::command]

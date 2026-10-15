@@ -7,11 +7,13 @@ import type {
   LlmApiFormat,
   ChineseScript,
   TranscribeAcceleratorSetting,
+  ModelUnloadTimeout,
   OrtAcceleratorSetting,
   VadBackend,
 } from "@/bindings";
 import { commands } from "@/bindings";
 import { toast } from "sonner";
+import { ok, toastError } from "@/lib/result";
 
 interface SettingsStore {
   settings: Settings | null;
@@ -133,8 +135,12 @@ const settingUpdaters: {
     commands.changeMeetingSensitivitySetting(
       value as "low" | "medium" | "high",
     ),
+  model_unload_timeout: (value) =>
+    commands.setModelUnloadTimeout(value as ModelUnloadTimeout),
   meeting_observer_interval_secs: (value) =>
     commands.changeMeetingObserverIntervalSetting(value as number),
+  meeting_max_line_secs: (value) =>
+    commands.changeMeetingMaxLineSetting(value as number),
   meeting_beep_enabled: (value) =>
     commands.changeMeetingBeepSetting(value as boolean),
   log_level: (value) => commands.setLogLevel(value as any),
@@ -210,11 +216,11 @@ export const useSettingsStore = create<SettingsStore>()(
           };
           set({ settings: normalizedSettings, isLoading: false });
         } else {
-          console.error("Failed to load settings:", result.error);
+          toastError("errors.settingsLoadFailed", result.error);
           set({ isLoading: false });
         }
       } catch (error) {
-        console.error("Failed to load settings:", error);
+        toastError("errors.settingsLoadFailed", error);
         set({ isLoading: false });
       }
     },
@@ -232,10 +238,11 @@ export const useSettingsStore = create<SettingsStore>()(
           ];
           set({ audioDevices: devicesWithDefault });
         } else {
+          toastError("errors.devicesLoadFailed", result.error);
           set({ audioDevices: [DEFAULT_AUDIO_DEVICE] });
         }
       } catch (error) {
-        console.error("Failed to load audio devices:", error);
+        toastError("errors.devicesLoadFailed", error);
         set({ audioDevices: [DEFAULT_AUDIO_DEVICE] });
       }
     },
@@ -253,10 +260,11 @@ export const useSettingsStore = create<SettingsStore>()(
           ];
           set({ outputDevices: devicesWithDefault });
         } else {
+          toastError("errors.devicesLoadFailed", result.error);
           set({ outputDevices: [DEFAULT_AUDIO_DEVICE] });
         }
       } catch (error) {
-        console.error("Failed to load output devices:", error);
+        toastError("errors.devicesLoadFailed", error);
         set({ outputDevices: [DEFAULT_AUDIO_DEVICE] });
       }
     },
@@ -264,9 +272,9 @@ export const useSettingsStore = create<SettingsStore>()(
     // Play a test sound
     playTestSound: async (soundType: "start" | "stop") => {
       try {
-        await commands.playTestSound(soundType);
+        await ok(commands.playTestSound(soundType));
       } catch (error) {
-        console.error(`Failed to play test sound (${soundType}):`, error);
+        toastError("errors.soundTestFailed", error);
       }
     },
 
@@ -297,15 +305,17 @@ export const useSettingsStore = create<SettingsStore>()(
 
         const updater = settingUpdaters[key];
         if (updater) {
-          await updater(value);
+          await ok(updater(value));
         } else if (key !== "bindings" && key !== "selected_model") {
           console.warn(`No handler for setting: ${String(key)}`);
         }
       } catch (error) {
-        console.error(`Failed to update setting ${String(key)}:`, error);
-        if (settings) {
-          set({ settings: { ...settings, [key]: originalValue } });
-        }
+        toastError("errors.settingSaveFailed", error);
+        set((state) => ({
+          settings: state.settings
+            ? { ...state.settings, [key]: originalValue }
+            : null,
+        }));
       } finally {
         setUpdating(updateKey, false);
       }
@@ -394,10 +404,10 @@ export const useSettingsStore = create<SettingsStore>()(
       setUpdating(updateKey, true);
 
       try {
-        await commands.resetBinding(id);
+        await ok(commands.resetBinding(id));
         await refreshSettings();
       } catch (error) {
-        console.error(`Failed to reset binding ${id}:`, error);
+        toastError("errors.settingSaveFailed", error);
       } finally {
         setUpdating(updateKey, false);
       }
@@ -424,10 +434,10 @@ export const useSettingsStore = create<SettingsStore>()(
       setLlmModelOptions(providerId, []);
 
       try {
-        await commands.setLlmProvider(providerId);
+        await ok(commands.setLlmProvider(providerId));
         await refreshSettings();
       } catch (error) {
-        console.error("Failed to set post-process provider:", error);
+        toastError("errors.settingSaveFailed", error);
         if (previousId !== null) {
           set((state) => ({
             settings: state.settings
@@ -453,18 +463,16 @@ export const useSettingsStore = create<SettingsStore>()(
 
       try {
         if (settingType === "base_url") {
-          await commands.changeLlmBaseUrlSetting(providerId, value);
+          await ok(commands.changeLlmBaseUrlSetting(providerId, value));
         } else if (settingType === "api_key") {
-          await commands.changeLlmApiKeySetting(providerId, value);
+          await ok(commands.changeLlmApiKeySetting(providerId, value));
         } else if (settingType === "model") {
-          await commands.changeLlmModelSetting(providerId, value);
+          await ok(commands.changeLlmModelSetting(providerId, value));
         }
         await refreshSettings();
       } catch (error) {
-        console.error(
-          `Failed to update post-process ${settingType.replace("_", " ")}:`,
-          error,
-        );
+        toastError("errors.settingSaveFailed", error);
+        await refreshSettings();
       } finally {
         setUpdating(updateKey, false);
       }
@@ -478,26 +486,12 @@ export const useSettingsStore = create<SettingsStore>()(
 
       try {
         // Persist the new base URL first.
-        const urlResult = await commands.changeLlmBaseUrlSetting(
-          providerId,
-          baseUrl,
-        );
-        if (urlResult.status === "error") {
-          console.error("Failed to persist base URL:", urlResult.error);
-          return;
-        }
+        await ok(commands.changeLlmBaseUrlSetting(providerId, baseUrl));
 
         // Reset the stored model since the previous value is almost certainly
         // invalid for the new endpoint (e.g. switching Custom from Groq to
         // Cerebras). Only proceed if the reset succeeds.
-        const modelResult = await commands.changeLlmModelSetting(
-          providerId,
-          "",
-        );
-        if (modelResult.status === "error") {
-          console.error("Failed to reset model setting:", modelResult.error);
-          return;
-        }
+        await ok(commands.changeLlmModelSetting(providerId, ""));
 
         // Clear cached model options only after both backend writes succeed.
         set((state) => ({
@@ -510,7 +504,8 @@ export const useSettingsStore = create<SettingsStore>()(
         // Single refresh after both backend writes.
         await refreshSettings();
       } catch (error) {
-        console.error("Failed to update post-process base URL:", error);
+        toastError("errors.settingSaveFailed", error);
+        await refreshSettings();
       } finally {
         setUpdating(updateKey, false);
       }
@@ -531,17 +526,11 @@ export const useSettingsStore = create<SettingsStore>()(
       setUpdating(updateKey, true);
 
       try {
-        const result = await commands.changeLlmApiFormatSetting(
-          providerId,
-          apiFormat,
-        );
-        if (result.status === "error") {
-          console.error("Failed to update API format:", result.error);
-          return;
-        }
+        await ok(commands.changeLlmApiFormatSetting(providerId, apiFormat));
         await refreshSettings();
       } catch (error) {
-        console.error("Failed to update post-process API format:", error);
+        toastError("errors.settingSaveFailed", error);
+        await refreshSettings();
       } finally {
         setUpdating(updateKey, false);
       }
@@ -574,13 +563,12 @@ export const useSettingsStore = create<SettingsStore>()(
         if (result.status === "ok") {
           setLlmModelOptions(providerId, result.data);
           return result.data;
-        } else {
-          console.error("Failed to fetch models:", result.error);
-          return [];
         }
+        toastError("errors.modelListFailed", result.error);
+        return [];
       } catch (error) {
-        console.error("Failed to fetch models:", error);
         // Don't cache empty array on error - let user retry
+        toastError("errors.modelListFailed", error);
         return [];
       } finally {
         setUpdating(updateKey, false);

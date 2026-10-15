@@ -11,6 +11,49 @@ import { ToggleSwitch } from "../../ui/ToggleSwitch";
 const MIN_INTERVAL = 10;
 const MAX_INTERVAL = 120;
 const DEFAULT_INTERVAL_SECS = 20;
+const MIN_LINE = 5;
+const MAX_LINE = 60;
+const DEFAULT_LINE_SECS = 30;
+
+/** A whole number of seconds, clamped to [min, max] and saved on blur. */
+const SecondsInput: React.FC<{
+  value: number;
+  min: number;
+  max: number;
+  disabled: boolean;
+  onCommit: (secs: number) => void;
+}> = ({ value, min, max, disabled, onCommit }) => {
+  const [draft, setDraft] = useState(String(value));
+  useEffect(() => setDraft(String(value)), [value]);
+
+  const commit = () => {
+    const n = Math.round(Number(draft));
+    if (!Number.isFinite(n) || draft.trim() === "") {
+      setDraft(String(value));
+      return;
+    }
+    const clamped = Math.min(max, Math.max(min, n));
+    setDraft(String(clamped));
+    if (clamped !== value) onCommit(clamped);
+  };
+
+  return (
+    <Input
+      type="number"
+      variant="compact"
+      className="w-24"
+      min={min}
+      max={max}
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") e.currentTarget.blur();
+      }}
+      disabled={disabled}
+    />
+  );
+};
 
 /** When and how loudly the assistant speaks up during a meeting. */
 export const AssistantBehaviour: React.FC = () => {
@@ -19,26 +62,12 @@ export const AssistantBehaviour: React.FC = () => {
 
   const interval =
     getSetting("meeting_observer_interval_secs") ?? DEFAULT_INTERVAL_SECS;
-  const [draft, setDraft] = useState(String(interval));
   const enabled = getSetting("meeting_assistant_enabled") ?? false;
-  useEffect(() => setDraft(String(interval)), [interval]);
 
   const sensitivityOptions = (["low", "medium", "high"] as const).map((v) => ({
     value: v,
     label: t(`settings.meeting.sensitivity.${v}`),
   }));
-
-  const commitInterval = () => {
-    const n = Math.round(Number(draft));
-    if (!Number.isFinite(n) || draft.trim() === "") {
-      setDraft(String(interval));
-      return;
-    }
-    const clamped = Math.min(MAX_INTERVAL, Math.max(MIN_INTERVAL, n));
-    setDraft(String(clamped));
-    if (clamped !== interval)
-      updateSetting("meeting_observer_interval_secs", clamped);
-  };
 
   return (
     <SettingsGroup
@@ -75,19 +104,26 @@ export const AssistantBehaviour: React.FC = () => {
         descriptionMode="tooltip"
         grouped={true}
       >
-        <Input
-          type="number"
-          variant="compact"
-          className="w-24"
+        <SecondsInput
+          value={interval}
           min={MIN_INTERVAL}
           max={MAX_INTERVAL}
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={commitInterval}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") e.currentTarget.blur();
-          }}
           disabled={!enabled || isUpdating("meeting_observer_interval_secs")}
+          onCommit={(v) => updateSetting("meeting_observer_interval_secs", v)}
+        />
+      </SettingContainer>
+      <SettingContainer
+        title={t("settings.meeting.maxLine.label")}
+        description={t("settings.meeting.maxLine.description")}
+        descriptionMode="tooltip"
+        grouped={true}
+      >
+        <SecondsInput
+          value={getSetting("meeting_max_line_secs") ?? DEFAULT_LINE_SECS}
+          min={MIN_LINE}
+          max={MAX_LINE}
+          disabled={isUpdating("meeting_max_line_secs")}
+          onCommit={(v) => updateSetting("meeting_max_line_secs", v)}
         />
       </SettingContainer>
       <ToggleSwitch

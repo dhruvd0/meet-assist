@@ -4,7 +4,8 @@
 
 #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
 use crate::managers::audio::create_capture_vad;
-use crate::meeting::capture::{MeetingSink, Utterance};
+use crate::meeting::capture::{Echo, MeetingSink, Utterance};
+use crate::meeting::echo::EchoReference;
 use crate::meeting::resample::{FrameSlicer, MonoResampler};
 use crate::settings::AppSettings;
 #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
@@ -154,6 +155,7 @@ impl SystemCapture {
         settings: &AppSettings,
         app: &tauri::AppHandle,
         tx: mpsc::Sender<Utterance>,
+        reference: EchoReference,
     ) -> Result<Self> {
         use handy_cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 
@@ -190,7 +192,13 @@ impl SystemCapture {
         let frame = vad.frame_samples();
         let resampler = MonoResampler::new(cfg.sample_rate(), TARGET_RATE, cfg.channels())
             .context("create resampler")?;
-        let sink = MeetingSink::with_speaker(vad, tx, "them");
+        let sink = MeetingSink::with_speaker(
+            vad,
+            tx,
+            "them",
+            settings.meeting_max_line_secs,
+            Echo::Record(reference),
+        );
         let (frame_tx, frame_rx) = mpsc::sync_channel(FRAME_QUEUE);
         let dropped = Arc::new(AtomicU64::new(0));
         let failed = Arc::new(AtomicBool::new(false));
@@ -237,6 +245,7 @@ impl SystemCapture {
         settings: &AppSettings,
         app: &tauri::AppHandle,
         tx: mpsc::Sender<Utterance>,
+        reference: EchoReference,
     ) -> Result<Self> {
         use crate::managers::audio::microphone_config;
         use handy_cpal::traits::{DeviceTrait, HostTrait};
@@ -267,7 +276,13 @@ impl SystemCapture {
         })
         .map_err(|e| anyhow::anyhow!("open monitor source: {e}"))?;
         recorder
-            .start(MeetingSink::with_speaker(vad, tx, "them"))
+            .start(MeetingSink::with_speaker(
+                vad,
+                tx,
+                "them",
+                settings.meeting_max_line_secs,
+                Echo::Record(reference),
+            ))
             .map_err(|e| anyhow::anyhow!("start monitor source: {}", e.error))?;
         info!("system audio capture started on monitor {id}");
         Ok(Self { recorder, failed })
@@ -278,6 +293,7 @@ impl SystemCapture {
         _settings: &AppSettings,
         _app: &tauri::AppHandle,
         _tx: mpsc::Sender<Utterance>,
+        _reference: EchoReference,
     ) -> Result<Self> {
         Err(anyhow!(
             "system audio capture is not supported on this platform"

@@ -372,6 +372,9 @@ pub struct AppSettings {
     pub meeting_sensitivity: MeetingSensitivity,
     #[serde(default = "default_meeting_observer_interval_secs")]
     pub meeting_observer_interval_secs: u32,
+    /// Seconds of non-stop speech before the segmenter cuts a new line.
+    #[serde(default = "default_meeting_max_line_secs")]
+    pub meeting_max_line_secs: u32,
     #[serde(default = "default_meeting_beep_enabled")]
     pub meeting_beep_enabled: bool,
     #[serde(default = "default_app_language")]
@@ -499,6 +502,10 @@ fn default_meeting_observer_interval_secs() -> u32 {
     20
 }
 
+fn default_meeting_max_line_secs() -> u32 {
+    30
+}
+
 fn default_meeting_beep_enabled() -> bool {
     true
 }
@@ -513,8 +520,15 @@ fn default_show_tray_icon() -> bool {
     true
 }
 
+/// OpenRouter key shipped with the app, used while the user has not entered
+/// their own.
+pub const BUNDLED_OPENROUTER_API_KEY: &str =
+    "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";
+/// OpenRouter model used while the user has not picked one.
+pub const BUNDLED_OPENROUTER_MODEL: &str = "anthropic/claude-haiku-5.5";
+
 fn default_llm_provider_id() -> String {
-    "openai".to_string()
+    "openrouter".to_string()
 }
 
 fn default_llm_providers() -> Vec<LlmProvider> {
@@ -611,7 +625,14 @@ fn default_llm_api_keys() -> SecretMap {
 fn default_llm_models() -> HashMap<String, String> {
     default_llm_providers()
         .into_iter()
-        .map(|provider| (provider.id, String::new()))
+        .map(|provider| {
+            let model = if provider.id == "openrouter" {
+                BUNDLED_OPENROUTER_MODEL.to_string()
+            } else {
+                String::new()
+            };
+            (provider.id, model)
+        })
         .collect()
 }
 
@@ -751,6 +772,7 @@ pub fn get_default_settings() -> AppSettings {
         meeting_vision_enabled: default_meeting_vision_enabled(),
         meeting_sensitivity: MeetingSensitivity::default(),
         meeting_observer_interval_secs: default_meeting_observer_interval_secs(),
+        meeting_max_line_secs: default_meeting_max_line_secs(),
         meeting_beep_enabled: default_meeting_beep_enabled(),
         app_language: default_app_language(),
         theme: default_theme(),
@@ -780,15 +802,36 @@ impl AppSettings {
         self.llm_provider_by_id(&self.llm_provider_id)
     }
 
+    /// The selected model; on OpenRouter with none picked, the bundled one.
     pub fn llm_model(&self) -> Option<String> {
         let provider = self.llm_provider()?;
-        self.llm_models.get(&provider.id).cloned()
+        let model = self.llm_models.get(&provider.id).cloned();
+        if provider.id == "openrouter" && model.as_deref().is_none_or(|m| m.trim().is_empty()) {
+            return Some(BUNDLED_OPENROUTER_MODEL.to_string());
+        }
+        model
     }
 
+    /// The selected provider's key; on OpenRouter with none entered, the
+    /// bundled one.
     pub fn llm_api_key(&self) -> String {
-        self.llm_provider()
-            .and_then(|p| self.llm_api_keys.get(&p.id).cloned())
-            .unwrap_or_default()
+        let Some(provider) = self.llm_provider() else {
+            return String::new();
+        };
+        self.llm_provider_api_key(&provider.id)
+    }
+
+    /// A provider's stored key, or the bundled key for an empty OpenRouter one.
+    pub fn llm_provider_api_key(&self, provider_id: &str) -> String {
+        let key = self
+            .llm_api_keys
+            .get(provider_id)
+            .cloned()
+            .unwrap_or_default();
+        if provider_id == "openrouter" && key.trim().is_empty() {
+            return BUNDLED_OPENROUTER_API_KEY.to_string();
+        }
+        key
     }
 
     pub fn llm_provider_by_id(&self, provider_id: &str) -> Option<&LlmProvider> {

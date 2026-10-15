@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   AudioLines,
@@ -70,7 +70,7 @@ interface ModelCardProps {
   className?: string;
   onSelect: (modelId: string) => void;
   onDownload?: (modelId: string) => void;
-  onDelete?: (modelId: string) => void;
+  onDelete?: (modelId: string) => void | Promise<void>;
   onCancel?: (modelId: string) => void;
   downloadProgress?: number;
   downloadSpeed?: number; // MB/s
@@ -139,9 +139,15 @@ const ModelCard: React.FC<ModelCardProps> = ({
     }
   };
 
-  const handleDelete = (e: React.MouseEvent) => {
+  const [deleting, setDeleting] = useState(false);
+  const handleDelete = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    onDelete?.(model.id);
+    setDeleting(true);
+    try {
+      await onDelete?.(model.id);
+    } finally {
+      setDeleting(false);
+    }
   };
 
   return (
@@ -279,10 +285,15 @@ const ModelCard: React.FC<ModelCardProps> = ({
             variant="ghost"
             size="sm"
             onClick={handleDelete}
+            disabled={deleting}
             title={t("modelSelector.deleteModel", { modelName: displayName })}
             className="flex items-center gap-1.5 text-accent/85 hover:text-accent hover:bg-surface-hover"
           >
-            <Trash2 className="w-3.5 h-3.5" />
+            {deleting ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Trash2 className="w-3.5 h-3.5" />
+            )}
             <span>{t("common.delete")}</span>
           </Button>
         )}

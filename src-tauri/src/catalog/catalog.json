@@ -36,7 +36,7 @@
       ],
       "default_quant": "Q8_0",
       "recommended": true,
-      "recommended_rank": 1
+      "recommended_rank": 2
     },
     {
       "id": "handy-computer/nemotron-3.5-asr-streaming-0.6b-gguf",
@@ -69,7 +69,7 @@
       ],
       "default_quant": "Q8_0",
       "recommended": true,
-      "recommended_rank": 2
+      "recommended_rank": 1
     },
     {
       "id": "handy-computer/canary-180m-flash-gguf",

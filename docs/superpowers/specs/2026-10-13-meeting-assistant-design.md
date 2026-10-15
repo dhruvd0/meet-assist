@@ -184,7 +184,7 @@ Observer system prompt (fixed in v1):
 - Sensitivity: low adds "only loop and explicit stuck"; high adds "offer ideas freely".
 - Message order: project brief, previous meeting's rolling summary, meeting context, recent interventions (do not repeat), last ~3 minutes of transcript. Instruction: use tools to check sources before asserting project facts; prefer silence over an unverified claim.
 
-Session summary prompt: decisions, open questions, action items, three-line recap. Rolling summary prompt: merge previous rolling summary with new session summary, cap ~300 words.
+Session summary prompt: decisions, open questions, action items, three-line recap, and an efficiency report in the same call: a 0–100 score (share of the talk that moved things forward), a one-line verdict, and issues worst first, each a kind (`circle`, `argument`, `tangent`, `repetition`), a 2–4 word topic, a one-sentence note, and rough minutes from the line timestamps. The report is judged by the kind of conversation (a debate is not inefficient for lacking decisions). It is stored inside the session summary JSON; a malformed report is dropped without losing the summary, and summaries written before it simply have none. Rolling summary prompt: merge previous rolling summary with new session summary, cap ~300 words.
 
 ## 6. Testing
 
