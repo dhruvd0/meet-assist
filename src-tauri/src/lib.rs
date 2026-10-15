@@ -740,6 +740,7 @@ pub fn run(cli_args: CliArgs) {
             meeting::summary::SessionSummaryPayload,
             meeting::observer::InterventionPayload,
             meeting::observer::ObserverStatusPayload,
+            meeting::filing::MeetingFiledPayload,
             commands::meeting::OpenMeetingPayload,
         ]);
 
