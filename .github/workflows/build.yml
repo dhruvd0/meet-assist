@@ -543,7 +543,9 @@ jobs:
           releaseName: ${{ inputs.release-id && format('v{0}', steps.get-version.outputs.version) || '' }}
           releaseId: ${{ inputs.release-id }}
           assetNamePattern: ${{ steps.patch-release-name.outputs.platform }}
-          args: ${{ inputs.build-args }}
+          # Unsigned builds drop the Windows signCommand (Azure Trusted Signing)
+          # and updater artifacts, which both need signing secrets.
+          args: ${{ inputs.build-args }} ${{ !inputs.sign-binaries && '--config ''{"bundle":{"createUpdaterArtifacts":false,"windows":{"signCommand":null}}}''' || '' }}
 
       # tauri-action uploads release assets before returning. All AppImage
       # filtering therefore happens inside linuxdeploy above; this verifies the

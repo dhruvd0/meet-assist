@@ -1,6 +1,14 @@
 name: "Release"
 
-on: workflow_dispatch
+# Publishes a GitHub Release with macOS (Apple Silicon, Intel) and Windows
+# installers. Push a tag matching the version in tauri.conf.json (for example
+# `git tag v0.9.8 && git push origin v0.9.8`), or run it by hand.
+# Builds are unsigned: this fork has no Apple or Azure signing secrets.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
 
 jobs:
   create-release:
@@ -20,6 +28,10 @@ jobs:
         run: |
           VERSION=$(grep -o '"version": "[^"]*"' src-tauri/tauri.conf.json | cut -d'"' -f4)
           echo "Application version from tauri.conf.json: $VERSION"
+          if [[ "$GITHUB_REF_TYPE" == "tag" && "$GITHUB_REF_NAME" != "v$VERSION" ]]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match tauri.conf.json version v$VERSION"
+            exit 1
+          fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Create Draft Release
@@ -31,10 +43,21 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               tag_name: `v${{ steps.get-version.outputs.version }}`,
-              name: `v${{ steps.get-version.outputs.version }}`,
+              target_commitish: context.sha,
+              name: `Meet Assist v${{ steps.get-version.outputs.version }}`,
               draft: true,
               prerelease: false,
-              generate_release_notes: true
+              generate_release_notes: true,
+              body: [
+                "## Download",
+                "- **macOS (Apple Silicon):** `*_aarch64.dmg`",
+                "- **macOS (Intel):** `*_x64.dmg`",
+                "- **Windows:** `*_x64-setup.exe` (or `.msi`)",
+                "",
+                "These builds are not signed.",
+                "- macOS: after dragging the app to Applications, run `xattr -dr com.apple.quarantine \"/Applications/Meet Assist.app\"` once, or macOS reports it as damaged.",
+                "- Windows: SmartScreen warns on first launch; choose **More info → Run anyway**.",
+              ].join("\n"),
             })
             return data.id
 
@@ -46,38 +69,43 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: "macos-26" # for Arm based macs (M1 and above). Uses macOS 26 for Apple Intelligence SDK.
+          - platform: "macos-26" # Apple Silicon. macOS 26 for the Apple Intelligence SDK.
             args: "--target aarch64-apple-darwin"
             target: "aarch64-apple-darwin"
-          - platform: "macos-latest" # for Intel based macs.
+          - platform: "macos-latest" # Intel
             args: "--target x86_64-apple-darwin"
             target: "x86_64-apple-darwin"
-          - platform: "ubuntu-22.04" # Build .deb on 22.04
-            args: "--bundles deb"
-            target: "x86_64-unknown-linux-gnu"
-          - platform: "ubuntu-24.04" # Build AppImage and RPM on 24.04
-            args: "--bundles appimage,rpm"
-            target: "x86_64-unknown-linux-gnu"
-          - platform: "ubuntu-24.04-arm" # Build for ARM64 Linux
-            args: "--bundles appimage,deb,rpm"
-            target: "aarch64-unknown-linux-gnu"
           - platform: "windows-latest"
             args: ""
             target: "x86_64-pc-windows-msvc"
-          - platform: "windows-11-arm" # for ARM64 Windows runner
-            args: "--target aarch64-pc-windows-msvc"
-            target: "aarch64-pc-windows-msvc"
 
     uses: ./.github/workflows/build.yml
     with:
       platform: ${{ matrix.platform }}
       target: ${{ matrix.target }}
       build-args: ${{ matrix.args }}
-      sign-binaries: true
-      asset-prefix: "handy"
+      sign-binaries: false
+      asset-prefix: "meet-assist"
       upload-artifacts: false
       release-id: ${{ needs.create-release.outputs.release-id }}
       # Releases always build from scratch — never restore the Rust cache, so a
       # stale cached native lib can never be linked into a shipped artifact.
       no-cache: true
     secrets: inherit
+
+  publish-release:
+    permissions:
+      contents: write
+    needs: [create-release, publish-tauri]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish release
+        uses: actions/github-script@v9
+        with:
+          script: |
+            await github.rest.repos.updateRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: ${{ needs.create-release.outputs.release-id }},
+              draft: false,
+            })
