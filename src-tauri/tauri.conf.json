@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Meet Assist",
-  "version": "0.9.8",
+  "version": "0.9.9",
   "identifier": "com.meetassist.app",
   "build": {
     "beforeDevCommand": "bun run dev",
@@ -79,7 +79,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEJBQjcyMDk1MjA2NjAxRjkKUldUNUFXWWdsU0MzdXRRZi8zYzhqV2FaNUVDbDd2Rk5VM1IvWWowVXdmRFNKQ1BrMXF5RFFsLy8K",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDEzMUI0QjRDMDBERjgwNzEKUldSeGdOOEFURXNiRXdna2tJcUF6dktPdmhMTFV0ZkNJTkVnbGpyS2N1Vko5R2pVSE9uVHlKeWQK",
       "endpoints": [
         "https://github.com/dhruvd0/meet-assist/releases/latest/download/latest.json"
       ]

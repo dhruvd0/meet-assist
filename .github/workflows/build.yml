@@ -526,8 +526,8 @@ jobs:
           AZURE_CLIENT_ID: ${{ inputs.sign-binaries && secrets.AZURE_CLIENT_ID || '' }}
           AZURE_CLIENT_SECRET: ${{ inputs.sign-binaries && secrets.AZURE_CLIENT_SECRET || '' }}
           AZURE_TENANT_ID: ${{ inputs.sign-binaries && secrets.AZURE_TENANT_ID || '' }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ inputs.sign-binaries && secrets.TAURI_SIGNING_PRIVATE_KEY || '' }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ inputs.sign-binaries && secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD || '' }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           # The Vulkan loader and Wayland client library must come from the host
           # graphics stack. Bundling Ubuntu's copies ahead of the system libraries can
           # prevent a newer distro's Vulkan ICD or Mesa stack from loading.
@@ -543,9 +543,13 @@ jobs:
           releaseName: ${{ inputs.release-id && format('v{0}', steps.get-version.outputs.version) || '' }}
           releaseId: ${{ inputs.release-id }}
           assetNamePattern: ${{ steps.patch-release-name.outputs.platform }}
-          # Unsigned builds drop the Windows signCommand (Azure Trusted Signing)
-          # and updater artifacts, which both need signing secrets.
-          args: ${{ inputs.build-args }} ${{ !inputs.sign-binaries && '--config ''{"bundle":{"createUpdaterArtifacts":false,"windows":{"signCommand":null}}}''' || '' }}
+          # Unsigned builds drop the Windows signCommand (Azure Trusted Signing).
+          # Updater artifacts are signed with TAURI_SIGNING_PRIVATE_KEY on its
+          # own, independent of platform signing; without the key, skip them.
+          args: >-
+            ${{ inputs.build-args }}
+            ${{ !inputs.sign-binaries && '--config ''{"bundle":{"windows":{"signCommand":null}}}''' || '' }}
+            ${{ secrets.TAURI_SIGNING_PRIVATE_KEY == '' && '--config ''{"bundle":{"createUpdaterArtifacts":false}}''' || '' }}
 
       # tauri-action uploads release assets before returning. All AppImage
       # filtering therefore happens inside linuxdeploy above; this verifies the
