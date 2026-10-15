@@ -848,6 +848,29 @@ async deleteMeeting(id: number) : Promise<Result<null, string>> {
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * The user's choice of project for a meeting (`None` = Unfiled).
+ */
+async moveMeeting(meetingId: number, projectId: number | null) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("move_meeting", { meetingId, projectId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Undo from the filed card: back to Unfiled, and delete the project the
+ * assistant created if nobody has used it yet.
+ */
+async undoFiling(meetingId: number, createdProjectId: number | null, createdBrief: string | null) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("undo_filing", { meetingId, createdProjectId, createdBrief }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async listInterventions(meetingId: number) : Promise<Result<Intervention[], string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("list_interventions", { meetingId }) };
@@ -898,6 +921,7 @@ async summarizeSession(sessionId: number) : Promise<Result<null, string>> {
 export const events = __makeEvents__<{
 interventionPayload: InterventionPayload,
 meetingCaptureWarningPayload: MeetingCaptureWarningPayload,
+meetingFiledPayload: MeetingFiledPayload,
 meetingStatePayload: MeetingStatePayload,
 observerStatusPayload: ObserverStatusPayload,
 openMeetingPayload: OpenMeetingPayload,
@@ -907,6 +931,7 @@ transcriptLinePayload: TranscriptLinePayload
 }>({
 interventionPayload: "intervention-payload",
 meetingCaptureWarningPayload: "meeting-capture-warning-payload",
+meetingFiledPayload: "meeting-filed-payload",
 meetingStatePayload: "meeting-state-payload",
 observerStatusPayload: "observer-status-payload",
 openMeetingPayload: "open-meeting-payload",
@@ -1027,7 +1052,11 @@ export type LlmApiFormat =
 "anthropic"
 export type LlmProvider = { id: string; label: string; base_url: string; allow_base_url_edit?: boolean; models_endpoint?: string | null; supports_structured_output?: boolean; api_format?: LlmApiFormat }
 export type LogLevel = "trace" | "debug" | "info" | "warn" | "error"
-export type Meeting = { id: number; project_id: number | null; title: string; created_at: number; updated_at: number; status: MeetingStatus; context: string; rolling_summary: string | null }
+export type Meeting = { id: number; project_id: number | null; title: string; created_at: number; updated_at: number; status: MeetingStatus; context: string; rolling_summary: string | null; 
+/**
+ * Who chose the project: `None` (nobody yet), `"ai"`, or `"user"`.
+ */
+filed_by: string | null }
 /**
  * Emitted once per capture run when a capture source fails: the
  * microphone stops delivering audio, or system audio cannot start.
@@ -1038,6 +1067,23 @@ export type MeetingCaptureWarningPayload = { meeting_id: number;
  */
 source: string; message: string }
 export type MeetingDetail = { meeting: Meeting; sessions: Session[]; lines: TranscriptLine[]; interventions: Intervention[] }
+/**
+ * A meeting's project changed, by the assistant or the user.
+ */
+export type MeetingFiledPayload = { meeting_id: number; project_id: number | null; project_title: string | null; meeting_title: string; 
+/**
+ * `"ai"` or `"user"`.
+ */
+by: string; 
+/**
+ * The assistant created `project_id` in this run (Undo may delete it).
+ */
+created_project: boolean; 
+/**
+ * Brief the assistant wrote for a created project; Undo deletes the
+ * project only while its brief still equals this.
+ */
+created_brief: string | null }
 /**
  * How readily the meeting observer raises interventions.
  */
