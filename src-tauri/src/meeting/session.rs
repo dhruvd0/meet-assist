@@ -7,7 +7,7 @@ use crate::meeting::store::{Meeting, MeetingStatus, ProjectStore, TranscriptLine
 use crate::meeting::summary::{run_summary_job, SessionSummaryPayload, Summarizer};
 use crate::meeting::system_capture::SystemCapture;
 use anyhow::{anyhow, Result};
-use log::{error, info, warn};
+use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -19,6 +19,29 @@ use tauri_specta::Event;
 
 /// How long pause/end wait for the transcriber to finish queued utterances.
 const WORKER_DRAIN_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// On speakers, the mic also hears the call, so the same speech arrives on
+/// both channels. Lines this close in time are compared for echo.
+const ECHO_WINDOW_MS: i64 = 15_000;
+/// Shorter lines ("Yeah.") are never treated as echo.
+const ECHO_MIN_WORDS: usize = 3;
+/// Share of the shorter line's words that must appear in the other line.
+const ECHO_OVERLAP: f64 = 0.8;
+
+fn words(text: &str) -> std::collections::HashSet<String> {
+    text.split(|c: char| !c.is_alphanumeric())
+        .filter(|w| !w.is_empty())
+        .map(str::to_lowercase)
+        .collect()
+}
+
+/// Whether `a` and `b` are the same speech transcribed twice: most of the
+/// shorter line's words appear in the longer one.
+fn is_echo(a: &str, b: &str) -> bool {
+    let (a, b) = (words(a), words(b));
+    let shorter = a.len().min(b.len());
+    shorter >= ECHO_MIN_WORDS && a.intersection(&b).count() as f64 >= ECHO_OVERLAP * shorter as f64
+}
 
 pub trait Transcriber: Send + Sync {
     fn transcribe(&self, samples: Vec<f32>) -> Result<String>;
@@ -533,6 +556,18 @@ impl MeetingManager {
         };
         let text = text.trim();
         if text.is_empty() {
+            return Ok(None);
+        }
+        let nearby = store.session_lines_between(
+            session_id,
+            started_at - ECHO_WINDOW_MS,
+            started_at + ECHO_WINDOW_MS,
+        )?;
+        if nearby
+            .iter()
+            .any(|l| l.speaker != speaker && is_echo(text, &l.text))
+        {
+            debug!("dropping {speaker} line echoed from the other channel: {text}");
             return Ok(None);
         }
         Ok(Some(

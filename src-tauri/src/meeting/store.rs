@@ -1044,6 +1044,22 @@ impl ProjectStore {
         Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
     }
 
+    /// Lines of a session that started within `[from_ts, to_ts]`.
+    pub fn session_lines_between(
+        &self,
+        session_id: i64,
+        from_ts: i64,
+        to_ts: i64,
+    ) -> Result<Vec<TranscriptLine>> {
+        let conn = self.conn()?;
+        let mut stmt = conn.prepare(
+            "SELECT id, session_id, ts, speaker, text FROM transcript_lines
+             WHERE session_id = ?1 AND ts BETWEEN ?2 AND ?3 ORDER BY ts ASC, id ASC",
+        )?;
+        let rows = stmt.query_map(params![session_id, from_ts, to_ts], Self::map_line)?;
+        Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+    }
+
     /// Ended sessions with no summary yet and at least one line.
     pub fn sessions_without_summary(&self, meeting_id: i64) -> Result<Vec<Session>> {
         let conn = self.conn()?;

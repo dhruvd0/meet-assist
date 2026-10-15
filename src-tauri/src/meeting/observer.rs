@@ -17,15 +17,18 @@ use std::sync::Arc;
 use tauri::AppHandle;
 use tauri_specta::Event;
 
-pub const COOLDOWN_MS: i64 = 60_000;
+/// Minimum gap between any two interventions.
+pub const COOLDOWN_MS: i64 = 180_000;
+/// Minimum gap between two interventions of the same kind.
+pub const SAME_KIND_COOLDOWN_MS: i64 = 600_000;
 pub const WINDOW_MS: i64 = 180_000;
 pub const MAX_TOOL_CALLS: usize = 5;
-pub const DEDUPE_RECENT: usize = 3;
+pub const DEDUPE_RECENT: usize = 5;
 /// Max characters of the meeting's context pasted into the prompt; the model
 /// can read sources and the transcript through tools for more.
 pub const CONTEXT_MAX_CHARS: usize = 4096;
 /// Max characters of an intervention card's text.
-pub const CARD_TEXT_MAX_CHARS: usize = 280;
+pub const CARD_TEXT_MAX_CHARS: usize = 100;
 /// Consecutive judge failures after which the observer slows down.
 pub const BACKOFF_AFTER_FAILURES: u32 = 5;
 /// Interval multiplier while backing off.
@@ -245,7 +248,7 @@ pub fn build_prompt(
             "Sensitivity MEDIUM: intervene on loops, stuck moments, and clearly missing facts."
         }
         MeetingSensitivity::High => {
-            "Sensitivity HIGH: also offer ideas freely when an obvious alternative is untried."
+            "Sensitivity HIGH: also offer an idea when a specific, concrete alternative is clearly untried."
         }
     };
     let tools_rule = if tools_available {
@@ -254,12 +257,18 @@ pub fn build_prompt(
         "No tools are available this turn. Do not assert project facts you cannot see in the prompt."
     };
     let system = format!(
-        "You are a silent meeting copilot for one participant. You read their live transcript and answer ONE question: should you speak up right now? Silence is the default answer.\n\
+        "You are a silent meeting copilot for one participant. You read their live transcript and answer ONE question: should you speak up right now? Silence is the default answer; most checks end in silence.\n\
          Speakers: `me` is the user you assist; `them` is everyone else on the call.\n\
-         Signals: the same point restated three or more times without a decision (kind \"loop\"); a long pause or someone saying they do not know how to proceed (kind \"stuck\"); a factual question nobody answers (kind \"info\"); the discussion converging while an obvious alternative is untried (kind \"idea\").\n\
+         The transcript is raw speech-to-text: it has fragments, misheard words, mixed languages (for example Hindi and English), and the same sentence sometimes appears twice. None of that is a reason to speak, and never comment on the conversation being unclear.\n\
+         Signals:\n\
+         - kind \"loop\": the same open question comes back in at least two separate exchanges at least two minutes apart, still without a decision. Repeated or echoed lines are not a loop.\n\
+         - kind \"stuck\": someone says they do not know how to proceed, and nobody offers a way forward.\n\
+         - kind \"info\": a factual question nobody answers that you can answer.\n\
+         - kind \"idea\": the discussion is converging while a specific alternative is clearly untried.\n\
          {sensitivity_rule}\n{tools_rule}\n\
+         Never give generic process advice (summarize, document, align, clarify, take notes, ask for feedback). Only speak about a concrete point from this meeting.\n\
          Answer with JSON only, exactly this shape: {{\"intervene\": boolean, \"kind\": \"loop\"|\"stuck\"|\"info\"|\"idea\"|null, \"text\": string|null, \"reason\": string}}. \
-         \"text\" is one to three sentences addressed to the participant, or null. Never repeat a recent intervention."
+         \"text\" is one short line of at most 12 words naming the concrete point, like a note passed under the table (shape: \"<the open point> still undecided — <one concrete next step>?\"), or null. Never repeat a recent intervention."
     );
     let mut user = String::new();
     user.push_str("## Project brief\n");
@@ -347,6 +356,12 @@ pub fn should_emit(
         return false;
     };
     if now_ms - state.last_intervention_ts < COOLDOWN_MS {
+        return false;
+    }
+    if recent
+        .iter()
+        .any(|i| i.kind == kind && now_ms - i.ts < SAME_KIND_COOLDOWN_MS)
+    {
         return false;
     }
     let norm = text.to_lowercase();
