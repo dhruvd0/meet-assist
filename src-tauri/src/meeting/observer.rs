@@ -522,6 +522,11 @@ pub fn spawn_observer(
                 if ready != Readiness::Ready {
                     continue;
                 }
+                if let Some(mid) = st.meeting_id {
+                    // Files the meeting first, so this tick's judge already
+                    // sees the project's brief and sources.
+                    mm.maybe_file_live(mid);
+                }
                 let now = chrono::Utc::now().timestamp_millis();
                 match tick(&store, judge.as_ref(), &mm, &settings, &mut state, now) {
                     Ok(Some(iv)) => {
