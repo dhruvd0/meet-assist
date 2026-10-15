@@ -725,6 +725,8 @@ pub fn run(cli_args: CliArgs) {
             commands::meeting::update_meeting_title,
             commands::meeting::update_meeting_context,
             commands::meeting::delete_meeting,
+            commands::meeting::move_meeting,
+            commands::meeting::undo_filing,
             commands::meeting::list_interventions,
             commands::meeting::dismiss_intervention,
             commands::meeting::hide_intervention_window,
@@ -740,6 +742,7 @@ pub fn run(cli_args: CliArgs) {
             meeting::summary::SessionSummaryPayload,
             meeting::observer::InterventionPayload,
             meeting::observer::ObserverStatusPayload,
+            meeting::filing::MeetingFiledPayload,
             commands::meeting::OpenMeetingPayload,
         ]);
 

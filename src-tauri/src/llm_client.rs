@@ -568,6 +568,29 @@ pub fn create_tool_client(
     create_client(provider, api_key)
 }
 
+/// One reusable tool-loop HTTP client, rebuilt when the provider, base URL,
+/// or API key changes.
+#[derive(Default)]
+pub struct ToolClientCache(std::sync::Mutex<Option<(String, reqwest::Client)>>);
+
+impl ToolClientCache {
+    pub fn get(&self, provider: &LlmProvider, api_key: &str) -> Result<reqwest::Client, String> {
+        use std::hash::{Hash, Hasher};
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        api_key.hash(&mut h);
+        let key = format!("{}|{}|{:x}", provider.id, provider.base_url, h.finish());
+        let mut slot = self.0.lock().unwrap_or_else(|p| p.into_inner());
+        if let Some((k, c)) = slot.as_ref() {
+            if *k == key {
+                return Ok(c.clone());
+            }
+        }
+        let c = create_tool_client(provider, api_key)?;
+        *slot = Some((key, c.clone()));
+        Ok(c)
+    }
+}
+
 /// `send_with_tools` over a caller-owned client (built by `create_tool_client`
 /// with the provider's auth headers), so connections are reused across calls.
 #[allow(clippy::too_many_arguments)] // mirrors the request shape; a params struct adds no clarity

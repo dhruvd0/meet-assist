@@ -148,6 +148,20 @@
       "empty": "No nudges yet.",
       "dismissed": "Dismissed"
     },
+    "filing": {
+      "project": "Project",
+      "unfiled": "Unfiled",
+      "byAssistant": "Filed by assistant",
+      "pending": "Assistant will file this soon",
+      "pickProject": "Unfiled · pick a project",
+      "card": {
+        "title": "Filed by assistant",
+        "filedInto": "Filed into {{project}} as “{{title}}”",
+        "created": "Created {{project}} and filed “{{title}}”",
+        "change": "Change",
+        "undo": "Undo"
+      }
+    },
     "observer": {
       "toolsUnavailable": "This provider does not support tools; the assistant answers from the transcript only.",
       "failing": "The assistant has failed {{count}} times in a row. Check the provider settings.",

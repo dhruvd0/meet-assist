@@ -144,8 +144,18 @@ fn card_payload(meeting_id: i64, iv: &Intervention) -> serde_json::Value {
 
 /// Shows the card for `iv` (from meeting `meeting_id`) without taking focus.
 pub fn show(app: &AppHandle, meeting_id: i64, iv: &Intervention) {
+    present(app, "intervention:show", card_payload(meeting_id, iv));
+}
+
+/// Shows the "filed by assistant" card without taking focus.
+pub fn show_filed(app: &AppHandle, payload: &crate::meeting::filing::MeetingFiledPayload) {
+    let v = serde_json::to_value(payload).unwrap_or_else(|_| serde_json::json!({}));
+    present(app, "intervention:filed", v);
+}
+
+/// Positions the card, sends it `event` with `payload`, and shows it.
+fn present(app: &AppHandle, event: &'static str, payload: serde_json::Value) {
     let handle = app.clone();
-    let iv = card_payload(meeting_id, iv);
     INTERVENTION_GENERATION.fetch_add(1, Ordering::SeqCst);
     let _ = app.run_on_main_thread(move || {
         let Some(window) = handle.get_webview_window(LABEL) else {
@@ -153,7 +163,7 @@ pub fn show(app: &AppHandle, meeting_id: i64, iv: &Intervention) {
             return;
         };
         position_top_right(&handle, &window);
-        let _ = window.emit("intervention:show", &iv);
+        let _ = window.emit(event, &payload);
         #[cfg(target_os = "macos")]
         match handle.get_webview_panel(LABEL) {
             Ok(panel) => panel.show(),

@@ -1,3 +1,4 @@
+use crate::meeting::filing::MeetingFiledPayload;
 use crate::meeting::session::{MeetingManager, MeetingStatePayload};
 use crate::meeting::store::{Intervention, Meeting, MeetingDetail};
 use serde::{Deserialize, Serialize};
@@ -86,6 +87,73 @@ pub fn delete_meeting(mm: Mm<'_>, id: i64) -> Result<(), String> {
         return Err("End the meeting before deleting it".into());
     }
     mm.store().delete_meeting(id).map_err(err)
+}
+
+/// The user's choice of project for a meeting (`None` = Unfiled).
+#[tauri::command]
+#[specta::specta]
+pub fn move_meeting(
+    app: tauri::AppHandle,
+    mm: Mm<'_>,
+    meeting_id: i64,
+    project_id: Option<i64>,
+) -> Result<(), String> {
+    mm.store()
+        .move_meeting(meeting_id, project_id)
+        .map_err(err)?;
+    mm.set_active_project(meeting_id, project_id);
+    emit_user_filed(&app, &mm, meeting_id, project_id);
+    Ok(())
+}
+
+/// Undo from the filed card: back to Unfiled, and delete the project the
+/// assistant created if nobody has used it yet.
+#[tauri::command]
+#[specta::specta]
+pub fn undo_filing(
+    app: tauri::AppHandle,
+    mm: Mm<'_>,
+    meeting_id: i64,
+    created_project_id: Option<i64>,
+    created_brief: Option<String>,
+) -> Result<(), String> {
+    mm.store()
+        .undo_filing(meeting_id, created_project_id, created_brief.as_deref())
+        .map_err(err)?;
+    mm.set_active_project(meeting_id, None);
+    emit_user_filed(&app, &mm, meeting_id, None);
+    crate::intervention::hide(&app);
+    Ok(())
+}
+
+fn emit_user_filed(
+    app: &tauri::AppHandle,
+    mm: &MeetingManager,
+    meeting_id: i64,
+    project_id: Option<i64>,
+) {
+    let project_title = project_id
+        .and_then(|p| mm.store().get_project(p).ok().flatten())
+        .map(|p| p.title);
+    let meeting_title = mm
+        .store()
+        .get_meeting(meeting_id)
+        .ok()
+        .flatten()
+        .map(|m| m.title)
+        .unwrap_or_default();
+    let payload = MeetingFiledPayload {
+        meeting_id,
+        project_id,
+        project_title,
+        meeting_title,
+        by: crate::meeting::store::FILED_BY_USER.into(),
+        created_project: false,
+        created_brief: None,
+    };
+    if let Err(e) = payload.emit(app) {
+        log::warn!("emit meeting filed: {e}");
+    }
 }
 
 #[tauri::command]

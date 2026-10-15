@@ -100,7 +100,7 @@ Meet Assist is a cross-platform, meeting-only desktop app built with Tauri 2.x (
 
 ### Meeting Subsystem
 
-Built; see `docs/ARCHITECTURE.md` for the full table. Backend code lives under `src-tauri/src/meeting/`: `mod.rs`, `store.rs`, `chunk.rs`, `indexer.rs`, `manager.rs` (projects, sources, vision digests via `Describer`), `capture.rs` (mic capture, `MeetingSink`), `system_capture.rs` and `resample.rs` (system audio loopback tagged `them`), `segment.rs`, `session.rs` (`MeetingManager`, `CombinedCapture`), `toggle.rs` (`toggle_meeting`, the one entry point for shortcut, tray, CLI, and SIGUSR2), `observer.rs`, `tools.rs`, and `summary.rs` (session and rolling summaries). Commands are in `commands/project.rs` and `commands/meeting.rs`; the floating card is `intervention.rs`. Frontend code lives under `src/components/projects/`, `src/components/meetings/`, `src/components/settings/meeting/`, `src/components/onboarding/AssistantOnboarding.tsx`, `src/stores/projectStore.ts`, `src/stores/meetingStore.ts`, and the separate window entry `src/intervention/`. Reuse `TranscriptionManager`, `CaptureVad`, `llm_client`, `audio_feedback`, and `components/ui`. Do not add a second LLM client, a second VAD, or new UI primitives. Keep the existing design language.
+Built; see `docs/ARCHITECTURE.md` for the full table. Backend code lives under `src-tauri/src/meeting/`: `mod.rs`, `store.rs`, `chunk.rs`, `indexer.rs`, `manager.rs` (projects, sources, vision digests via `Describer`), `capture.rs` (mic capture, `MeetingSink`), `system_capture.rs` and `resample.rs` (system audio loopback tagged `them`), `segment.rs`, `session.rs` (`MeetingManager`, `CombinedCapture`), `toggle.rs` (`toggle_meeting`, the one entry point for shortcut, tray, CLI, and SIGUSR2), `filing.rs` (assistant files unfiled meetings into projects), `observer.rs`, `tools.rs`, and `summary.rs` (session and rolling summaries). Commands are in `commands/project.rs` and `commands/meeting.rs`; the floating card is `intervention.rs`. Frontend code lives under `src/components/projects/`, `src/components/meetings/`, `src/components/settings/meeting/`, `src/components/onboarding/AssistantOnboarding.tsx`, `src/stores/projectStore.ts`, `src/stores/meetingStore.ts`, and the separate window entry `src/intervention/`. Reuse `TranscriptionManager`, `CaptureVad`, `llm_client`, `audio_feedback`, and `components/ui`. Do not add a second LLM client, a second VAD, or new UI primitives. Keep the existing design language.
 
 ### Technology Stack
 
@@ -117,7 +117,7 @@ Built; see `docs/ARCHITECTURE.md` for the full table. Backend code lives under `
 
 1. **Start:** App starts minimized to tray, loads settings, initializes managers
 2. **Onboarding:** Model, then assistant (LLM provider), then done
-3. **Meeting:** The shortcut toggles a meeting (starts one in the most recent project, or ends the running one)
+3. **Meeting:** The shortcut toggles a meeting (starts an unfiled one, or ends the running one); the assistant files it into a project once it knows what it is about
 4. **Live:** Mic and system audio are transcribed into the transcript; the observer nudges with a beep and card
 5. **End:** A session summary is written and merged into the rolling summary
 
@@ -173,7 +173,7 @@ For translation contribution guidelines, see [CONTRIBUTING_TRANSLATIONS.md](CONT
 - Tailwind CSS for styling
 - Path aliases: `@/` → `./src/`
 
-**Tests:** typecheck, clippy, lint, and the 7 data-safety tests (settings migration, store, summary). Do not add UI, end-to-end, or unit tests outside that core.
+**Tests:** typecheck, clippy, lint, and the 10 data-safety tests (settings migration, store, summary). Do not add UI, end-to-end, or unit tests outside that core.
 
 ## CLI Parameters
 

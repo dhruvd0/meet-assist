@@ -82,6 +82,7 @@ static MIGRATIONS: &[M] = &[
         );
         CREATE INDEX interventions_session_idx ON interventions(session_id);",
     ),
+    M::up("ALTER TABLE meetings ADD COLUMN filed_by TEXT;"),
 ];
 
 #[derive(Clone, Debug, Serialize, Deserialize, Type)]
@@ -610,6 +611,8 @@ pub struct Meeting {
     pub status: MeetingStatus,
     pub context: String,
     pub rolling_summary: Option<String>,
+    /// Who chose the project: `None` (nobody yet), `"ai"`, or `"user"`.
+    pub filed_by: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Type)]
@@ -651,8 +654,11 @@ pub struct Intervention {
 
 const INTERVENTION_COLS: &str = "i.id, i.session_id, i.ts, i.kind, i.text, i.reason, i.dismissed";
 
+pub const FILED_BY_AI: &str = "ai";
+pub const FILED_BY_USER: &str = "user";
+
 const MEETING_COLS: &str =
-    "id, project_id, title, created_at, updated_at, status, context, rolling_summary";
+    "id, project_id, title, created_at, updated_at, status, context, rolling_summary, filed_by";
 
 impl ProjectStore {
     fn map_meeting(row: &rusqlite::Row<'_>) -> rusqlite::Result<Meeting> {
@@ -666,6 +672,7 @@ impl ProjectStore {
             status: MeetingStatus::parse(&status).unwrap_or(MeetingStatus::Ended),
             context: row.get("context")?,
             rolling_summary: row.get("rolling_summary")?,
+            filed_by: row.get("filed_by")?,
         })
     }
 
@@ -721,6 +728,7 @@ impl ProjectStore {
             status: MeetingStatus::Live,
             context: String::new(),
             rolling_summary: None,
+            filed_by: None,
         })
     }
 
@@ -823,6 +831,151 @@ impl ProjectStore {
         tx.execute("DELETE FROM meetings WHERE id = ?1", params![id])?;
         tx.commit()?;
         Ok(())
+    }
+
+    /// Transcript lines across all sessions of a meeting.
+    pub fn count_meeting_lines(&self, meeting_id: i64) -> Result<i64> {
+        let conn = self.conn()?;
+        Ok(conn.query_row(
+            "SELECT COUNT(*) FROM transcript_lines l JOIN sessions s ON s.id = l.session_id
+             WHERE s.meeting_id = ?1",
+            params![meeting_id],
+            |r| r.get(0),
+        )?)
+    }
+
+    /// Files an unfiled meeting into `project_id` for the assistant. Returns
+    /// `false` when the meeting is no longer eligible (it has a project, or
+    /// the user chose one), so a manual move always wins.
+    pub fn file_meeting_ai(&self, meeting_id: i64, project_id: i64) -> Result<bool> {
+        let conn = self.conn()?;
+        Self::file_meeting_ai_on(&conn, meeting_id, project_id)
+    }
+
+    fn file_meeting_ai_on(conn: &Connection, meeting_id: i64, project_id: i64) -> Result<bool> {
+        let changed = conn.execute(
+            "UPDATE meetings SET project_id = ?1, filed_by = 'ai', updated_at = ?2
+             WHERE id = ?3 AND project_id IS NULL AND filed_by IS NULL
+               AND EXISTS (SELECT 1 FROM projects WHERE id = ?1)",
+            params![project_id, now(), meeting_id],
+        )?;
+        if changed == 1 {
+            Self::touch_project(conn, project_id)?;
+        }
+        Ok(changed == 1)
+    }
+
+    /// Files the meeting into the project titled `title` (trimmed,
+    /// case-insensitive), creating it with `brief` if none exists. `None`
+    /// when the meeting is no longer eligible; a project created here is
+    /// rolled back in that case. The bool is whether the project was created.
+    pub fn create_project_and_file_ai(
+        &self,
+        meeting_id: i64,
+        title: &str,
+        brief: &str,
+    ) -> Result<Option<(Project, bool)>> {
+        let mut conn = self.conn()?;
+        let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let existing = tx
+            .query_row(
+                "SELECT id, title, brief, created_at, updated_at FROM projects
+                 WHERE lower(trim(title)) = lower(trim(?1))
+                 ORDER BY updated_at DESC, id DESC LIMIT 1",
+                params![title],
+                Self::map_project,
+            )
+            .optional()?;
+        let (project, created) = match existing {
+            Some(p) => (p, false),
+            None => {
+                let ts = now();
+                tx.execute(
+                    "INSERT INTO projects (title, brief, created_at, updated_at) VALUES (?1, ?2, ?3, ?3)",
+                    params![title, brief, ts],
+                )?;
+                let project = Project {
+                    id: tx.last_insert_rowid(),
+                    title: title.to_string(),
+                    brief: brief.to_string(),
+                    created_at: ts,
+                    updated_at: ts,
+                };
+                (project, true)
+            }
+        };
+        if !Self::file_meeting_ai_on(&tx, meeting_id, project.id)? {
+            // Dropping `tx` rolls back the insert.
+            return Ok(None);
+        }
+        tx.commit()?;
+        Ok(Some((project, created)))
+    }
+
+    /// Renames the meeting for the assistant unless the user chose its
+    /// project or changed the title from `expected_title`. Returns whether
+    /// the title changed.
+    pub fn rename_meeting_ai(
+        &self,
+        meeting_id: i64,
+        title: &str,
+        expected_title: &str,
+    ) -> Result<bool> {
+        let conn = self.conn()?;
+        let changed = conn.execute(
+            "UPDATE meetings SET title = ?1, updated_at = ?2
+             WHERE id = ?3 AND (filed_by IS NULL OR filed_by = 'ai') AND title = ?4",
+            params![title, now(), meeting_id, expected_title],
+        )?;
+        Ok(changed == 1)
+    }
+
+    /// The user's choice of project (`None` = Unfiled). Marks the meeting
+    /// `filed_by = 'user'` so the assistant never re-files it.
+    pub fn move_meeting(&self, meeting_id: i64, project_id: Option<i64>) -> Result<()> {
+        let conn = self.conn()?;
+        Self::move_meeting_on(&conn, meeting_id, project_id)
+    }
+
+    fn move_meeting_on(conn: &Connection, meeting_id: i64, project_id: Option<i64>) -> Result<()> {
+        let changed = conn.execute(
+            "UPDATE meetings SET project_id = ?1, filed_by = 'user', updated_at = ?2 WHERE id = ?3",
+            params![project_id, now(), meeting_id],
+        )?;
+        if changed == 0 {
+            return Err(anyhow!("meeting {} not found", meeting_id));
+        }
+        if let Some(pid) = project_id {
+            Self::touch_project(conn, pid)?;
+        }
+        Ok(())
+    }
+
+    /// Undo of an assistant filing: the meeting becomes Unfiled (by the
+    /// user), and `created_project_id` is deleted only if it is still
+    /// untouched: no meetings, no sources, brief equal to `created_brief`.
+    /// Returns whether the project was deleted.
+    pub fn undo_filing(
+        &self,
+        meeting_id: i64,
+        created_project_id: Option<i64>,
+        created_brief: Option<&str>,
+    ) -> Result<bool> {
+        let mut conn = self.conn()?;
+        let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        Self::move_meeting_on(&tx, meeting_id, None)?;
+        let mut deleted = false;
+        if let (Some(pid), Some(brief)) = (created_project_id, created_brief) {
+            let n = tx.execute(
+                "DELETE FROM projects WHERE id = ?1 AND brief = ?2
+                   AND NOT EXISTS (SELECT 1 FROM meetings WHERE project_id = ?1)
+                   AND NOT EXISTS (SELECT 1 FROM sources WHERE project_id = ?1)",
+                params![pid, brief],
+            )?;
+            deleted = n == 1;
+        }
+        tx.commit()?;
+        Ok(deleted)
     }
 
     pub fn create_session(&self, meeting_id: i64) -> Result<Session> {
@@ -1183,5 +1336,105 @@ mod tests {
             .query_row("SELECT COUNT(*) FROM transcript_lines", [], |r| r.get(0))
             .unwrap();
         assert_eq!(n, 0);
+    }
+
+    #[test]
+    fn filed_by_migration_keeps_existing_meetings() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("meet.db");
+        {
+            // A database as it was before the `filed_by` migration.
+            let mut conn = Connection::open(&path).unwrap();
+            Migrations::new(MIGRATIONS[..MIGRATIONS.len() - 1].to_vec())
+                .to_latest(&mut conn)
+                .unwrap();
+            conn.execute(
+                "INSERT INTO projects (title, brief, created_at, updated_at) VALUES ('P', '', 1, 1)",
+                [],
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT INTO meetings (project_id, title, created_at, updated_at) VALUES (1, 'M', 1, 1)",
+                [],
+            )
+            .unwrap();
+        }
+        let s = ProjectStore::open(path).unwrap();
+        let meetings = s.list_meetings(None).unwrap();
+        assert_eq!(meetings.len(), 1);
+        assert_eq!(meetings[0].project_id, Some(1));
+        assert_eq!(meetings[0].filed_by, None);
+    }
+
+    #[test]
+    fn manual_move_beats_ai_filing() {
+        let (_d, s) = store();
+        let a = s.create_project("A").unwrap();
+        let b = s.create_project("B").unwrap();
+        let m = s.create_meeting(None, "M").unwrap();
+        s.move_meeting(m.id, Some(b.id)).unwrap();
+        assert!(!s.file_meeting_ai(m.id, a.id).unwrap());
+        assert!(s
+            .create_project_and_file_ai(m.id, "New", "brief")
+            .unwrap()
+            .is_none());
+        assert!(!s.rename_meeting_ai(m.id, "AI title", &m.title).unwrap());
+        let got = s.get_meeting(m.id).unwrap().unwrap();
+        assert_eq!(got.project_id, Some(b.id));
+        assert_eq!(got.filed_by.as_deref(), Some(FILED_BY_USER));
+        assert_eq!(got.title, "M");
+        assert_eq!(
+            s.list_projects().unwrap().len(),
+            2,
+            "a refused create leaves no project behind"
+        );
+        // Moving back to Unfiled is a user choice too; the assistant stays out.
+        s.move_meeting(m.id, None).unwrap();
+        assert!(!s.file_meeting_ai(m.id, a.id).unwrap());
+    }
+
+    #[test]
+    fn undo_filing_deletes_only_an_untouched_created_project() {
+        let (_d, s) = store();
+        let m1 = s.create_meeting(None, "M1").unwrap();
+        let (p1, created) = s
+            .create_project_and_file_ai(m1.id, "Acme", "Pilot")
+            .unwrap()
+            .unwrap();
+        assert!(created);
+        assert!(s.undo_filing(m1.id, Some(p1.id), Some("Pilot")).unwrap());
+        assert!(s.get_project(p1.id).unwrap().is_none());
+        let got = s.get_meeting(m1.id).unwrap().unwrap();
+        assert_eq!(got.project_id, None);
+        assert_eq!(got.filed_by.as_deref(), Some(FILED_BY_USER));
+
+        // A project that gained another meeting is kept.
+        let m2 = s.create_meeting(None, "M2").unwrap();
+        let (p2, _) = s
+            .create_project_and_file_ai(m2.id, "Beta", "B")
+            .unwrap()
+            .unwrap();
+        s.create_meeting(Some(p2.id), "Other").unwrap();
+        assert!(!s.undo_filing(m2.id, Some(p2.id), Some("B")).unwrap());
+        assert!(s.get_project(p2.id).unwrap().is_some());
+
+        // An edited brief keeps it too.
+        let m3 = s.create_meeting(None, "M3").unwrap();
+        let (p3, _) = s
+            .create_project_and_file_ai(m3.id, "Gamma", "G")
+            .unwrap()
+            .unwrap();
+        s.update_project_brief(p3.id, "G, edited").unwrap();
+        assert!(!s.undo_filing(m3.id, Some(p3.id), Some("G")).unwrap());
+        assert!(s.get_project(p3.id).unwrap().is_some());
+
+        // Create reuses a project whose title matches case-insensitively.
+        let m4 = s.create_meeting(None, "M4").unwrap();
+        let (p4, created4) = s
+            .create_project_and_file_ai(m4.id, "gamma", "x")
+            .unwrap()
+            .unwrap();
+        assert_eq!(p4.id, p3.id);
+        assert!(!created4);
     }
 }

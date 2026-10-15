@@ -174,6 +174,9 @@ pub struct MeetingManager {
     summarizer: Option<Arc<dyn Summarizer>>,
     /// Serialises summary jobs: the rolling summary is a chain.
     summary_lock: Arc<Mutex<()>>,
+    /// Files unfiled meetings into projects; `None` without an app handle.
+    filer: Option<Arc<crate::meeting::filing::LlmFiler>>,
+    filing: Arc<crate::meeting::filing::FilingTracker>,
 }
 
 /// Whether transcript text may go to the cloud provider: the assistant
@@ -231,20 +234,29 @@ impl MeetingManager {
                 app: app.clone(),
             })),
             summary_lock: Arc::new(Mutex::new(())),
+            filer: Some(Arc::new(crate::meeting::filing::LlmFiler::new(app.clone()))),
+            filing: Arc::new(crate::meeting::filing::FilingTracker::default()),
         }
     }
 
     /// Summarize a session on a background thread and emit the result.
     /// No-op without a summarizer.
     pub fn spawn_summary(&self, session_id: i64) {
-        self.spawn_summaries(vec![session_id], None);
+        self.spawn_summaries(vec![session_id], None, None);
     }
 
     /// Summarize sessions one after another (the rolling summary is a chain,
     /// so they must not run concurrently) on one background thread.
     /// `pending` is a transcriber still finishing queued utterances; the
-    /// thread joins it first so the summary sees every line.
-    fn spawn_summaries(&self, session_ids: Vec<i64>, pending: Option<JoinHandle<()>>) {
+    /// thread joins it first so the summary sees every line. `file_meeting`
+    /// gets one last filing attempt before the summaries, so they see its
+    /// project.
+    fn spawn_summaries(
+        &self,
+        session_ids: Vec<i64>,
+        pending: Option<JoinHandle<()>>,
+        file_meeting: Option<i64>,
+    ) {
         let Some(summarizer) = self.summarizer.clone() else {
             return;
         };
@@ -263,6 +275,8 @@ impl MeetingManager {
         let store = Arc::clone(&self.store);
         let app = self.app.clone();
         let summary_lock = Arc::clone(&self.summary_lock);
+        let filer = self.filer.clone();
+        let filing = Arc::clone(&self.filing);
         let spawned = std::thread::Builder::new()
             .name("meet-summary".into())
             .spawn(move || {
@@ -270,6 +284,11 @@ impl MeetingManager {
                     if worker.join().is_err() {
                         error!("meet-transcriber panicked");
                     }
+                }
+                if let (Some(filer), Some(app), Some(meeting_id)) =
+                    (filer.as_ref(), app.as_ref(), file_meeting)
+                {
+                    crate::meeting::filing::final_attempt(filer, &store, &filing, app, meeting_id);
                 }
                 for session_id in session_ids {
                     let result = {
@@ -335,8 +354,57 @@ impl MeetingManager {
     }
 
     /// Project of the running (live or paused) meeting, if any.
+    #[allow(dead_code)] // public accessor with no caller yet
     pub fn active_project_id(&self) -> Option<i64> {
         self.lock_active().as_ref().and_then(|a| a.project_id)
+    }
+
+    /// Points the running meeting's cached project at `project_id` after it
+    /// was filed or moved. No-op for any other meeting.
+    pub fn set_active_project(&self, meeting_id: i64, project_id: Option<i64>) {
+        if let Some(a) = self.lock_active().as_mut() {
+            if a.meeting_id == meeting_id {
+                a.project_id = project_id;
+            }
+        }
+    }
+
+    /// Live filing attempt for the running meeting when one is due. The
+    /// observer calls this before its tick, under the same gates.
+    pub fn maybe_file_live(&self, meeting_id: i64) {
+        use crate::meeting::filing;
+        let Some(filer) = &self.filer else {
+            return;
+        };
+        let Ok(Some(meeting)) = self.store.get_meeting(meeting_id) else {
+            return;
+        };
+        if !filing::eligible(&meeting) {
+            return;
+        }
+        let lines = match self.store.count_meeting_lines(meeting_id) {
+            Ok(n) => n,
+            Err(e) => {
+                warn!("filing: count lines failed: {e:#}");
+                return;
+            }
+        };
+        if !self.filing.live_due(meeting_id, lines) {
+            return;
+        }
+        self.filing.record_attempt(meeting_id, lines);
+        if let Some(filed) = filing::attempt(filer, &self.store, &self.filing, meeting_id) {
+            // The user may have moved the meeting while the run was going;
+            // the store is the truth.
+            if let Ok(Some(stored)) = self.store.get_meeting(meeting_id) {
+                self.set_active_project(meeting_id, stored.project_id);
+                if let Some(app) = &self.app {
+                    if filing::still_ai_filed(&stored, &filed) {
+                        filing::notify(app, &filed);
+                    }
+                }
+            }
+        }
     }
 
     pub fn state(&self) -> MeetingStatePayload {
@@ -484,8 +552,11 @@ impl MeetingManager {
         Self::transcribe_and_store(&self.store, self.transcriber.as_ref(), session_id, utt)
     }
 
-    fn auto_title() -> String {
-        chrono::Local::now()
+    /// The title a new meeting gets when created at `ts_ms`.
+    pub fn auto_title_at(ts_ms: i64) -> String {
+        chrono::DateTime::from_timestamp_millis(ts_ms)
+            .unwrap_or_else(chrono::Utc::now)
+            .with_timezone(&chrono::Local)
             .format("Meeting %b %-d %H:%M")
             .to_string()
     }
@@ -509,7 +580,10 @@ impl MeetingManager {
                     ..m
                 }
             }
-            None => self.store.create_meeting(project_id, &Self::auto_title())?,
+            None => self.store.create_meeting(
+                project_id,
+                &Self::auto_title_at(chrono::Utc::now().timestamp_millis()),
+            )?,
         };
         let session = self.store.create_session(meeting.id)?;
         let (capture, worker) = match self.start_capture_and_worker(meeting.id, session.id) {
@@ -621,7 +695,7 @@ impl MeetingManager {
         self.emit_state();
         if result.is_ok() {
             self.play_feedback(crate::audio_feedback::SoundType::Stop);
-            self.spawn_summaries(vec![session_id], leftover);
+            self.spawn_summaries(vec![session_id], leftover, Some(meeting_id));
         }
         result
     }
@@ -650,7 +724,7 @@ impl MeetingManager {
             .into_iter()
             .map(|s| s.id)
             .collect();
-        self.spawn_summaries(ids, None);
+        self.spawn_summaries(ids, None, None);
         Ok(())
     }
 }

@@ -13,7 +13,7 @@ use log::{info, warn};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use specta::Type;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use tauri::AppHandle;
 use tauri_specta::Event;
 
@@ -171,32 +171,15 @@ pub trait Judge: Send + Sync {
 pub struct LlmJudge {
     app: AppHandle,
     /// One HTTP client per observer, rebuilt when the provider or key changes.
-    /// Keyed by provider id, base URL and a hash of the API key.
-    client: Mutex<Option<(String, reqwest::Client)>>,
+    clients: llm_client::ToolClientCache,
 }
 
 impl LlmJudge {
     pub fn new(app: AppHandle) -> Self {
         Self {
             app,
-            client: Mutex::new(None),
+            clients: llm_client::ToolClientCache::default(),
         }
-    }
-
-    fn client_for(&self, provider: &LlmProvider, api_key: &str) -> Result<reqwest::Client, String> {
-        use std::hash::{Hash, Hasher};
-        let mut h = std::collections::hash_map::DefaultHasher::new();
-        api_key.hash(&mut h);
-        let key = format!("{}|{}|{:x}", provider.id, provider.base_url, h.finish());
-        let mut slot = self.client.lock().unwrap_or_else(|p| p.into_inner());
-        if let Some((k, c)) = slot.as_ref() {
-            if *k == key {
-                return Ok(c.clone());
-            }
-        }
-        let c = llm_client::create_tool_client(provider, api_key)?;
-        *slot = Some((key, c.clone()));
-        Ok(c)
     }
 }
 
@@ -217,7 +200,8 @@ impl Judge for LlmJudge {
             .ok_or_else(|| JudgeError::Other("no model configured".into()))?;
         let api_key = settings.llm_api_key();
         let client = self
-            .client_for(&provider, &api_key)
+            .clients
+            .get(&provider, &api_key)
             .map_err(JudgeError::Other)?;
         let defs = if allow_tools { tool_defs() } else { Vec::new() };
         let handler = |c: &llm_client::ToolCall| handle_tool(tools_ctx, c);
@@ -537,6 +521,11 @@ pub fn spawn_observer(
                 }
                 if ready != Readiness::Ready {
                     continue;
+                }
+                if let Some(mid) = st.meeting_id {
+                    // Files the meeting first, so this tick's judge already
+                    // sees the project's brief and sources.
+                    mm.maybe_file_live(mid);
                 }
                 let now = chrono::Utc::now().timestamp_millis();
                 match tick(&store, judge.as_ref(), &mm, &settings, &mut state, now) {

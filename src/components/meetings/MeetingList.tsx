@@ -1,8 +1,9 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { ask } from "@tauri-apps/plugin-dialog";
 import { Mic, Trash2 } from "lucide-react";
 import { useMeetingStore } from "@/stores/meetingStore";
+import { useProjectStore } from "@/stores/projectStore";
 import Badge from "../ui/Badge";
 import { Button } from "../ui/Button";
 import { SettingsGroup } from "../ui/SettingsGroup";
@@ -16,6 +17,23 @@ export const MeetingList: React.FC = () => {
   const openMeeting = useMeetingStore((s) => s.openMeeting);
   const startMeeting = useMeetingStore((s) => s.startMeeting);
   const deleteMeeting = useMeetingStore((s) => s.deleteMeeting);
+  const observer = useMeetingStore((s) => s.observer);
+  const projects = useProjectStore((s) => s.projects);
+  const loadProjects = useProjectStore((s) => s.loadProjects);
+
+  useEffect(() => {
+    loadProjects();
+  }, [loadProjects]);
+
+  const projectLabel = (m: (typeof meetings)[number]) => {
+    if (m.project_id !== null)
+      return projects.find((p) => p.id === m.project_id)?.title ?? "";
+    if (live.meeting_id === m.id && m.filed_by === null)
+      return observer.readiness === "ready"
+        ? t("meetings.filing.pending")
+        : t("meetings.filing.pickProject");
+    return t("meetings.filing.unfiled");
+  };
 
   return (
     <div className="space-y-6">
@@ -50,6 +68,7 @@ export const MeetingList: React.FC = () => {
                 onClick={() => openMeeting(m.id)}
               >
                 <div className="text-sm font-semibold text-text">{m.title}</div>
+                <div className="text-xs text-mid-gray">{projectLabel(m)}</div>
                 {m.rolling_summary && (
                   <div className="text-xs text-text/60 truncate max-w-md">
                     {m.rolling_summary.split("\n")[0]}

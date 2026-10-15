@@ -51,8 +51,13 @@ pub fn delete_project(
     mm: State<'_, Arc<MeetingManager>>,
     id: i64,
 ) -> Result<(), String> {
-    if mm.active_project_id() == Some(id) {
-        return Err("End the meeting before deleting its project".into());
+    // Read the store, not the cache: a filing run may have moved the live
+    // meeting before the cache catches up.
+    if let Some(meeting_id) = mm.state().meeting_id {
+        let meeting = mm.store().get_meeting(meeting_id).map_err(err)?;
+        if meeting.and_then(|m| m.project_id) == Some(id) {
+            return Err("End the meeting before deleting its project".into());
+        }
     }
     pm.delete_project(id).map_err(err)
 }
