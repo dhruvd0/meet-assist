@@ -172,7 +172,9 @@ export const InterventionCard: React.FC = () => {
           <X className="w-4 h-4" aria-hidden="true" />
         </button>
       </div>
-      <p className="text-sm leading-snug flex-1 overflow-hidden">{body}</p>
+      <p className="text-sm leading-snug flex-1 overflow-hidden whitespace-pre-line">
+        {body}
+      </p>
       <div className="flex justify-end gap-3">
         {card.type === "filed" ? (
           <>
