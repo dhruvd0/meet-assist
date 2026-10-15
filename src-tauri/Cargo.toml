@@ -1,6 +1,6 @@
 [package]
 name = "handy"
-version = "0.9.8"
+version = "0.9.9"
 description = "Meet Assist, a private meeting copilot"
 authors = ["cjpais"]
 edition = "2021"
