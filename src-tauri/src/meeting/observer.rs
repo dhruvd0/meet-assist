@@ -29,6 +29,10 @@ pub const DEDUPE_RECENT: usize = 5;
 pub const CONTEXT_MAX_CHARS: usize = 4096;
 /// Max characters of an intervention card's text.
 pub const CARD_TEXT_MAX_CHARS: usize = 100;
+/// Max characters of a "loop" card, which is a checklist of up to
+/// `LOOP_MAX_LINES` lines.
+pub const LOOP_TEXT_MAX_CHARS: usize = 160;
+pub const LOOP_MAX_LINES: usize = 3;
 /// Consecutive judge failures after which the observer slows down.
 pub const BACKOFF_AFTER_FAILURES: u32 = 5;
 /// Interval multiplier while backing off.
@@ -268,7 +272,7 @@ pub fn build_prompt(
          {sensitivity_rule}\n{tools_rule}\n\
          Never give generic process advice (summarize, document, align, clarify, take notes, ask for feedback). Only speak about a concrete point from this meeting.\n\
          Answer with JSON only, exactly this shape: {{\"intervene\": boolean, \"kind\": \"loop\"|\"stuck\"|\"info\"|\"idea\"|null, \"text\": string|null, \"reason\": string}}. \
-         \"text\" is one short line of at most 12 words naming the concrete point, like a note passed under the table (shape: \"<the open point> still undecided — <one concrete next step>?\"), or null. Never repeat a recent intervention."
+         \"text\" is null when silent. For kind \"loop\", \"text\" is a checklist of up to three lines separated by \"\\n\", each starting with its label and at most 8 words after it, using only the lines that apply: \"Decided: <what the meeting already agreed>\", \"Decide now: <the open point to settle>\", \"Park: <a point to take up later>\". Include at least a \"Decide now\" or a \"Park\" line, and a \"Decided\" line only for something actually agreed; when tools are available, you must call read_transcript for this meeting before answering kind \"loop\", to find what was already decided and which side topics could be parked; the transcript below is only the last three minutes. For every other kind, \"text\" is one short line of at most 12 words naming the concrete point, like a note passed under the table. Never repeat a recent intervention."
     );
     let mut user = String::new();
     user.push_str("## Project brief\n");
@@ -371,6 +375,23 @@ pub fn should_emit(
         .any(|i| i.text.trim().to_lowercase() == norm)
 }
 
+/// The card's text: a checklist of at most `LOOP_MAX_LINES` lines for
+/// "loop", one line otherwise, each within its character cap.
+pub fn card_text(kind: &str, text: &str) -> String {
+    let (max_lines, max_chars) = if kind == "loop" {
+        (LOOP_MAX_LINES, LOOP_TEXT_MAX_CHARS)
+    } else {
+        (1, CARD_TEXT_MAX_CHARS)
+    };
+    let lines: Vec<&str> = text
+        .lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty())
+        .take(max_lines)
+        .collect();
+    truncate_chars(&lines.join("\n"), max_chars).0.to_string()
+}
+
 pub fn tick(
     store: &ProjectStore,
     judge: &dyn Judge,
@@ -455,9 +476,8 @@ pub fn tick(
         return Ok(None);
     }
     let kind = verdict.kind.unwrap_or_default();
-    let text = verdict.text.unwrap_or_default();
-    let (text, _) = truncate_chars(text.trim(), CARD_TEXT_MAX_CHARS);
-    let iv = store.add_intervention(session_id, &kind, text, &verdict.reason)?;
+    let text = card_text(&kind, &verdict.text.unwrap_or_default());
+    let iv = store.add_intervention(session_id, &kind, &text, &verdict.reason)?;
     state.last_intervention_ts = now_ms;
     Ok(Some(iv))
 }

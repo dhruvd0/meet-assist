@@ -27,7 +27,9 @@ export const InterventionTimeline: React.FC<{ items: Intervention[] }> = ({
               })}
             </Badge>
             <div className="flex-1 min-w-0">
-              <div className="text-sm text-text">{iv.text}</div>
+              <div className="text-sm text-text whitespace-pre-line">
+                {iv.text}
+              </div>
               <div className="text-xs text-mid-gray">
                 {formatDateTime(
                   String(Math.floor(iv.ts / 1000)),
