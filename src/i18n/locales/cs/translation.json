@@ -395,7 +395,7 @@
       },
       "rescan": {
         "label": "Znovu prohledat",
-        "tooltip": "Znovu prohledat modely přidané do složky modelů nebo mezipaměti Hugging Face mimo Handy"
+        "tooltip": "Znovu prohledat modely přidané do složky modelů nebo mezipaměti Hugging Face mimo Meet Assist"
       },
       "noModelsMatch": "Tomuto filtru neodpovídají žádné modely."
     },
@@ -457,11 +457,11 @@
       },
       "autostart": {
         "label": "Spouštět při startu",
-        "description": "Automaticky spustit Handy po přihlášení do počítače."
+        "description": "Automaticky spustit Meet Assist po přihlášení do počítače."
       },
       "showTrayIcon": {
         "label": "Zobrazit ikonu v systémové liště",
-        "description": "Zobrazit ikonu Handy v systémové liště."
+        "description": "Zobrazit ikonu Meet Assist v systémové liště."
       },
       "translateToEnglish": {
         "label": "Překládat do angličtiny",
@@ -538,7 +538,7 @@
       },
       "updateChecks": {
         "label": "Kontrolovat aktualizace",
-        "description": "Automaticky kontrolovat nové verze Handy",
+        "description": "Automaticky kontrolovat nové verze Meet Assist",
         "lockedDescription": "Zakázáno systémovou konfigurací (HANDY_DISABLE_UPDATER)"
       },
       "whatsNewPreview": {
@@ -577,15 +577,15 @@
       "title": "O aplikaci",
       "version": {
         "title": "Verze",
-        "description": "Aktuální verze Handy"
+        "description": "Aktuální verze Meet Assist"
       },
       "whatsNewUpdates": {
         "label": "Zobrazovat novinky",
-        "description": "Zobrazovat poznámky k vydání po aktualizacích Handy"
+        "description": "Zobrazovat poznámky k vydání po aktualizacích Meet Assist"
       },
       "appDataDirectory": {
         "title": "Adresář dat aplikace",
-        "description": "Umístění, kde Handy ukládá data"
+        "description": "Umístění, kde Meet Assist ukládá data"
       },
       "sourceCode": {
         "title": "Zdrojový kód",
@@ -602,7 +602,7 @@
         "ggml": {
           "title": "ggml",
           "description": "Vysoce výkonné inferenční zpracování modelu automatického rozpoznávání řeči Whisper od OpenAI",
-          "details": "Handy používá ggml pro rychlé lokální zpracování řeči na text. Díky skvělé práci Georgiho Gerganova a přispěvatelů."
+          "details": "Meet Assist používá ggml pro rychlé lokální zpracování řeči na text. Díky skvělé práci Georgiho Gerganova a přispěvatelů."
         }
       }
     },
@@ -650,7 +650,7 @@
     "portableUpdateBrowseButton": "Otevřít GitHub Releases"
   },
   "whatsNew": {
-    "title": "Novinky v Handy v{{version}}"
+    "title": "Novinky v Meet Assist v{{version}}"
   },
   "common": {
     "loading": "Načítání...",
@@ -674,11 +674,11 @@
   },
   "appLanguage": {
     "title": "Jazyk aplikace",
-    "description": "Změňte jazyk rozhraní Handy"
+    "description": "Změňte jazyk rozhraní Meet Assist"
   },
   "theme": {
     "title": "Motiv aplikace",
-    "description": "Zvolte, zda má Handy sledovat motiv systému, nebo zůstat světlý či tmavý",
+    "description": "Zvolte, zda má Meet Assist sledovat motiv systému, nebo zůstat světlý či tmavý",
     "options": {
       "system": "Systém",
       "light": "Světlý",

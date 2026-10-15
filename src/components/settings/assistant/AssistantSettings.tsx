@@ -27,7 +27,7 @@ export const AssistantSettings: React.FC = () => {
   return (
     <div className="max-w-3xl w-full mx-auto space-y-6">
       {blocked && (
-        <p role="alert" className="px-4 py-2 text-sm text-red-500">
+        <p role="alert" className="px-4 py-2 text-sm text-error">
           {t(`meetings.observer.readiness.${ready.readiness}`, {
             detail: ready.detail ?? "",
           })}

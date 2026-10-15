@@ -725,6 +725,7 @@ pub fn run(cli_args: CliArgs) {
             commands::meeting::update_meeting_title,
             commands::meeting::update_meeting_context,
             commands::meeting::delete_meeting,
+            commands::meeting::get_line_audio_path,
             commands::meeting::move_meeting,
             commands::meeting::undo_filing,
             commands::meeting::list_interventions,
@@ -911,12 +912,21 @@ pub fn run(cli_args: CliArgs) {
             // for portable mode (redirects WebView2 cache to portable Data dir)
             let mut win_builder =
                 tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::App("/".into()))
-                    .title("Handy")
-                    .inner_size(680.0, 570.0)
-                    .min_inner_size(680.0, 570.0)
+                    .title("Meet Assist")
+                    .inner_size(1240.0, 780.0)
+                    .min_inner_size(760.0, 560.0)
                     .resizable(true)
                     .maximizable(true)
                     .visible(false);
+
+            // macOS: traffic lights float over the sidebar (the frontend
+            // reserves the strip and marks it as a drag region).
+            #[cfg(target_os = "macos")]
+            {
+                win_builder = win_builder
+                    .title_bar_style(tauri::TitleBarStyle::Overlay)
+                    .hidden_title(true);
+            }
 
             if let Some(data_dir) = portable::data_dir() {
                 win_builder = win_builder.data_directory(data_dir.join("webview"));

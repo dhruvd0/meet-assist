@@ -78,7 +78,7 @@ export const AddSourceDialog: React.FC<{
       }
     >
       <div className="space-y-3">
-        <label className="block text-xs text-mid-gray">
+        <label className="block text-xs text-muted">
           {t("projects.sources.dialog.kind")}
           <div className="flex gap-2 mt-1 flex-wrap">
             {KINDS.map((k) => (
@@ -97,7 +97,7 @@ export const AddSourceDialog: React.FC<{
           </div>
         </label>
 
-        <label className="block text-xs text-mid-gray">
+        <label className="block text-xs text-muted">
           {t("projects.sources.dialog.titleLabel")}
           <Input
             variant="compact"
@@ -109,7 +109,7 @@ export const AddSourceDialog: React.FC<{
         </label>
 
         {kind === "text" && (
-          <label className="block text-xs text-mid-gray">
+          <label className="block text-xs text-muted">
             {t("projects.sources.dialog.textLabel")}
             <Textarea
               variant="compact"
@@ -122,7 +122,7 @@ export const AddSourceDialog: React.FC<{
         )}
 
         {kind === "link" && (
-          <label className="block text-xs text-mid-gray">
+          <label className="block text-xs text-muted">
             {t("projects.sources.dialog.linkLabel")}
             <Input
               variant="compact"
@@ -135,7 +135,7 @@ export const AddSourceDialog: React.FC<{
         )}
 
         {needsPicker && (
-          <div className="text-xs text-mid-gray">
+          <div className="text-xs text-muted">
             {t("projects.sources.dialog.pathLabel")}
             <div className="flex items-center gap-2 mt-1">
               <Input

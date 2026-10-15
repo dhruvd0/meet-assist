@@ -1,48 +1,74 @@
-/* Handy Colors */
+/* Meet Assist tokens (after t3.codes: zinc neutrals, one blue accent). */
 
 :root {
   /* Palette source of truth. Each themed color is defined once as a
      light/dark pair; the active tokens below and the `data-theme` overrides
-     in App.css reference these, so a hex value lives in exactly one place. */
-  --light-color-text: #0f0f0f;
-  --light-color-background: #fbfbfb;
-  --light-color-logo-primary: #faa2ca;
-  --light-color-logo-stroke: #382731;
+     reference these, so a value lives in exactly one place. */
+  --light-color-background: #ffffff;
+  --light-color-sidebar: #f7f7f8;
+  --light-color-surface: #f4f4f5;
+  --light-color-surface-hover: #ebebed;
+  --light-color-text: #09090b;
+  --light-color-text-muted: #52525b;
+  --light-color-text-faint: #71717a;
+  --light-color-line: #09090b14;
+  --light-color-line-strong: #09090b26;
+  --light-color-accent: oklch(0.55 0.19 255);
+  --light-color-ok: oklch(0.55 0.15 150);
+  --light-color-warning: oklch(0.58 0.15 65);
+  --light-color-error: oklch(0.55 0.2 25);
 
-  --dark-color-text: #fbfbfb;
-  --dark-color-background: #2c2b29;
-  --dark-color-logo-primary: #f28cbb;
-  --dark-color-logo-stroke: #fad1ed;
+  --dark-color-background: #09090b;
+  --dark-color-sidebar: #0c0c0e;
+  --dark-color-surface: #111113;
+  --dark-color-surface-hover: #18181b;
+  --dark-color-text: #fafafa;
+  --dark-color-text-muted: #a1a1aa;
+  --dark-color-text-faint: #7c7c86;
+  --dark-color-line: #ffffff14;
+  --dark-color-line-strong: #ffffff24;
+  --dark-color-accent: oklch(0.68 0.17 250);
+  --dark-color-ok: oklch(0.72 0.16 150);
+  --dark-color-warning: oklch(0.76 0.15 75);
+  --dark-color-error: oklch(0.7 0.17 25);
 
-  /* Semantic status colors. First used by SecureInputWarning; intended to
-     replace the ad-hoc yellow-500/red-500 usages (e.g. ui/Alert.tsx) over
-     time so status styling is themeable from one place. */
-  --light-color-warning: #d97706;
-  --light-color-error: #dc2626;
-  --dark-color-warning: #fbbf24;
-  --dark-color-error: #f87171;
+  /* Type */
+  --font-sans:
+    "DM Sans Variable", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font-serif: "Newsreader Variable", "Iowan Old Style", Georgia, serif;
+  --font-mono:
+    "JetBrains Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace;
 
-  /* Tokens that do not change between light and dark */
-  --color-background-ui: #da5893;
-  --color-text-stroke: #f6f6f6;
-  --color-mid-gray: #808080;
-
-  /* Active palette — defaults to light, follows the OS via the media query
-     below, or is forced by `data-theme` (see the overrides below). */
-  --color-text: var(--light-color-text);
+  /* Active palette: light by default, follows the OS via the media query
+     below, or is forced by `data-theme`. */
   --color-background: var(--light-color-background);
-  --color-logo-primary: var(--light-color-logo-primary);
-  --color-logo-stroke: var(--light-color-logo-stroke);
+  --color-sidebar: var(--light-color-sidebar);
+  --color-surface: var(--light-color-surface);
+  --color-surface-hover: var(--light-color-surface-hover);
+  --color-text: var(--light-color-text);
+  --color-text-muted: var(--light-color-text-muted);
+  --color-text-faint: var(--light-color-text-faint);
+  --color-line: var(--light-color-line);
+  --color-line-strong: var(--light-color-line-strong);
+  --color-accent: var(--light-color-accent);
+  --color-ok: var(--light-color-ok);
   --color-warning: var(--light-color-warning);
   --color-error: var(--light-color-error);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --color-text: var(--dark-color-text);
     --color-background: var(--dark-color-background);
-    --color-logo-primary: var(--dark-color-logo-primary);
-    --color-logo-stroke: var(--dark-color-logo-stroke);
+    --color-sidebar: var(--dark-color-sidebar);
+    --color-surface: var(--dark-color-surface);
+    --color-surface-hover: var(--dark-color-surface-hover);
+    --color-text: var(--dark-color-text);
+    --color-text-muted: var(--dark-color-text-muted);
+    --color-text-faint: var(--dark-color-text-faint);
+    --color-line: var(--dark-color-line);
+    --color-line-strong: var(--dark-color-line-strong);
+    --color-accent: var(--dark-color-accent);
+    --color-ok: var(--dark-color-ok);
     --color-warning: var(--dark-color-warning);
     --color-error: var(--dark-color-error);
   }
@@ -50,28 +76,39 @@
 
 /*
  * Explicit theme override, driven by the `theme` setting via
- * `document.documentElement.dataset.theme`. When set, the higher-specificity
- * attribute selectors win over the `prefers-color-scheme` media query above,
- * so a user can keep Handy light or dark regardless of the OS setting.
- * `system` (or no attribute) leaves the OS in charge.
- *
- * Lives here (not in App.css) so every window that imports the shared palette —
- * the settings window and the recording overlay alike — honours the override.
+ * `document.documentElement.dataset.theme`. The attribute selectors win over
+ * the media query above; `system` (or no attribute) leaves the OS in charge.
+ * Lives here so every window importing the palette (main window and the
+ * intervention card) honours the override.
  */
 :root[data-theme="light"] {
-  --color-text: var(--light-color-text);
   --color-background: var(--light-color-background);
-  --color-logo-primary: var(--light-color-logo-primary);
-  --color-logo-stroke: var(--light-color-logo-stroke);
+  --color-sidebar: var(--light-color-sidebar);
+  --color-surface: var(--light-color-surface);
+  --color-surface-hover: var(--light-color-surface-hover);
+  --color-text: var(--light-color-text);
+  --color-text-muted: var(--light-color-text-muted);
+  --color-text-faint: var(--light-color-text-faint);
+  --color-line: var(--light-color-line);
+  --color-line-strong: var(--light-color-line-strong);
+  --color-accent: var(--light-color-accent);
+  --color-ok: var(--light-color-ok);
   --color-warning: var(--light-color-warning);
   --color-error: var(--light-color-error);
 }
 
 :root[data-theme="dark"] {
-  --color-text: var(--dark-color-text);
   --color-background: var(--dark-color-background);
-  --color-logo-primary: var(--dark-color-logo-primary);
-  --color-logo-stroke: var(--dark-color-logo-stroke);
+  --color-sidebar: var(--dark-color-sidebar);
+  --color-surface: var(--dark-color-surface);
+  --color-surface-hover: var(--dark-color-surface-hover);
+  --color-text: var(--dark-color-text);
+  --color-text-muted: var(--dark-color-text-muted);
+  --color-text-faint: var(--dark-color-text-faint);
+  --color-line: var(--dark-color-line);
+  --color-line-strong: var(--dark-color-line-strong);
+  --color-accent: var(--dark-color-accent);
+  --color-ok: var(--dark-color-ok);
   --color-warning: var(--dark-color-warning);
   --color-error: var(--dark-color-error);
 }

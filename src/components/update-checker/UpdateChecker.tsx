@@ -210,24 +210,24 @@ const UpdateChecker: React.FC<UpdateCheckerProps> = ({ className = "" }) => {
     <>
       {showPortableUpdateDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-background border border-mid-gray/20 rounded-lg p-6 max-w-md w-full mx-4 space-y-4">
+          <div className="bg-background border border-line rounded-lg p-6 max-w-md w-full mx-4 space-y-4">
             <h2 className="text-base font-semibold">
               {t("footer.portableUpdateTitle")}
             </h2>
-            <p className="text-sm text-text/70">
+            <p className="text-sm text-muted">
               {hasDirectInstaller
                 ? t("footer.portableUpdateMessage")
                 : t("footer.portableUpdateBrowseMessage")}
             </p>
             <div className="flex gap-2 justify-end">
               <button
-                className="px-3 py-1.5 text-sm rounded border border-mid-gray/20 hover:bg-mid-gray/10 transition-colors"
+                className="px-3 py-1.5 text-sm rounded border border-line hover:bg-surface-hover transition-colors"
                 onClick={() => setShowPortableUpdateDialog(false)}
               >
                 {t("common.close")}
               </button>
               <button
-                className="px-3 py-1.5 text-sm rounded bg-logo-primary text-white hover:bg-logo-primary/80 transition-colors"
+                className="px-3 py-1.5 text-sm rounded-lg bg-text text-background hover:bg-text/85 transition-colors"
                 onClick={() => {
                   openUrl(portableInstallerUrl);
                   setShowPortableUpdateDialog(false);
@@ -248,14 +248,14 @@ const UpdateChecker: React.FC<UpdateCheckerProps> = ({ className = "" }) => {
             disabled={isUpdateDisabled}
             className={`transition-colors disabled:opacity-50 tabular-nums ${
               updateAvailable
-                ? "text-logo-primary hover:text-logo-primary/80 font-medium"
-                : "text-text/60 hover:text-text/80"
+                ? "text-accent hover:text-accent/80 font-medium"
+                : "text-muted hover:text-muted"
             }`}
           >
             {getUpdateStatusText()}
           </button>
         ) : (
-          <span className="text-text/60 tabular-nums">
+          <span className="text-muted tabular-nums">
             {getUpdateStatusText()}
           </span>
         )}

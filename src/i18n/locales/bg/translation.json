@@ -395,7 +395,7 @@
       },
       "rescan": {
         "label": "Сканиране отново",
-        "tooltip": "Сканиране отново за модели, добавени в папката с модели или кеша на Hugging Face извън Handy"
+        "tooltip": "Сканиране отново за модели, добавени в папката с модели или кеша на Hugging Face извън Meet Assist"
       },
       "noModelsMatch": "Няма модели, отговарящи на този филтър."
     },
@@ -457,11 +457,11 @@
       },
       "autostart": {
         "label": "Стартиране със системата",
-        "description": "Автоматично стартиране на Handy при влизане в профила ви."
+        "description": "Автоматично стартиране на Meet Assist при влизане в профила ви."
       },
       "showTrayIcon": {
         "label": "Икона в системната област",
-        "description": "Показване на иконата на Handy в системната област."
+        "description": "Показване на иконата на Meet Assist в системната област."
       },
       "translateToEnglish": {
         "label": "Превод на английски",
@@ -538,7 +538,7 @@
       },
       "updateChecks": {
         "label": "Проверка за актуализации",
-        "description": "Автоматична проверка за нови версии на Handy",
+        "description": "Автоматична проверка за нови версии на Meet Assist",
         "lockedDescription": "Деактивирано от системната конфигурация (HANDY_DISABLE_UPDATER)"
       },
       "whatsNewPreview": {
@@ -577,15 +577,15 @@
       "title": "За приложението",
       "version": {
         "title": "Версия",
-        "description": "Текуща версия на Handy"
+        "description": "Текуща версия на Meet Assist"
       },
       "whatsNewUpdates": {
         "label": "Показвай новостите",
-        "description": "Показвай бележки към изданието след актуализации на Handy"
+        "description": "Показвай бележки към изданието след актуализации на Meet Assist"
       },
       "appDataDirectory": {
         "title": "Папка с данни на приложението",
-        "description": "Мястото, където Handy съхранява данните си"
+        "description": "Мястото, където Meet Assist съхранява данните си"
       },
       "sourceCode": {
         "title": "Изходен код",
@@ -602,7 +602,7 @@
         "ggml": {
           "title": "ggml",
           "description": "Високопроизводително изпълнение на автоматичния модел за разпознаване на реч Whisper на OpenAI",
-          "details": "Handy използва ggml за бързо локално реч-към-текст. Благодарности на Georgi Gerganov и сътрудниците за отличната работа."
+          "details": "Meet Assist използва ggml за бързо локално реч-към-текст. Благодарности на Georgi Gerganov и сътрудниците за отличната работа."
         }
       }
     },
@@ -650,7 +650,7 @@
     "portableUpdateBrowseButton": "Отвори GitHub Releases"
   },
   "whatsNew": {
-    "title": "Ново в Handy v{{version}}"
+    "title": "Ново в Meet Assist v{{version}}"
   },
   "common": {
     "loading": "Зареждане...",
@@ -674,11 +674,11 @@
   },
   "appLanguage": {
     "title": "Език на приложението",
-    "description": "Промяна на езика на интерфейса на Handy"
+    "description": "Промяна на езика на интерфейса на Meet Assist"
   },
   "theme": {
     "title": "Тема на приложението",
-    "description": "Изберете дали Handy да следва системната тема, или да остане светла или тъмна",
+    "description": "Изберете дали Meet Assist да следва системната тема, или да остане светла или тъмна",
     "options": {
       "system": "Системна",
       "light": "Светла",

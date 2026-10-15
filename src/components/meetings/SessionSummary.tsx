@@ -33,13 +33,16 @@ const List: React.FC<{ title: string; items: string[] }> = ({
   items,
 }) =>
   items.length === 0 ? null : (
-    <div className="space-y-1">
-      <div className="text-xs font-medium text-mid-gray uppercase tracking-wide">
-        {title}
-      </div>
-      <ul className="list-disc pl-5 text-sm text-text space-y-0.5">
+    <div>
+      <h3 className="text-[14px] font-semibold text-text mb-1.5">{title}</h3>
+      <ul className="space-y-1">
         {items.map((item, i) => (
-          <li key={i}>{item}</li>
+          <li
+            key={i}
+            className="relative ps-5 text-[15px] leading-7 text-text before:absolute before:start-1.5 before:top-[11.5px] before:w-[5px] before:h-[5px] before:rounded-full before:bg-faint/70"
+          >
+            {item}
+          </li>
         ))}
       </ul>
     </div>
@@ -56,10 +59,8 @@ export const SessionSummary: React.FC<{
   if (session.summary === null) {
     if (!ended) return null;
     return (
-      <div className="flex items-center gap-3 p-4">
-        <span className="text-sm text-mid-gray">
-          {t("meetings.summary.none")}
-        </span>
+      <div className="flex items-center gap-3 py-1">
+        <span className="text-sm text-faint">{t("meetings.summary.none")}</span>
         <Button size="sm" variant="secondary" onClick={onRetry}>
           {t("meetings.summary.retry")}
         </Button>
@@ -70,11 +71,9 @@ export const SessionSummary: React.FC<{
   const parsed = parseSummary(session.summary);
   if (!parsed) {
     return (
-      <div className="p-4 space-y-1">
-        <div className="text-xs text-mid-gray">
-          {t("meetings.summary.failed")}
-        </div>
-        <p className="text-sm text-text whitespace-pre-wrap">
+      <div className="space-y-1">
+        <div className="text-xs text-faint">{t("meetings.summary.failed")}</div>
+        <p className="text-[15px] leading-7 text-text whitespace-pre-wrap">
           {session.summary}
         </p>
       </div>
@@ -82,23 +81,18 @@ export const SessionSummary: React.FC<{
   }
 
   return (
-    <div className="p-4 space-y-3">
+    <div className="space-y-5">
       {parsed.recap && (
-        <div className="space-y-1">
-          <div className="text-xs font-medium text-mid-gray uppercase tracking-wide">
-            {t("meetings.summary.recap")}
-          </div>
-          <p className="text-sm text-text">{parsed.recap}</p>
-        </div>
+        <p className="text-[15px] leading-7 text-text">{parsed.recap}</p>
       )}
       <List title={t("meetings.summary.decisions")} items={parsed.decisions} />
       <List
-        title={t("meetings.summary.openQuestions")}
-        items={parsed.open_questions}
-      />
-      <List
         title={t("meetings.summary.actionItems")}
         items={parsed.action_items}
+      />
+      <List
+        title={t("meetings.summary.openQuestions")}
+        items={parsed.open_questions}
       />
     </div>
   );

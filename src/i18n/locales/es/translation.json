@@ -395,7 +395,7 @@
       },
       "rescan": {
         "label": "Volver a escanear",
-        "tooltip": "Vuelve a escanear en busca de modelos añadidos a la carpeta de modelos o a la caché de Hugging Face fuera de Handy"
+        "tooltip": "Vuelve a escanear en busca de modelos añadidos a la carpeta de modelos o a la caché de Hugging Face fuera de Meet Assist"
       },
       "noModelsMatch": "Ningún modelo coincide con este filtro."
     },
@@ -457,11 +457,11 @@
       },
       "autostart": {
         "label": "Iniciar al arranque",
-        "description": "Iniciar Handy automáticamente cuando inicies sesión en tu computadora."
+        "description": "Iniciar Meet Assist automáticamente cuando inicies sesión en tu computadora."
       },
       "showTrayIcon": {
         "label": "Mostrar icono de bandeja",
-        "description": "Mostrar el icono de Handy en la bandeja del sistema."
+        "description": "Mostrar el icono de Meet Assist en la bandeja del sistema."
       },
       "translateToEnglish": {
         "label": "Traducir al inglés",
@@ -538,7 +538,7 @@
       },
       "updateChecks": {
         "label": "Buscar actualizaciones",
-        "description": "Buscar automáticamente nuevas versiones de Handy",
+        "description": "Buscar automáticamente nuevas versiones de Meet Assist",
         "lockedDescription": "Deshabilitado por la configuración del sistema (HANDY_DISABLE_UPDATER)"
       },
       "whatsNewPreview": {
@@ -577,15 +577,15 @@
       "title": "Acerca de",
       "version": {
         "title": "Versión",
-        "description": "Versión actual de Handy"
+        "description": "Versión actual de Meet Assist"
       },
       "whatsNewUpdates": {
         "label": "Mostrar novedades",
-        "description": "Mostrar notas de la versión después de las actualizaciones de Handy"
+        "description": "Mostrar notas de la versión después de las actualizaciones de Meet Assist"
       },
       "appDataDirectory": {
         "title": "Directorio de datos de la aplicación",
-        "description": "Ubicación donde Handy almacena sus datos"
+        "description": "Ubicación donde Meet Assist almacena sus datos"
       },
       "sourceCode": {
         "title": "Código fuente",
@@ -602,7 +602,7 @@
         "ggml": {
           "title": "ggml",
           "description": "Biblioteca de tensores de alto rendimiento para inferencia de aprendizaje automático en el dispositivo",
-          "details": "El habla a texto local de Handy está construido sobre transcribe.cpp y ggml. Gracias al increíble trabajo de Georgi Gerganov y colaboradores."
+          "details": "El habla a texto local de Meet Assist está construido sobre transcribe.cpp y ggml. Gracias al increíble trabajo de Georgi Gerganov y colaboradores."
         }
       }
     },
@@ -650,7 +650,7 @@
     "portableUpdateBrowseButton": "Abrir GitHub Releases"
   },
   "whatsNew": {
-    "title": "Nuevo en Handy v{{version}}"
+    "title": "Nuevo en Meet Assist v{{version}}"
   },
   "common": {
     "loading": "Cargando...",
@@ -674,11 +674,11 @@
   },
   "appLanguage": {
     "title": "Idioma de la aplicación",
-    "description": "Cambia el idioma de la interfaz de Handy"
+    "description": "Cambia el idioma de la interfaz de Meet Assist"
   },
   "theme": {
     "title": "Tema de la aplicación",
-    "description": "Elige si Handy sigue el tema del sistema o permanece claro u oscuro",
+    "description": "Elige si Meet Assist sigue el tema del sistema o permanece claro u oscuro",
     "options": {
       "system": "Sistema",
       "light": "Claro",

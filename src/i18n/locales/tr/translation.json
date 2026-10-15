@@ -395,7 +395,7 @@
       },
       "rescan": {
         "label": "Yeniden Tara",
-        "tooltip": "Handy dışında modeller klasörüne veya Hugging Face önbelleğine eklenen modelleri yeniden tara"
+        "tooltip": "Meet Assist dışında modeller klasörüne veya Hugging Face önbelleğine eklenen modelleri yeniden tara"
       },
       "noModelsMatch": "Bu filtreyle eşleşen model yok."
     },
@@ -457,11 +457,11 @@
       },
       "autostart": {
         "label": "Başlangıçta Çalıştır",
-        "description": "Bilgisayara giriş yaptığınızda Handy otomatik olarak başlatılır."
+        "description": "Bilgisayara giriş yaptığınızda Meet Assist otomatik olarak başlatılır."
       },
       "showTrayIcon": {
         "label": "Tepsi Simgesini Göster",
-        "description": "Handy simgesini sistem tepsisinde göster."
+        "description": "Meet Assist simgesini sistem tepsisinde göster."
       },
       "translateToEnglish": {
         "label": "İngilizce'ye Çevir",
@@ -538,7 +538,7 @@
       },
       "updateChecks": {
         "label": "Güncellemeleri Kontrol Et",
-        "description": "Handy için yeni sürümleri otomatik olarak kontrol eder",
+        "description": "Meet Assist için yeni sürümleri otomatik olarak kontrol eder",
         "lockedDescription": "Sistem yapılandırması tarafından devre dışı bırakıldı (HANDY_DISABLE_UPDATER)"
       },
       "whatsNewPreview": {
@@ -577,15 +577,15 @@
       "title": "Hakkında",
       "version": {
         "title": "Sürüm",
-        "description": "Handy'nin mevcut sürümü"
+        "description": "Meet Assist'nin mevcut sürümü"
       },
       "whatsNewUpdates": {
         "label": "Yenilikleri Göster",
-        "description": "Handy güncellemelerinden sonra sürüm notlarını göster"
+        "description": "Meet Assist güncellemelerinden sonra sürüm notlarını göster"
       },
       "appDataDirectory": {
         "title": "Uygulama Veri Dizini",
-        "description": "Handy'nin verilerini sakladığı konum"
+        "description": "Meet Assist'nin verilerini sakladığı konum"
       },
       "sourceCode": {
         "title": "Kaynak Kodu",
@@ -602,7 +602,7 @@
         "ggml": {
           "title": "ggml",
           "description": "Cihaz üzerinde makine öğrenmesi çıkarımı için yüksek performanslı tensör kütüphanesi",
-          "details": "Handy'nin yerel konuşmadan metne dönüştürme özelliği transcribe.cpp ve ggml üzerine kuruludur. Georgi Gerganov'a ve katkıda bulunanlara harika çalışmaları için teşekkür ederiz."
+          "details": "Meet Assist'nin yerel konuşmadan metne dönüştürme özelliği transcribe.cpp ve ggml üzerine kuruludur. Georgi Gerganov'a ve katkıda bulunanlara harika çalışmaları için teşekkür ederiz."
         }
       }
     },
@@ -650,7 +650,7 @@
     "portableUpdateBrowseButton": "GitHub Releases’i aç"
   },
   "whatsNew": {
-    "title": "Handy v{{version}} yenilikleri"
+    "title": "Meet Assist v{{version}} yenilikleri"
   },
   "common": {
     "loading": "Yükleniyor...",
@@ -674,11 +674,11 @@
   },
   "appLanguage": {
     "title": "Uygulama Dili",
-    "description": "Handy arayüzünün dilini değiştirin"
+    "description": "Meet Assist arayüzünün dilini değiştirin"
   },
   "theme": {
     "title": "Uygulama Teması",
-    "description": "Handy'nin sistem temasını izlemesini ya da açık veya koyu kalmasını seçin",
+    "description": "Meet Assist'nin sistem temasını izlemesini ya da açık veya koyu kalmasını seçin",
     "options": {
       "system": "Sistem",
       "light": "Açık",

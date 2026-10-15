@@ -849,6 +849,17 @@ async deleteMeeting(id: number) : Promise<Result<null, string>> {
 }
 },
 /**
+ * File path of a transcript line's recorded audio, if one was saved.
+ */
+async getLineAudioPath(lineId: number) : Promise<Result<string | null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_line_audio_path", { lineId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * The user's choice of project for a meeting (`None` = Unfiled).
  */
 async moveMeeting(meetingId: number, projectId: number | null) : Promise<Result<null, string>> {

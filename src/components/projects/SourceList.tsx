@@ -15,7 +15,7 @@ import { useProjectStore } from "@/stores/projectStore";
 import Badge from "../ui/Badge";
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
-import { SettingsGroup } from "../ui/SettingsGroup";
+import { DocSection } from "../shared";
 import { AddSourceDialog } from "./AddSourceDialog";
 
 const KIND_ICON: Record<
@@ -67,38 +67,39 @@ export const SourceList: React.FC<{ projectId: number }> = ({ projectId }) => {
   const [open, setOpen] = useState(false);
 
   return (
-    <SettingsGroup
+    <DocSection
       title={t("projects.sources.title")}
       description={t("projects.sources.description")}
-    >
-      <div className="flex justify-end p-3">
-        <Button size="sm" onClick={() => setOpen(true)}>
-          <Plus className="w-4 h-4 inline mr-1" />
+      action={
+        <Button size="sm" variant="secondary" onClick={() => setOpen(true)}>
+          <Plus className="w-3.5 h-3.5" />
           {t("projects.sources.add")}
         </Button>
-      </div>
+      }
+    >
       {sources.length === 0 ? (
-        <p className="p-4 text-sm text-mid-gray">
-          {t("projects.sources.empty")}
-        </p>
+        <p className="py-2 text-sm text-faint">{t("projects.sources.empty")}</p>
       ) : (
         sources.map((s) => {
           const Icon = KIND_ICON[s.kind];
           return (
-            <div key={s.id} className="p-4">
+            <div
+              key={s.id}
+              className="group -mx-3 px-3 py-2.5 rounded-xl hover:bg-surface transition-colors"
+            >
               <div className="flex items-center gap-3">
-                <Icon className="w-4 h-4 text-logo-primary shrink-0" />
+                <span className="w-8 h-8 shrink-0 inline-flex items-center justify-center rounded-lg border border-line bg-surface text-faint">
+                  <Icon className="w-4 h-4" />
+                </span>
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-semibold text-text truncate">
-                    {s.title}
-                  </div>
-                  <div className="text-xs text-mid-gray truncate">
+                  <div className="text-sm text-text truncate">{s.title}</div>
+                  <div className="text-xs text-faint truncate">
                     {s.kind === "text"
                       ? t("projects.sources.kind.text")
                       : s.locator}
                   </div>
                   {s.status === "failed" && s.error && (
-                    <div className="text-xs text-red-500 mt-1">{s.error}</div>
+                    <div className="text-xs text-error mt-1">{s.error}</div>
                   )}
                 </div>
                 <Badge variant={statusVariant(s.status)}>
@@ -131,6 +132,6 @@ export const SourceList: React.FC<{ projectId: number }> = ({ projectId }) => {
         open={open}
         onOpenChange={setOpen}
       />
-    </SettingsGroup>
+    </DocSection>
   );
 };

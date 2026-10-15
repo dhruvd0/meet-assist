@@ -147,6 +147,53 @@ impl ProjectStore {
         Ok(store)
     }
 
+    /// Per-line meeting audio lives beside the database:
+    /// `meeting-audio/<meeting_id>/<line_id>.wav`.
+    fn meeting_audio_dir(&self, meeting_id: i64) -> PathBuf {
+        self.db_path
+            .with_file_name("meeting-audio")
+            .join(meeting_id.to_string())
+    }
+
+    /// Save the audio a transcript line was transcribed from (16 kHz mono).
+    pub fn save_line_audio(&self, line: &TranscriptLine, samples: &[f32]) -> Result<()> {
+        let meeting_id: i64 = self.conn()?.query_row(
+            "SELECT meeting_id FROM sessions WHERE id = ?1",
+            params![line.session_id],
+            |r| r.get(0),
+        )?;
+        let dir = self.meeting_audio_dir(meeting_id);
+        std::fs::create_dir_all(&dir)?;
+        crate::audio_toolkit::save_wav_file(dir.join(format!("{}.wav", line.id)), samples)
+    }
+
+    /// Path of a line's saved audio, if it was recorded.
+    pub fn line_audio_path(&self, line_id: i64) -> Result<Option<PathBuf>> {
+        let meeting_id: Option<i64> = self
+            .conn()?
+            .query_row(
+                "SELECT s.meeting_id FROM transcript_lines l JOIN sessions s ON s.id = l.session_id
+                 WHERE l.id = ?1",
+                params![line_id],
+                |r| r.get(0),
+            )
+            .optional()?;
+        Ok(meeting_id
+            .map(|m| self.meeting_audio_dir(m).join(format!("{line_id}.wav")))
+            .filter(|p| p.is_file()))
+    }
+
+    /// Remove a deleted meeting's audio. The rows are already gone, so a
+    /// failure here only leaves orphaned files; log it rather than fail.
+    fn remove_meeting_audio(&self, meeting_id: i64) {
+        let dir = self.meeting_audio_dir(meeting_id);
+        match std::fs::remove_dir_all(&dir) {
+            Ok(()) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => log::warn!("remove meeting audio {}: {e}", dir.display()),
+        }
+    }
+
     fn conn(&self) -> Result<Connection> {
         let conn = Connection::open(&self.db_path)?;
         conn.busy_timeout(std::time::Duration::from_secs(5))?;
@@ -232,6 +279,10 @@ impl ProjectStore {
     pub fn delete_project(&self, id: i64) -> Result<()> {
         let mut conn = self.conn()?;
         let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let meeting_ids: Vec<i64> = tx
+            .prepare("SELECT id FROM meetings WHERE project_id = ?1")?
+            .query_map(params![id], |r| r.get(0))?
+            .collect::<rusqlite::Result<_>>()?;
         tx.execute(
             "DELETE FROM source_chunks WHERE source_id IN (SELECT id FROM sources WHERE project_id = ?1)",
             params![id],
@@ -254,6 +305,9 @@ impl ProjectStore {
         tx.execute("DELETE FROM sources WHERE project_id = ?1", params![id])?;
         tx.execute("DELETE FROM projects WHERE id = ?1", params![id])?;
         tx.commit()?;
+        for m in meeting_ids {
+            self.remove_meeting_audio(m);
+        }
         Ok(())
     }
 }
@@ -830,6 +884,7 @@ impl ProjectStore {
         tx.execute("DELETE FROM sessions WHERE meeting_id = ?1", params![id])?;
         tx.execute("DELETE FROM meetings WHERE id = ?1", params![id])?;
         tx.commit()?;
+        self.remove_meeting_audio(id);
         Ok(())
     }
 

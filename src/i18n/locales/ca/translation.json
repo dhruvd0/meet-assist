@@ -395,7 +395,7 @@
       },
       "rescan": {
         "label": "Torna a cercar",
-        "tooltip": "Torna a cercar models afegits a la carpeta de models o a la memòria cau de Hugging Face des de fora del Handy"
+        "tooltip": "Torna a cercar models afegits a la carpeta de models o a la memòria cau de Hugging Face des de fora del Meet Assist"
       },
       "noModelsMatch": "Cap model no coincideix amb aquest filtre."
     },
@@ -457,11 +457,11 @@
       },
       "autostart": {
         "label": "Inicia en entrar a la sessió",
-        "description": "Inicia automàticament el Handy quan entreu a la sessió de l'ordinador."
+        "description": "Inicia automàticament el Meet Assist quan entreu a la sessió de l'ordinador."
       },
       "showTrayIcon": {
         "label": "Mostra la icona a la safata",
-        "description": "Mostra la icona del Handy a la safata del sistema."
+        "description": "Mostra la icona del Meet Assist a la safata del sistema."
       },
       "translateToEnglish": {
         "label": "Traduïu a l'anglès",
@@ -538,7 +538,7 @@
       },
       "updateChecks": {
         "label": "Comproveu si hi ha actualitzacions",
-        "description": "Comprova automàticament si hi ha versions noves del Handy",
+        "description": "Comprova automàticament si hi ha versions noves del Meet Assist",
         "lockedDescription": "Desactivat per la configuració del sistema (HANDY_DISABLE_UPDATER)"
       },
       "whatsNewPreview": {
@@ -577,15 +577,15 @@
       "title": "Quant a",
       "version": {
         "title": "Versió",
-        "description": "Versió actual del Handy"
+        "description": "Versió actual del Meet Assist"
       },
       "whatsNewUpdates": {
         "label": "Mostra les novetats",
-        "description": "Mostra les notes de la versió després d'actualitzar el Handy"
+        "description": "Mostra les notes de la versió després d'actualitzar el Meet Assist"
       },
       "appDataDirectory": {
         "title": "Directori de dades de l'aplicació",
-        "description": "Ubicació on el Handy desa les dades"
+        "description": "Ubicació on el Meet Assist desa les dades"
       },
       "sourceCode": {
         "title": "Codi font",
@@ -602,7 +602,7 @@
         "ggml": {
           "title": "ggml",
           "description": "Biblioteca de tensors d'alt rendiment per a la inferència d'aprenentatge automàtic al dispositiu",
-          "details": "La transcripció local de veu a text del Handy es basa en el transcribe.cpp i el ggml. Gràcies a la gran feina de Georgi Gerganov i dels col·laboradors."
+          "details": "La transcripció local de veu a text del Meet Assist es basa en el transcribe.cpp i el ggml. Gràcies a la gran feina de Georgi Gerganov i dels col·laboradors."
         }
       }
     },
@@ -650,7 +650,7 @@
     "portableUpdateBrowseButton": "Obriu GitHub Releases"
   },
   "whatsNew": {
-    "title": "Novetats del Handy v{{version}}"
+    "title": "Novetats del Meet Assist v{{version}}"
   },
   "common": {
     "loading": "S'està carregant...",
@@ -674,11 +674,11 @@
   },
   "appLanguage": {
     "title": "Llengua de l'aplicació",
-    "description": "Canvia la llengua de la interfície del Handy"
+    "description": "Canvia la llengua de la interfície del Meet Assist"
   },
   "theme": {
     "title": "Tema de l'aplicació",
-    "description": "Tria si el Handy segueix el tema del sistema o es manté en mode clar o fosc",
+    "description": "Tria si el Meet Assist segueix el tema del sistema o es manté en mode clar o fosc",
     "options": {
       "system": "Sistema",
       "light": "Clar",

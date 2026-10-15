@@ -395,7 +395,7 @@
       },
       "rescan": {
         "label": "סריקה מחדש",
-        "tooltip": "סריקה מחדש לאיתור מודלים שנוספו לתיקיית המודלים או למטמון של Hugging Face מחוץ ל-Handy"
+        "tooltip": "סריקה מחדש לאיתור מודלים שנוספו לתיקיית המודלים או למטמון של Hugging Face מחוץ ל-Meet Assist"
       },
       "noModelsMatch": "אין מודלים שמתאימים לסינון הזה."
     },
@@ -457,11 +457,11 @@
       },
       "autostart": {
         "label": "הפעל עם עליית המערכת",
-        "description": "הפעל את Handy אוטומטית כשאתה מתחבר למחשב."
+        "description": "הפעל את Meet Assist אוטומטית כשאתה מתחבר למחשב."
       },
       "showTrayIcon": {
         "label": "הצג אייקון במגש",
-        "description": "הצג את האייקון של Handy במגש המערכת."
+        "description": "הצג את האייקון של Meet Assist במגש המערכת."
       },
       "translateToEnglish": {
         "label": "תרגם לאנגלית",
@@ -538,7 +538,7 @@
       },
       "updateChecks": {
         "label": "בדוק עדכונים",
-        "description": "בדוק אוטומטית אם קיימות גרסאות חדשות של Handy",
+        "description": "בדוק אוטומטית אם קיימות גרסאות חדשות של Meet Assist",
         "lockedDescription": "מושבת על ידי תצורת המערכת (HANDY_DISABLE_UPDATER)"
       },
       "whatsNewPreview": {
@@ -577,15 +577,15 @@
       "title": "אודות",
       "version": {
         "title": "גרסה",
-        "description": "הגרסה הנוכחית של Handy"
+        "description": "הגרסה הנוכחית של Meet Assist"
       },
       "whatsNewUpdates": {
         "label": "הצג מה חדש",
-        "description": "הצג הערות גרסה לאחר עדכוני Handy"
+        "description": "הצג הערות גרסה לאחר עדכוני Meet Assist"
       },
       "appDataDirectory": {
         "title": "תיקיית נתוני אפליקציה",
-        "description": "המיקום שבו Handy שומר את הנתונים שלו"
+        "description": "המיקום שבו Meet Assist שומר את הנתונים שלו"
       },
       "sourceCode": {
         "title": "קוד מקור",
@@ -602,7 +602,7 @@
         "ggml": {
           "title": "ggml",
           "description": "הסקה מהירה לביצועים גבוהים עבור מודל זיהוי הדיבור Whisper של OpenAI",
-          "details": "Handy משתמש ב-ggml לתמלול מהיר ומקומי. תודה לעבודה המדהימה של Georgi Gerganov וכל התורמים."
+          "details": "Meet Assist משתמש ב-ggml לתמלול מהיר ומקומי. תודה לעבודה המדהימה של Georgi Gerganov וכל התורמים."
         }
       }
     },
@@ -650,7 +650,7 @@
     "portableUpdateBrowseButton": "פתח את GitHub Releases"
   },
   "whatsNew": {
-    "title": "חדש ב-Handy v{{version}}"
+    "title": "חדש ב-Meet Assist v{{version}}"
   },
   "common": {
     "loading": "טוען...",
@@ -674,11 +674,11 @@
   },
   "appLanguage": {
     "title": "שפת האפליקציה",
-    "description": "שנה את שפת הממשק של Handy"
+    "description": "שנה את שפת הממשק של Meet Assist"
   },
   "theme": {
     "title": "ערכת נושא של האפליקציה",
-    "description": "בחר אם Handy יעקוב אחר ערכת הנושא של המערכת או יישאר בהיר או כהה",
+    "description": "בחר אם Meet Assist יעקוב אחר ערכת הנושא של המערכת או יישאר בהיר או כהה",
     "options": {
       "system": "מערכת",
       "light": "בהיר",

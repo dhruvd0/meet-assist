@@ -1,8 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useMeetingStore } from "@/stores/meetingStore";
-import { SettingsGroup } from "../ui/SettingsGroup";
-import { Textarea } from "../ui/Textarea";
+import { DocSection, DocTextarea } from "../shared";
 
 export const ContextEditor: React.FC<{
   meetingId: number;
@@ -44,18 +43,15 @@ export const ContextEditor: React.FC<{
   };
 
   return (
-    <SettingsGroup
+    <DocSection
       title={t("meetings.context.title")}
       description={t("meetings.context.description")}
     >
-      <div className="p-4">
-        <Textarea
-          className="w-full"
-          placeholder={t("meetings.context.placeholder")}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-        />
-      </div>
-    </SettingsGroup>
+      <DocTextarea
+        placeholder={t("meetings.context.placeholder")}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </DocSection>
   );
 };

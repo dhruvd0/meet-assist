@@ -551,7 +551,7 @@ impl MeetingManager {
             Err(first) => {
                 warn!("transcribe failed once ({first:#}); retrying");
                 std::thread::sleep(Duration::from_millis(500));
-                transcriber.transcribe(samples)?
+                transcriber.transcribe(samples.clone())?
             }
         };
         let text = text.trim();
@@ -570,9 +570,12 @@ impl MeetingManager {
             debug!("dropping {speaker} line echoed from the other channel: {text}");
             return Ok(None);
         }
-        Ok(Some(
-            store.append_line(session_id, &speaker, text, started_at)?,
-        ))
+        let line = store.append_line(session_id, &speaker, text, started_at)?;
+        // Keep the utterance so the transcript can be played back.
+        if let Err(e) = store.save_line_audio(&line, &samples) {
+            warn!("save line audio: {e:#}");
+        }
+        Ok(Some(line))
     }
 
     /// Public for tests and for a future system-audio path; the worker uses
