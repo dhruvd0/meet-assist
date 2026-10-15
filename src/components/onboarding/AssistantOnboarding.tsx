@@ -50,7 +50,7 @@ export const AssistantOnboarding: React.FC<AssistantOnboardingProps> = ({
         <h2 className="text-xl font-semibold">
           {t("onboarding.assistant.title")}
         </h2>
-        <p className="text-text/70">{t("onboarding.assistant.description")}</p>
+        <p className="text-muted">{t("onboarding.assistant.description")}</p>
       </div>
 
       <div className="max-w-xl w-full flex flex-col gap-3">
@@ -118,18 +118,18 @@ export const AssistantOnboarding: React.FC<AssistantOnboardingProps> = ({
           </Button>
           <div role="status" aria-live="polite">
             {test.status === "success" && (
-              <span className="text-sm text-green-500">
+              <span className="text-sm text-ok">
                 {t("onboarding.assistant.success", { count: test.count })}
               </span>
             )}
             {test.status === "failure" && (
-              <span className="text-sm text-red-500">
+              <span className="text-sm text-error">
                 {t("onboarding.assistant.failure", { error: test.error })}
               </span>
             )}
           </div>
         </div>
-        <p className="text-xs text-text/50">{t("onboarding.assistant.hint")}</p>
+        <p className="text-xs text-faint">{t("onboarding.assistant.hint")}</p>
       </div>
 
       <div className="flex gap-3">

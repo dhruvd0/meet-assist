@@ -1,8 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useProjectStore } from "@/stores/projectStore";
-import { SettingsGroup } from "../ui/SettingsGroup";
-import { Textarea } from "../ui/Textarea";
+import { DocSection, DocTextarea } from "../shared";
 
 export const BriefEditor: React.FC<{ projectId: number; brief: string }> = ({
   projectId,
@@ -44,18 +43,15 @@ export const BriefEditor: React.FC<{ projectId: number; brief: string }> = ({
   };
 
   return (
-    <SettingsGroup
+    <DocSection
       title={t("projects.brief.title")}
       description={t("projects.brief.description")}
     >
-      <div className="p-4">
-        <Textarea
-          className="w-full"
-          placeholder={t("projects.brief.placeholder")}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-        />
-      </div>
-    </SettingsGroup>
+      <DocTextarea
+        placeholder={t("projects.brief.placeholder")}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </DocSection>
   );
 };

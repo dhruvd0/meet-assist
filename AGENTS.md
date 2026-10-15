@@ -75,13 +75,13 @@ Meet Assist is a cross-platform, meeting-only desktop app built with Tauri 2.x (
 
 ### Frontend Structure (src/)
 
-- `App.tsx` - Main component with onboarding flow
+- `App.tsx` - App shell: onboarding, sidebar, page routing (home, space, meeting, settings), live dock
 - `components/` - React UI components:
-  - `settings/` - Settings UI
+  - `settings/` - Settings UI (`SettingsView.tsx` tabs)
   - `model-selector/` - Model management interface
   - `onboarding/` - First-run experience
   - `update-checker/` - App update notifications
-  - `shared/`, `ui/`, `icons/`, `footer/` - Shared components
+  - `shared/` (`DocSection`), `ui/`, `icons/` (`Wordmark`) - Shared components
 - `hooks/useSettings.ts` - Settings state management hook
 - `stores/settingsStore.ts` - Zustand store for settings
 - `bindings.ts` - Auto-generated Tauri type bindings (via tauri-specta)
@@ -100,7 +100,7 @@ Meet Assist is a cross-platform, meeting-only desktop app built with Tauri 2.x (
 
 ### Meeting Subsystem
 
-Built; see `docs/ARCHITECTURE.md` for the full table. Backend code lives under `src-tauri/src/meeting/`: `mod.rs`, `store.rs`, `chunk.rs`, `indexer.rs`, `manager.rs` (projects, sources, vision digests via `Describer`), `capture.rs` (mic capture, `MeetingSink`), `system_capture.rs` and `resample.rs` (system audio loopback tagged `them`), `segment.rs`, `session.rs` (`MeetingManager`, `CombinedCapture`), `toggle.rs` (`toggle_meeting`, the one entry point for shortcut, tray, CLI, and SIGUSR2), `filing.rs` (assistant files unfiled meetings into projects), `observer.rs`, `tools.rs`, and `summary.rs` (session and rolling summaries). Commands are in `commands/project.rs` and `commands/meeting.rs`; the floating card is `intervention.rs`. Frontend code lives under `src/components/projects/`, `src/components/meetings/`, `src/components/settings/meeting/`, `src/components/onboarding/AssistantOnboarding.tsx`, `src/stores/projectStore.ts`, `src/stores/meetingStore.ts`, and the separate window entry `src/intervention/`. Reuse `TranscriptionManager`, `CaptureVad`, `llm_client`, `audio_feedback`, and `components/ui`. Do not add a second LLM client, a second VAD, or new UI primitives. Keep the existing design language.
+Built; see `docs/ARCHITECTURE.md` for the full table. Backend code lives under `src-tauri/src/meeting/`: `mod.rs`, `store.rs`, `chunk.rs`, `indexer.rs`, `manager.rs` (projects, sources, vision digests via `Describer`), `capture.rs` (mic capture, `MeetingSink`), `system_capture.rs` and `resample.rs` (system audio loopback tagged `them`), `segment.rs`, `session.rs` (`MeetingManager`, `CombinedCapture`), `toggle.rs` (`toggle_meeting`, the one entry point for shortcut, tray, CLI, and SIGUSR2), `filing.rs` (assistant files unfiled meetings into projects), `observer.rs`, `tools.rs`, and `summary.rs` (session and rolling summaries). Commands are in `commands/project.rs` and `commands/meeting.rs`; the floating card is `intervention.rs`. Frontend code lives under `src/components/projects/`, `src/components/meetings/`, `src/components/settings/meeting/`, `src/components/onboarding/AssistantOnboarding.tsx`, `src/stores/projectStore.ts`, `src/stores/meetingStore.ts`, and the separate window entry `src/intervention/`. Reuse `TranscriptionManager`, `CaptureVad`, `llm_client`, `audio_feedback`, and `components/ui`. Do not add a second LLM client, a second VAD, or new UI primitives. Follow DESIGN.md (t3.codes tokens in `src/styles/theme.css`, Granola-style shell).
 
 ### Technology Stack
 

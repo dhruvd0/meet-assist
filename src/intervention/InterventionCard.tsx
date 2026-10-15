@@ -149,23 +149,21 @@ export const InterventionCard: React.FC = () => {
   };
 
   const action =
-    "text-xs font-medium text-logo-primary hover:underline cursor-pointer";
+    "text-xs font-medium text-accent hover:underline cursor-pointer";
 
   return (
     <div
-      className="h-screen w-screen p-3 bg-background text-text rounded-xl border border-mid-gray/30 shadow-lg flex flex-col gap-2"
+      className="h-screen w-screen p-3 bg-background text-text rounded-xl border border-line shadow-lg flex flex-col gap-2"
       onMouseEnter={() => (hovered.current = true)}
       onMouseLeave={() => (hovered.current = false)}
     >
       <div className="flex items-center gap-2">
-        <Icon className="w-4 h-4 text-logo-primary shrink-0" />
-        <span className="text-xs font-medium uppercase tracking-wide text-mid-gray flex-1">
-          {label}
-        </span>
+        <Icon className="w-4 h-4 text-accent shrink-0" />
+        <span className="text-xs font-medium text-muted flex-1">{label}</span>
         <button
           type="button"
           aria-label={t("meetings.intervention.dismiss")}
-          className="text-mid-gray hover:text-text cursor-pointer"
+          className="text-muted hover:text-text cursor-pointer"
           title={t("meetings.intervention.dismiss")}
           onClick={onDismiss}
         >

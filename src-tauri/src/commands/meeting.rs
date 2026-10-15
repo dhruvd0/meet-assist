@@ -89,6 +89,16 @@ pub fn delete_meeting(mm: Mm<'_>, id: i64) -> Result<(), String> {
     mm.store().delete_meeting(id).map_err(err)
 }
 
+/// File path of a transcript line's recorded audio, if one was saved.
+#[tauri::command]
+#[specta::specta]
+pub fn get_line_audio_path(mm: Mm<'_>, line_id: i64) -> Result<Option<String>, String> {
+    mm.store()
+        .line_audio_path(line_id)
+        .map(|p| p.map(|p| p.to_string_lossy().into_owned()))
+        .map_err(err)
+}
+
 /// The user's choice of project for a meeting (`None` = Unfiled).
 #[tauri::command]
 #[specta::specta]

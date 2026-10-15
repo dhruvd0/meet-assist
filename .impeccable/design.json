@@ -1,0 +1,635 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-15T00:00:00Z",
+  "title": "Design System: Meet Assist",
+  "extensions": {
+    "colorMeta": {
+      "accent": {
+        "role": "primary",
+        "displayName": "Signal Blue",
+        "canonical": "oklch(0.55 0.19 255)",
+        "tonalRamp": [
+          "oklch(0.15 0.15 255)",
+          "oklch(0.27 0.15 255)",
+          "oklch(0.38 0.15 255)",
+          "oklch(0.5 0.15 255)",
+          "oklch(0.62 0.15 255)",
+          "oklch(0.74 0.15 255)",
+          "oklch(0.85 0.15 255)",
+          "oklch(0.95 0.15 255)"
+        ]
+      },
+      "accent-dark": {
+        "role": "primary",
+        "displayName": "Signal Blue (dark)",
+        "canonical": "oklch(0.68 0.17 250)",
+        "tonalRamp": [
+          "oklch(0.15 0.14 250)",
+          "oklch(0.27 0.14 250)",
+          "oklch(0.38 0.14 250)",
+          "oklch(0.5 0.14 250)",
+          "oklch(0.62 0.14 250)",
+          "oklch(0.74 0.14 250)",
+          "oklch(0.85 0.14 250)",
+          "oklch(0.95 0.14 250)"
+        ]
+      },
+      "background": {
+        "role": "neutral",
+        "displayName": "Canvas",
+        "canonical": "#ffffff",
+        "tonalRamp": [
+          "#09090b",
+          "#18181b",
+          "#27272a",
+          "#3f3f46",
+          "#52525b",
+          "#71717a",
+          "#a1a1aa",
+          "#e4e4e7"
+        ]
+      },
+      "background-dark": {
+        "role": "neutral",
+        "displayName": "Canvas (dark)",
+        "canonical": "#09090b",
+        "tonalRamp": [
+          "#09090b",
+          "#18181b",
+          "#27272a",
+          "#3f3f46",
+          "#52525b",
+          "#71717a",
+          "#a1a1aa",
+          "#e4e4e7"
+        ]
+      },
+      "sidebar": {
+        "role": "neutral",
+        "displayName": "Sidebar Zinc",
+        "canonical": "#f7f7f8",
+        "tonalRamp": [
+          "#09090b",
+          "#18181b",
+          "#27272a",
+          "#3f3f46",
+          "#52525b",
+          "#71717a",
+          "#a1a1aa",
+          "#e4e4e7"
+        ]
+      },
+      "sidebar-dark": {
+        "role": "neutral",
+        "displayName": "Sidebar Zinc (dark)",
+        "canonical": "#0c0c0e",
+        "tonalRamp": [
+          "#09090b",
+          "#18181b",
+          "#27272a",
+          "#3f3f46",
+          "#52525b",
+          "#71717a",
+          "#a1a1aa",
+          "#e4e4e7"
+        ]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Surface",
+        "canonical": "#f4f4f5",
+        "tonalRamp": [
+          "#09090b",
+          "#18181b",
+          "#27272a",
+          "#3f3f46",
+          "#52525b",
+          "#71717a",
+          "#a1a1aa",
+          "#e4e4e7"
+        ]
+      },
+      "surface-dark": {
+        "role": "neutral",
+        "displayName": "Surface (dark)",
+        "canonical": "#111113",
+        "tonalRamp": [
+          "#09090b",
+          "#18181b",
+          "#27272a",
+          "#3f3f46",
+          "#52525b",
+          "#71717a",
+          "#a1a1aa",
+          "#e4e4e7"
+        ]
+      },
+      "surface-hover": {
+        "role": "neutral",
+        "displayName": "Surface Hover",
+        "canonical": "#ebebed",
+        "tonalRamp": [
+          "#09090b",
+          "#18181b",
+          "#27272a",
+          "#3f3f46",
+          "#52525b",
+          "#71717a",
+          "#a1a1aa",
+          "#e4e4e7"
+        ]
+      },
+      "surface-hover-dark": {
+        "role": "neutral",
+        "displayName": "Surface Hover (dark)",
+        "canonical": "#18181b",
+        "tonalRamp": [
+          "#09090b",
+          "#18181b",
+          "#27272a",
+          "#3f3f46",
+          "#52525b",
+          "#71717a",
+          "#a1a1aa",
+          "#e4e4e7"
+        ]
+      },
+      "text": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "#09090b",
+        "tonalRamp": [
+          "#09090b",
+          "#18181b",
+          "#27272a",
+          "#3f3f46",
+          "#52525b",
+          "#71717a",
+          "#a1a1aa",
+          "#e4e4e7"
+        ]
+      },
+      "text-dark": {
+        "role": "neutral",
+        "displayName": "Ink (dark)",
+        "canonical": "#fafafa",
+        "tonalRamp": [
+          "#09090b",
+          "#18181b",
+          "#27272a",
+          "#3f3f46",
+          "#52525b",
+          "#71717a",
+          "#a1a1aa",
+          "#e4e4e7"
+        ]
+      },
+      "text-muted": {
+        "role": "neutral",
+        "displayName": "Muted Ink",
+        "canonical": "#52525b",
+        "tonalRamp": [
+          "#09090b",
+          "#18181b",
+          "#27272a",
+          "#3f3f46",
+          "#52525b",
+          "#71717a",
+          "#a1a1aa",
+          "#e4e4e7"
+        ]
+      },
+      "text-muted-dark": {
+        "role": "neutral",
+        "displayName": "Muted Ink (dark)",
+        "canonical": "#a1a1aa",
+        "tonalRamp": [
+          "#09090b",
+          "#18181b",
+          "#27272a",
+          "#3f3f46",
+          "#52525b",
+          "#71717a",
+          "#a1a1aa",
+          "#e4e4e7"
+        ]
+      },
+      "text-faint": {
+        "role": "neutral",
+        "displayName": "Faint Ink",
+        "canonical": "#71717a",
+        "tonalRamp": [
+          "#09090b",
+          "#18181b",
+          "#27272a",
+          "#3f3f46",
+          "#52525b",
+          "#71717a",
+          "#a1a1aa",
+          "#e4e4e7"
+        ]
+      },
+      "text-faint-dark": {
+        "role": "neutral",
+        "displayName": "Faint Ink (dark)",
+        "canonical": "#7c7c86",
+        "tonalRamp": [
+          "#09090b",
+          "#18181b",
+          "#27272a",
+          "#3f3f46",
+          "#52525b",
+          "#71717a",
+          "#a1a1aa",
+          "#e4e4e7"
+        ]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "#09090b14",
+        "tonalRamp": [
+          "#09090b",
+          "#18181b",
+          "#27272a",
+          "#3f3f46",
+          "#52525b",
+          "#71717a",
+          "#a1a1aa",
+          "#e4e4e7"
+        ]
+      },
+      "line-dark": {
+        "role": "neutral",
+        "displayName": "Hairline (dark)",
+        "canonical": "#ffffff14",
+        "tonalRamp": [
+          "#09090b",
+          "#18181b",
+          "#27272a",
+          "#3f3f46",
+          "#52525b",
+          "#71717a",
+          "#a1a1aa",
+          "#e4e4e7"
+        ]
+      },
+      "line-strong": {
+        "role": "neutral",
+        "displayName": "Strong Hairline",
+        "canonical": "#09090b26",
+        "tonalRamp": [
+          "#09090b",
+          "#18181b",
+          "#27272a",
+          "#3f3f46",
+          "#52525b",
+          "#71717a",
+          "#a1a1aa",
+          "#e4e4e7"
+        ]
+      },
+      "line-strong-dark": {
+        "role": "neutral",
+        "displayName": "Strong Hairline (dark)",
+        "canonical": "#ffffff24",
+        "tonalRamp": [
+          "#09090b",
+          "#18181b",
+          "#27272a",
+          "#3f3f46",
+          "#52525b",
+          "#71717a",
+          "#a1a1aa",
+          "#e4e4e7"
+        ]
+      },
+      "ok": {
+        "role": "status",
+        "displayName": "OK Green",
+        "canonical": "oklch(0.55 0.15 150)",
+        "tonalRamp": [
+          "oklch(0.15 0.14 150)",
+          "oklch(0.27 0.14 150)",
+          "oklch(0.38 0.14 150)",
+          "oklch(0.5 0.14 150)",
+          "oklch(0.62 0.14 150)",
+          "oklch(0.74 0.14 150)",
+          "oklch(0.85 0.14 150)",
+          "oklch(0.95 0.14 150)"
+        ]
+      },
+      "ok-dark": {
+        "role": "status",
+        "displayName": "OK Green (dark)",
+        "canonical": "oklch(0.72 0.16 150)",
+        "tonalRamp": [
+          "oklch(0.15 0.14 150)",
+          "oklch(0.27 0.14 150)",
+          "oklch(0.38 0.14 150)",
+          "oklch(0.5 0.14 150)",
+          "oklch(0.62 0.14 150)",
+          "oklch(0.74 0.14 150)",
+          "oklch(0.85 0.14 150)",
+          "oklch(0.95 0.14 150)"
+        ]
+      },
+      "warning": {
+        "role": "status",
+        "displayName": "Warning Amber",
+        "canonical": "oklch(0.58 0.15 65)",
+        "tonalRamp": [
+          "oklch(0.15 0.14 70)",
+          "oklch(0.27 0.14 70)",
+          "oklch(0.38 0.14 70)",
+          "oklch(0.5 0.14 70)",
+          "oklch(0.62 0.14 70)",
+          "oklch(0.74 0.14 70)",
+          "oklch(0.85 0.14 70)",
+          "oklch(0.95 0.14 70)"
+        ]
+      },
+      "warning-dark": {
+        "role": "status",
+        "displayName": "Warning Amber (dark)",
+        "canonical": "oklch(0.76 0.15 75)",
+        "tonalRamp": [
+          "oklch(0.15 0.14 70)",
+          "oklch(0.27 0.14 70)",
+          "oklch(0.38 0.14 70)",
+          "oklch(0.5 0.14 70)",
+          "oklch(0.62 0.14 70)",
+          "oklch(0.74 0.14 70)",
+          "oklch(0.85 0.14 70)",
+          "oklch(0.95 0.14 70)"
+        ]
+      },
+      "error": {
+        "role": "status",
+        "displayName": "Error Red",
+        "canonical": "oklch(0.55 0.2 25)",
+        "tonalRamp": [
+          "oklch(0.15 0.14 25)",
+          "oklch(0.27 0.14 25)",
+          "oklch(0.38 0.14 25)",
+          "oklch(0.5 0.14 25)",
+          "oklch(0.62 0.14 25)",
+          "oklch(0.74 0.14 25)",
+          "oklch(0.85 0.14 25)",
+          "oklch(0.95 0.14 25)"
+        ]
+      },
+      "error-dark": {
+        "role": "status",
+        "displayName": "Error Red (dark)",
+        "canonical": "oklch(0.7 0.17 25)",
+        "tonalRamp": [
+          "oklch(0.15 0.14 25)",
+          "oklch(0.27 0.14 25)",
+          "oklch(0.38 0.14 25)",
+          "oklch(0.5 0.14 25)",
+          "oklch(0.62 0.14 25)",
+          "oklch(0.74 0.14 25)",
+          "oklch(0.85 0.14 25)",
+          "oklch(0.95 0.14 25)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Page titles only (Home, space, meeting, Settings); the wordmark at 17px."
+      },
+      "numeral": {
+        "displayName": "Numeral",
+        "purpose": "Day-of-month figure in the Now card date block."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Document section headings with a faint hanging '#'."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Sub-headings in notes and summaries; settings group titles."
+      },
+      "body-doc": {
+        "displayName": "Body Doc",
+        "purpose": "Reading text in notes, summaries, agenda, briefs."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Base UI text."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Group headings, speaker labels, subtitles, descriptions."
+      },
+      "mono": {
+        "displayName": "Mono",
+        "purpose": "Times, durations, elapsed timer, keycaps, version."
+      }
+    },
+    "shadows": [
+      {
+        "name": "float",
+        "value": "0 16px 40px -12px rgb(0 0 0 / 0.45)",
+        "purpose": "Toasts and the live dock (the dock adds a contact shadow)."
+      },
+      {
+        "name": "float-contact",
+        "value": "0 2px 6px -2px rgb(0 0 0 / 0.2)",
+        "purpose": "Second layer under the live dock only."
+      },
+      {
+        "name": "popover",
+        "value": "0 12px 32px -8px rgb(0 0 0 / 0.35)",
+        "purpose": "Tooltips and select menus."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-out-expo",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Entrances (page-in) and the live pulse."
+      },
+      {
+        "name": "state",
+        "value": "150ms",
+        "purpose": "Color, border, and opacity transitions on controls."
+      },
+      {
+        "name": "page-in",
+        "value": "320ms ease-out-expo; opacity 0.7 to 1, translateY 4px to 0",
+        "purpose": "Each page settles into place on open."
+      },
+      {
+        "name": "live-pulse",
+        "value": "1.8s ease-out-expo infinite; accent ring 0 to 5px",
+        "purpose": "Live dots on the sidebar, feed tiles, and meeting meta."
+      },
+      {
+        "name": "level",
+        "value": "0.9s ease-in-out infinite; bar height 4px to 14px, 140ms stagger",
+        "purpose": "Dock level meter while recording."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "prefers-reduced-motion: reduce disables live-pulse, level, page-in",
+        "purpose": "Accessibility."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "window-min",
+        "value": "760px"
+      }
+    ],
+    "themes": {
+      "mechanism": "Light by default; follows prefers-color-scheme; :root[data-theme=light|dark] forces a theme. Every *-dark color token is the dark half of a pair defined in src/styles/theme.css."
+    }
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Inverted ink button for the one main action (Start meeting, toast actions).",
+      "html": "<button class=\"ds-btn-primary\">Start meeting</button>",
+      "css": ".ds-btn-primary { font-family: var(--font-sans); display:inline-flex; align-items:center; gap:6px; height:32px; padding:0 14px; font-size:14px; font-weight:500; color:var(--color-background); background:var(--color-text); border:1px solid var(--color-text); border-radius:12px; cursor:pointer; transition:background-color 150ms, border-color 150ms, opacity 150ms; } .ds-btn-primary:hover { background:color-mix(in srgb, var(--color-text) 85%, transparent); border-color:color-mix(in srgb, var(--color-text) 85%, transparent); } .ds-btn-primary:focus-visible { outline:2px solid color-mix(in oklab, var(--color-accent) 70%, transparent); outline-offset:2px; } .ds-btn-primary:disabled { opacity:.4; cursor:not-allowed; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Surface button with a hairline for supporting actions.",
+      "html": "<button class=\"ds-btn-secondary\">Open</button>",
+      "css": ".ds-btn-secondary { font-family: var(--font-sans); display:inline-flex; align-items:center; gap:6px; height:32px; padding:0 14px; font-size:14px; font-weight:500; color:var(--color-text); background:var(--color-surface); border:1px solid var(--color-line); border-radius:12px; cursor:pointer; transition:background-color 150ms, border-color 150ms; } .ds-btn-secondary:hover { background:var(--color-surface-hover); border-color:var(--color-line-strong); } .ds-btn-secondary:focus-visible { outline:2px solid color-mix(in oklab, var(--color-accent) 70%, transparent); outline-offset:2px; }"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Muted text button that fills on hover.",
+      "html": "<button class=\"ds-btn-ghost\">Cancel</button>",
+      "css": ".ds-btn-ghost { font-family: var(--font-sans); display:inline-flex; align-items:center; height:32px; padding:0 14px; font-size:14px; font-weight:500; color:var(--color-text-muted); background:transparent; border:1px solid transparent; border-radius:12px; cursor:pointer; transition:background-color 150ms, color 150ms; } .ds-btn-ghost:hover { color:var(--color-text); background:var(--color-surface-hover); } .ds-btn-ghost:focus-visible { outline:2px solid color-mix(in oklab, var(--color-accent) 70%, transparent); outline-offset:2px; }"
+    },
+    {
+      "name": "Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Surface field with hairline; border shifts to accent on focus.",
+      "html": "<input class=\"ds-input\" placeholder=\"Space name\" />",
+      "css": ".ds-input { font-family: var(--font-sans); height:36px; padding:0 12px; font-size:14px; color:var(--color-text); background:var(--color-surface); border:1px solid var(--color-line); border-radius:12px; transition:border-color 150ms; } .ds-input::placeholder { color:var(--color-text-faint); } .ds-input:hover { border-color:var(--color-line-strong); } .ds-input:focus { outline:none; border-color:color-mix(in oklab, var(--color-accent) 70%, transparent); }"
+    },
+    {
+      "name": "Sidebar Navigation",
+      "kind": "nav",
+      "refersTo": "nav-item",
+      "description": "Sidebar rows; active is ink on surface-hover, a live space shows a pulsing accent dot.",
+      "html": "<nav class=\"ds-nav\"><button class=\"ds-nav-item ds-active\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8\"/><path d=\"M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z\"/></svg><span>Home</span></button><button class=\"ds-nav-item\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z\"/></svg><span>Roadmap</span><i class=\"ds-live-dot\"></i></button></nav>",
+      "css": ".ds-nav { width:240px; padding:8px; background:var(--color-sidebar); border-inline-end:1px solid var(--color-line); } .ds-nav-item { font-family: var(--font-sans); width:100%; display:flex; align-items:center; gap:10px; height:32px; padding:0 10px; border:0; border-radius:12px; background:transparent; color:var(--color-text-muted); font-size:13.5px; cursor:pointer; transition:background-color 150ms, color 150ms; } .ds-nav-item svg { color:var(--color-text-faint); flex-shrink:0; } .ds-nav-item span { flex:1; text-align:start; } .ds-nav-item:hover { color:var(--color-text); background:var(--color-surface); } .ds-nav-item.ds-active { color:var(--color-text); background:var(--color-surface-hover); } .ds-nav-item.ds-active svg { color:var(--color-text); } .ds-live-dot { width:6px; height:6px; border-radius:9999px; background:var(--color-accent); animation:ds-pulse 1.8s cubic-bezier(0.16,1,0.3,1) infinite; } @keyframes ds-pulse { 0% { box-shadow:0 0 0 0 color-mix(in oklab, var(--color-accent) 55%, transparent); } 70%,100% { box-shadow:0 0 0 5px transparent; } }"
+    },
+    {
+      "name": "Meta Chip and Live Badge",
+      "kind": "chip",
+      "refersTo": "chip-meta",
+      "description": "Pill meta chip (mono date) beside the accent Live badge on a meeting page.",
+      "html": "<div class=\"ds-meta\"><span class=\"ds-chip\">Thu, Oct 15, 1:34 PM</span><span class=\"ds-badge\"><i></i>Live</span></div>",
+      "css": ".ds-meta { display:flex; gap:8px; align-items:center; } .ds-chip { display:inline-flex; align-items:center; height:32px; padding:0 12px; border:1px solid var(--color-line); border-radius:9999px; font-family:var(--font-mono); font-size:12px; color:var(--color-text-muted); } .ds-badge { font-family: var(--font-sans); display:inline-flex; align-items:center; gap:4px; height:20px; padding:0 8px; border-radius:9999px; font-size:11px; font-weight:500; color:var(--color-accent); background:color-mix(in srgb, var(--color-accent) 15%, transparent); } .ds-badge i { width:6px; height:6px; border-radius:9999px; background:var(--color-accent); }"
+    },
+    {
+      "name": "Meeting Feed Row",
+      "kind": "card",
+      "refersTo": "feed-row",
+      "description": "Home feed row: icon tile, title over faint subtitle, right-aligned mono time.",
+      "html": "<button class=\"ds-row\"><span class=\"ds-tile\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z\"/><path d=\"M14 2v4a2 2 0 0 0 2 2h4\"/><path d=\"M10 9H8\"/><path d=\"M16 13H8\"/><path d=\"M16 17H8\"/></svg></span><span class=\"ds-row-text\"><span class=\"ds-row-title\">Weekly sync</span><span class=\"ds-row-sub\">Roadmap</span></span><span class=\"ds-row-time\">12:30 PM</span></button>",
+      "css": ".ds-row { font-family: var(--font-sans); width:100%; display:flex; align-items:center; gap:14px; padding:10px 12px; border:0; border-radius:16px; background:transparent; text-align:start; cursor:pointer; transition:background-color 150ms; } .ds-row:hover { background:var(--color-surface); } .ds-row:focus-visible { outline:2px solid color-mix(in oklab, var(--color-accent) 70%, transparent); outline-offset:2px; } .ds-tile { width:36px; height:36px; flex-shrink:0; display:inline-flex; align-items:center; justify-content:center; border:1px solid var(--color-line); border-radius:12px; background:var(--color-surface); color:var(--color-text-faint); } .ds-row-text { flex:1; min-width:0; display:flex; flex-direction:column; } .ds-row-title { font-size:14.5px; line-height:20px; color:var(--color-text); } .ds-row-sub { font-size:13px; line-height:20px; color:var(--color-text-faint); } .ds-row-time { font-family:var(--font-mono); font-size:11.5px; color:var(--color-text-faint); font-variant-numeric:tabular-nums; }"
+    },
+    {
+      "name": "Nudge Card",
+      "kind": "card",
+      "refersTo": "nudge-card",
+      "description": "Undismissed nudge in accent tint; dismissed ones fall back to a hairline.",
+      "html": "<div class=\"ds-nudge\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"m17 2 4 4-4 4\"/><path d=\"M3 11v-1a4 4 0 0 1 4-4h14\"/><path d=\"m7 22-4-4 4-4\"/><path d=\"M21 13v1a4 4 0 0 1-4 4H3\"/></svg><div><div class=\"ds-nudge-head\"><b>Going in circles</b><span>12:35 PM</span></div><p>Third pass on weights. Decide: one scale, or park it for Friday?</p></div></div>",
+      "css": ".ds-nudge { font-family: var(--font-sans); display:flex; gap:12px; align-items:flex-start; padding:12px 14px; border:1px solid color-mix(in srgb, var(--color-accent) 25%, transparent); background:color-mix(in srgb, var(--color-accent) 6%, transparent); border-radius:16px; } .ds-nudge svg { color:var(--color-accent); margin-top:3px; flex-shrink:0; } .ds-nudge-head { display:flex; gap:8px; align-items:baseline; font-size:12px; } .ds-nudge-head b { font-weight:500; color:var(--color-text); } .ds-nudge-head span { font-family:var(--font-mono); font-size:11px; color:var(--color-text-faint); } .ds-nudge p { margin:2px 0 0; font-size:14.5px; line-height:24px; color:var(--color-text); }"
+    },
+    {
+      "name": "Live Dock",
+      "kind": "custom",
+      "refersTo": "live-dock",
+      "description": "Signature floating pill shown on every page while a meeting runs.",
+      "html": "<div class=\"ds-dock\"><span class=\"ds-dock-level\"><i></i><i></i><i></i><i></i></span><span class=\"ds-dock-text\"><span>Weekly sync</span><small>Recording <code>14:05</code></small></span><span class=\"ds-dock-div\"></span><button class=\"ds-dock-icon\" aria-label=\"Pause\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"14\" y=\"4\" width=\"4\" height=\"16\" rx=\"1\"/><rect x=\"6\" y=\"4\" width=\"4\" height=\"16\" rx=\"1\"/></svg></button><button class=\"ds-dock-end\"><svg width=\"12\" height=\"12\" viewBox=\"0 0 24 24\" fill=\"currentColor\"><rect x=\"3\" y=\"3\" width=\"18\" height=\"18\" rx=\"2\"/></svg>End meeting</button></div>",
+      "css": ".ds-dock { font-family: var(--font-sans); display:inline-flex; align-items:center; gap:4px; height:48px; padding-inline:8px 6px; border-radius:9999px; background:color-mix(in srgb, var(--color-surface) 95%, transparent); border:1px solid var(--color-line-strong); box-shadow:0 16px 40px -12px rgb(0 0 0 / 0.45), 0 2px 6px -2px rgb(0 0 0 / 0.2); backdrop-filter:blur(12px); } .ds-dock-level { width:36px; height:36px; border-radius:9999px; display:inline-flex; align-items:center; justify-content:center; gap:3px; color:var(--color-accent); background:color-mix(in srgb, var(--color-accent) 15%, transparent); } .ds-dock-level i { width:3px; height:4px; border-radius:9999px; background:currentColor; animation:ds-level .9s ease-in-out infinite; } .ds-dock-level i:nth-child(2) { animation-delay:140ms; } .ds-dock-level i:nth-child(3) { animation-delay:280ms; } .ds-dock-level i:nth-child(4) { animation-delay:420ms; } @keyframes ds-level { 0%,100% { height:4px; } 50% { height:14px; } } .ds-dock-text { display:flex; flex-direction:column; padding:0 8px; } .ds-dock-text span { font-size:13px; line-height:16px; color:var(--color-text); } .ds-dock-text small { font-size:11.5px; line-height:16px; color:var(--color-text-faint); } .ds-dock-text code { font-family:var(--font-mono); margin-inline-start:6px; } .ds-dock-div { width:1px; height:24px; background:var(--color-line); margin:0 4px; } .ds-dock-icon { width:36px; height:36px; border:0; border-radius:9999px; background:transparent; color:var(--color-text-muted); display:inline-flex; align-items:center; justify-content:center; cursor:pointer; } .ds-dock-icon:hover { color:var(--color-text); background:var(--color-surface-hover); } .ds-dock-end { display:inline-flex; align-items:center; gap:6px; height:36px; padding:0 14px; border:0; border-radius:9999px; background:var(--color-text); color:var(--color-background); font-size:13px; font-weight:500; cursor:pointer; } .ds-dock-end:hover { background:color-mix(in srgb, var(--color-text) 85%, transparent); } @media (prefers-reduced-motion: reduce) { .ds-dock-level i { animation:none; } }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Quiet Notebook",
+    "overview": "A meeting is a document, not a record. Meet Assist sets every meeting as a centered page with a serif title, read top to bottom: agenda, nudges, notes, and the transcript last. The shell around it is a near-silent zinc ground: a slightly tinted sidebar, a white (or near-black) canvas, hairlines drawn in text-alpha rather than gray, and almost nothing raised off the page. It is a reading surface between calls, not a dashboard.\n\nDensity is calm and editorial. One 720px column, generous 40px breaks between document sections, and 14px UI type with 15px reading type. Color is nearly absent: the one blue accent marks only what is alive or yours (a running meeting, focus, selection, your lines in the transcript, an undismissed nudge). Actions are carried by an inverted neutral button, so the accent never has to compete with a call to action.\n\nThe live meeting is the one thing allowed to float. The live dock, a pill at the foot of the canvas with a pulsing level meter, timer, pause, and end, sits above every page while a meeting runs; it is the system's signature and its only persistent elevated object.",
+    "keyCharacteristics": [
+      "Zinc neutrals in matched light and dark pairs; both themes are first-class and follow the OS unless forced.",
+      "One blue accent, reserved for live state, focus, selection, and \"you\".",
+      "Three voices of type: Newsreader for page titles, DM Sans for everything read or clicked, JetBrains Mono for times, durations, and keys.",
+      "Flat by default; depth comes from tonal steps (canvas, sidebar, surface, surface-hover) and alpha hairlines.",
+      "Rounded but not soft: 12px controls, 16px containers, full pills for chips, meta, and the dock."
+    ],
+    "rules": [
+      {
+        "name": "The One Signal Rule",
+        "body": "Blue means alive, focused, selected, or yours. If an element is none of those, it is neutral; ordinary actions use the inverted ink button, not the accent.",
+        "section": "colors"
+      },
+      {
+        "name": "The Alpha Hairline Rule",
+        "body": "Borders are ink at low alpha (8% / 15% light, 8% / 14% dark), never a fixed gray, so they sit correctly on every tonal step.",
+        "section": "colors"
+      },
+      {
+        "name": "The Paired Token Rule",
+        "body": "A themed color is added as a `--light-color-*` / `--dark-color-*` pair in `src/styles/theme.css` and wired through all three active blocks; no color is written as a literal in components.",
+        "section": "colors"
+      },
+      {
+        "name": "The Serif Is a Title Rule",
+        "body": "Newsreader appears only as a page title, the day numeral, and the wordmark. Never in body, buttons, or section headings.",
+        "section": "typography"
+      },
+      {
+        "name": "The Numbers Line Up Rule",
+        "body": "Every time, duration, count, and shortcut is mono or carries `tabular-nums`.",
+        "section": "typography"
+      },
+      {
+        "name": "The Sentence Case Rule",
+        "body": "Labels and section names are sentence case at normal tracking; the system has no uppercase tracked eyebrows.",
+        "section": "typography"
+      },
+      {
+        "name": "The One Column Rule",
+        "body": "Content lives in the centered 720px column. No multi-column dashboards, no settings-panel grids in the main pane.",
+        "section": "layout"
+      },
+      {
+        "name": "The Only-Floaters-Cast Rule",
+        "body": "A shadow means \"this is above the page\". If it scrolls with the document, it is flat.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do reserve the accent for live state, focus, selection, \"you\", and undismissed nudges.",
+      "Do use the inverted ink button for the one main action on a surface.",
+      "Do set page titles in Newsreader 32px and everything else in DM Sans; put times and keys in JetBrains Mono with tabular figures.",
+      "Do keep content in the centered 720px column with 40px between document sections and 128px bottom padding under the dock.",
+      "Do draw borders with the alpha hairline tokens and separate layers with tonal steps before reaching for a shadow.",
+      "Do add new colors as light/dark pairs in `src/styles/theme.css` and use them through the Tailwind token names.",
+      "Do ease entrances with `cubic-bezier(0.16, 1, 0.3, 1)` and turn the live pulse, level meter, and page-in off under reduced motion."
+    ],
+    "donts": [
+      "Don't use the accent as a button fill or for decoration; a blue that does not mean \"alive or yours\" dilutes the signal.",
+      "Don't put shadows on in-page cards; only the dock, toasts, tooltips, and menus float.",
+      "Don't use the serif for body, buttons, or section headings.",
+      "Don't add uppercase tracked eyebrows or kickers above titles; headings are sentence case.",
+      "Don't write color literals in components; the old Handy pink (#FAA2CA) is not part of this system.",
+      "Don't arrange the main pane as grouped boxes in a narrow settings column; meetings and spaces are documents."
+    ]
+  }
+}

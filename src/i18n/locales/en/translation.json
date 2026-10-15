@@ -19,16 +19,35 @@
     "debug": "Debug",
     "about": "About"
   },
+  "nav": {
+    "label": "Main",
+    "home": "Home",
+    "spaces": "Spaces",
+    "newSpace": "New space",
+    "spacesEmpty": "The assistant creates spaces as it files your meetings. Add one yourself with +.",
+    "settings": "Settings",
+    "back": "Back"
+  },
+  "home": {
+    "title": "Home",
+    "idleTitle": "Nothing recording",
+    "idleHintBefore": "Press",
+    "idleHintAfter": "anywhere to start. The assistant files it into a space once it knows the topic.",
+    "idleHintNoShortcut": "Start here or from the tray. The assistant files the meeting into a space once it knows the topic.",
+    "startedAt": "Started {{time}}",
+    "openNotes": "Open notes",
+    "empty": "Meetings you record show up here, grouped by day."
+  },
   "projects": {
     "title": "Projects",
     "description": "A project holds a brief and sources the assistant can search during meetings.",
     "new": "New project",
-    "newPlaceholder": "Project name",
+    "newPlaceholder": "Space name",
     "create": "Create",
     "empty": "No projects yet. Create one and add the notes, files, and links the assistant should know.",
     "open": "Open",
-    "delete": "Delete project",
-    "deleteConfirm": "Delete this project, its sources, and its meetings?",
+    "delete": "Delete space",
+    "deleteConfirm": "Delete this space, its sources, and its meetings?",
     "back": "All projects",
     "rename": "Rename",
     "sourcesCount_one": "{{count}} source",
@@ -90,14 +109,15 @@
       "create": "Could not create project.",
       "delete": "Could not delete project.",
       "save": "Could not save."
-    }
+    },
+    "meetingsEmpty": "No meetings in this space yet."
   },
   "meetings": {
     "title": "Meetings",
     "description": "Live transcript of your microphone. Start a meeting, speak, and lines appear here.",
     "empty": "No meetings yet. Start one from a project or with the button above.",
     "quickStart": "Start quick meeting",
-    "newInProject": "New meeting",
+    "newInProject": "Start meeting",
     "continue": "Continue",
     "open": "Open",
     "delete": "Delete meeting",
@@ -116,7 +136,7 @@
       "listening": "Listening…"
     },
     "context": {
-      "title": "Meeting context",
+      "title": "Agenda",
       "description": "Agenda or notes for this meeting only. Sent to the assistant alongside the project brief.",
       "placeholder": "What is this meeting about?"
     },
@@ -125,7 +145,14 @@
       "empty": "Nothing transcribed yet. Say something.",
       "session": "Session {{n}}",
       "me": "You",
-      "them": "Them"
+      "them": "Them",
+      "show_one": "Show {{count}} line",
+      "show_other": "Show {{count}} lines",
+      "hide": "Hide",
+      "playLine": "Play this line",
+      "pauseLine": "Pause",
+      "playAll": "Play recording",
+      "stopAll": "Stop"
     },
     "errors": {
       "load": "Could not load meetings.",
@@ -144,12 +171,12 @@
       },
       "dismiss": "Dismiss",
       "open": "Open meeting",
-      "timeline": "Assistant nudges",
+      "timeline": "Nudges",
       "empty": "No nudges yet.",
       "dismissed": "Dismissed"
     },
     "filing": {
-      "project": "Project",
+      "project": "Space",
       "unfiled": "Unfiled",
       "byAssistant": "Filed by assistant",
       "pending": "Assistant will file this soon",
@@ -175,12 +202,12 @@
       }
     },
     "summary": {
-      "title": "Summary",
+      "title": "Notes",
       "decisions": "Decisions",
       "openQuestions": "Open questions",
       "actionItems": "Action items",
       "recap": "Recap",
-      "rolling": "Live summary",
+      "rolling": "Summary so far",
       "none": "No summary yet.",
       "retry": "Retry",
       "generating": "Generating summary...",
@@ -189,6 +216,12 @@
     "capture": {
       "systemAudioUnavailable": "System audio is unavailable; transcribing your microphone only. {{message}}",
       "systemAudioHint": "On macOS, allow Meet Assist under System Settings, Privacy & Security, Screen & System Audio Recording, then end and start the meeting again."
+    },
+    "start": "Start meeting",
+    "dock": {
+      "label": "Current meeting",
+      "recording": "Recording",
+      "open": "Open meeting"
     }
   },
   "onboarding": {
@@ -303,7 +336,7 @@
     "loading": "Loading {{modelName}}...",
     "loadingGeneric": "Loading...",
     "modelError": "Model Error",
-    "modelUnloaded": "Model Unloaded",
+    "modelUnloaded": "Model unloaded",
     "noModelDownloadRequired": "No Model - Download Required",
     "deleteModel": "Delete {{modelName}}",
     "downloadSpeed": "{{speed}} MB/s",
@@ -409,7 +442,7 @@
       },
       "rescan": {
         "label": "Rescan",
-        "tooltip": "Rescan for models added to the models folder or Hugging Face cache outside Handy"
+        "tooltip": "Rescan for models added to the models folder or Hugging Face cache outside Meet Assist"
       },
       "noModelsMatch": "No models match this filter."
     },
@@ -471,11 +504,11 @@
       },
       "autostart": {
         "label": "Launch on Startup",
-        "description": "Automatically start Handy when you log in to your computer."
+        "description": "Automatically start Meet Assist when you log in to your computer."
       },
       "showTrayIcon": {
         "label": "Show Tray Icon",
-        "description": "Display the Handy icon in the system tray."
+        "description": "Display the Meet Assist icon in the system tray."
       },
       "translateToEnglish": {
         "label": "Translate to English",
@@ -552,7 +585,7 @@
       },
       "updateChecks": {
         "label": "Check for Updates",
-        "description": "Automatically check for new versions of Handy",
+        "description": "Automatically check for new versions of Meet Assist",
         "lockedDescription": "Disabled by system configuration (HANDY_DISABLE_UPDATER)"
       },
       "whatsNewPreview": {
@@ -591,15 +624,15 @@
       "title": "About",
       "version": {
         "title": "Version",
-        "description": "Current version of Handy"
+        "description": "Current version of Meet Assist"
       },
       "whatsNewUpdates": {
         "label": "Show What's New",
-        "description": "Show release notes after Handy updates"
+        "description": "Show release notes after Meet Assist updates"
       },
       "appDataDirectory": {
         "title": "App Data Directory",
-        "description": "Location where Handy stores its data"
+        "description": "Location where Meet Assist stores its data"
       },
       "sourceCode": {
         "title": "Source Code",
@@ -608,7 +641,7 @@
       },
       "supportDevelopment": {
         "title": "Support Development",
-        "description": "Help us continue building Handy",
+        "description": "Support Handy, the open source engine Meet Assist is built on",
         "button": "Donate"
       },
       "acknowledgments": {
@@ -616,7 +649,7 @@
         "ggml": {
           "title": "ggml",
           "description": "High-performance tensor library for on-device machine learning inference",
-          "details": "Handy's local speech-to-text is built on transcribe.cpp and ggml. Thanks to the amazing work by Georgi Gerganov and contributors."
+          "details": "Meet Assist's local speech-to-text comes from Handy and is built on transcribe.cpp and ggml. Thanks to Georgi Gerganov and contributors."
         }
       }
     },
@@ -652,7 +685,7 @@
     "checkingUpdates": "Checking for updates...",
     "updateAvailableShort": "Update available",
     "upToDate": "Up to date",
-    "updateCheckingDisabled": "Update Checking Disabled",
+    "updateCheckingDisabled": "Updates off",
     "downloading": "Downloading... {{progress}}%",
     "installing": "Installing...",
     "preparing": "Preparing...",
@@ -664,7 +697,7 @@
     "portableUpdateBrowseButton": "Open GitHub Releases"
   },
   "whatsNew": {
-    "title": "New in Handy v{{version}}"
+    "title": "New in Meet Assist v{{version}}"
   },
   "common": {
     "loading": "Loading...",
@@ -688,11 +721,11 @@
   },
   "appLanguage": {
     "title": "Application Language",
-    "description": "Change the language of the Handy interface"
+    "description": "Change the language of the Meet Assist interface"
   },
   "theme": {
     "title": "Application Theme",
-    "description": "Choose whether Handy follows your system theme or stays light or dark",
+    "description": "Choose whether Meet Assist follows your system theme or stays light or dark",
     "options": {
       "system": "System",
       "light": "Light",

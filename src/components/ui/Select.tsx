@@ -39,29 +39,27 @@ type NonCreatableProps = {
 
 export type SelectProps = BaseProps & (CreatableProps | NonCreatableProps);
 
-const baseBackground =
-  "color-mix(in srgb, var(--color-mid-gray) 10%, transparent)";
-const hoverBackground =
-  "color-mix(in srgb, var(--color-logo-primary) 12%, transparent)";
-const focusBackground =
-  "color-mix(in srgb, var(--color-logo-primary) 20%, transparent)";
-const neutralBorder =
-  "color-mix(in srgb, var(--color-mid-gray) 80%, transparent)";
+const baseBackground = "var(--color-surface)";
+const hoverBackground = "var(--color-surface-hover)";
+const focusBackground = "var(--color-surface)";
+const neutralBorder = "var(--color-line-strong)";
 
 const selectStyles: StylesConfig<SelectOption, false> = {
   control: (base, state) => ({
     ...base,
-    minHeight: 40,
-    borderRadius: 6,
-    borderColor: state.isFocused ? "var(--color-logo-primary)" : neutralBorder,
-    boxShadow: state.isFocused ? "0 0 0 1px var(--color-logo-primary)" : "none",
+    minHeight: 36,
+    borderRadius: 8,
+    borderColor: state.isFocused ? "var(--color-accent)" : neutralBorder,
+    boxShadow: state.isFocused ? "0 0 0 1px var(--color-accent)" : "none",
     backgroundColor: state.isFocused ? focusBackground : baseBackground,
     fontSize: "0.875rem",
     color: "var(--color-text)",
     transition: "all 150ms ease",
     ":hover": {
-      borderColor: "var(--color-logo-primary)",
-      backgroundColor: hoverBackground,
+      borderColor: state.isFocused
+        ? "var(--color-accent)"
+        : "var(--color-line-strong)",
+      backgroundColor: state.isFocused ? focusBackground : hoverBackground,
     },
   }),
   valueContainer: (base) => ({
@@ -79,28 +77,27 @@ const selectStyles: StylesConfig<SelectOption, false> = {
   }),
   dropdownIndicator: (base, state) => ({
     ...base,
-    color: state.isFocused
-      ? "var(--color-logo-primary)"
-      : "color-mix(in srgb, var(--color-mid-gray) 80%, transparent)",
+    color: state.isFocused ? "var(--color-accent)" : "var(--color-line-strong)",
     ":hover": {
-      color: "var(--color-logo-primary)",
+      color: "var(--color-accent)",
     },
   }),
   clearIndicator: (base) => ({
     ...base,
-    color: "color-mix(in srgb, var(--color-mid-gray) 80%, transparent)",
+    color: "var(--color-line-strong)",
     ":hover": {
-      color: "var(--color-logo-primary)",
+      color: "var(--color-accent)",
     },
   }),
   menu: (provided) => ({
     ...provided,
     zIndex: 30,
-    backgroundColor: "var(--color-background)",
+    backgroundColor: "var(--color-surface)",
+    borderRadius: 12,
+    overflow: "hidden",
     color: "var(--color-text)",
-    border:
-      "1px solid color-mix(in srgb, var(--color-mid-gray) 30%, transparent)",
-    boxShadow: "0 10px 30px rgba(15, 15, 15, 0.2)",
+    border: "1px solid var(--color-line-strong)",
+    boxShadow: "0 12px 32px -8px rgb(0 0 0 / 0.35)",
   }),
   option: (base, state) => ({
     ...base,
@@ -115,7 +112,7 @@ const selectStyles: StylesConfig<SelectOption, false> = {
   }),
   placeholder: (base) => ({
     ...base,
-    color: "color-mix(in srgb, var(--color-mid-gray) 65%, transparent)",
+    color: "var(--color-text-faint)",
   }),
 };
 

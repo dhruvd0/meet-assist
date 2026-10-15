@@ -1,46 +1,32 @@
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ArrowLeft, Pencil } from "lucide-react";
+import { ask } from "@tauri-apps/plugin-dialog";
+import { Mic, Trash2 } from "lucide-react";
 import { useProjectStore } from "@/stores/projectStore";
 import { useMeetingStore } from "@/stores/meetingStore";
 import { Button } from "../ui/Button";
-import { Input } from "../ui/Input";
+import { DocSection } from "../shared";
 import { BriefEditor } from "./BriefEditor";
 import { SourceList } from "./SourceList";
-import { MeetingDetail } from "../meetings/MeetingDetail";
-import { ProjectMeetings } from "../meetings/ProjectMeetings";
+import { MeetingFeed } from "../meetings/MeetingFeed";
 
-export const ProjectDetail: React.FC = () => {
+/** A space (project): its brief, sources, and meetings, set as one page. */
+export const ProjectDetail: React.FC<{ onDeleted: () => void }> = ({
+  onDeleted,
+}) => {
   const { t } = useTranslation();
-  const activeProjectId = useProjectStore((s) => s.activeProjectId);
   const project = useProjectStore((s) =>
     s.projects.find((p) => p.id === s.activeProjectId),
   );
-  const closeProject = useProjectStore((s) => s.closeProject);
   const renameProject = useProjectStore((s) => s.renameProject);
-  const activeMeetingId = useMeetingStore((s) => s.activeMeetingId);
-  const detailProjectId = useMeetingStore(
-    (s) => s.detail?.meeting.project_id ?? null,
-  );
-  const closeMeeting = useMeetingStore((s) => s.closeMeeting);
-  const loadMeetings = useMeetingStore((s) => s.loadMeetings);
+  const deleteProject = useProjectStore((s) => s.deleteProject);
+  const meetings = useMeetingStore((s) => s.meetings);
+  const live = useMeetingStore((s) => s.live);
+  const startMeeting = useMeetingStore((s) => s.startMeeting);
   const [editing, setEditing] = useState(false);
-  const [title, setTitle] = useState(project?.title ?? "");
+  const [title, setTitle] = useState("");
 
-  if (activeProjectId === null || !project) return null;
-
-  // Only a meeting of this project takes over the page; one opened from the
-  // Meetings tab stays there.
-  if (activeMeetingId !== null && detailProjectId === project.id) {
-    return (
-      <MeetingDetail
-        onBack={() => {
-          closeMeeting();
-          loadMeetings(project.id);
-        }}
-      />
-    );
-  }
+  if (!project) return null;
 
   const commit = () => {
     const next = title.trim();
@@ -49,49 +35,75 @@ export const ProjectDetail: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-2">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={closeProject}
-          title={t("projects.back")}
-        >
-          <ArrowLeft className="w-4 h-4" />
-        </Button>
+    <div
+      key={project.id}
+      className="w-full max-w-[720px] mx-auto px-8 pt-6 pb-32 page-in"
+    >
+      <div className="flex items-start gap-3">
         {editing ? (
-          <Input
-            variant="compact"
-            className="flex-1"
-            value={title}
+          <input
             autoFocus
+            value={title}
             onChange={(e) => setTitle(e.target.value)}
             onBlur={commit}
             onKeyDown={(e) => {
               if (e.key === "Enter") commit();
               if (e.key === "Escape") setEditing(false);
             }}
+            className="flex-1 min-w-0 -mx-2 px-2 rounded-lg bg-surface font-serif text-[32px] leading-tight tracking-[-0.01em] text-text focus:outline-none"
           />
         ) : (
-          <h1 className="flex-1 text-lg font-semibold text-text truncate">
+          <h1
+            title={t("projects.rename")}
+            onClick={() => {
+              setTitle(project.title);
+              setEditing(true);
+            }}
+            className="flex-1 min-w-0 font-serif text-[32px] leading-tight tracking-[-0.01em] text-text cursor-text break-words"
+          >
             {project.title}
           </h1>
         )}
-        <Button
-          variant="ghost"
-          size="sm"
-          title={t("projects.rename")}
-          onClick={() => {
-            setTitle(project.title);
-            setEditing(true);
-          }}
-        >
-          <Pencil className="w-4 h-4" />
-        </Button>
+        <div className="flex items-center gap-1.5 pt-1.5 shrink-0">
+          <button
+            type="button"
+            title={t("projects.delete")}
+            aria-label={t("projects.delete")}
+            className="w-8 h-8 inline-flex items-center justify-center rounded-lg text-faint hover:text-error hover:bg-error/10 transition-colors cursor-pointer"
+            onClick={async () => {
+              const ok = await ask(t("projects.deleteConfirm"), {
+                title: t("projects.delete"),
+                kind: "warning",
+              });
+              if (ok) {
+                await deleteProject(project.id);
+                onDeleted();
+              }
+            }}
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+          <Button
+            disabled={live.meeting_id !== null}
+            onClick={() => startMeeting(project.id, null)}
+          >
+            <Mic className="w-3.5 h-3.5" />
+            {t("meetings.newInProject")}
+          </Button>
+        </div>
       </div>
+
       <BriefEditor projectId={project.id} brief={project.brief} />
       <SourceList projectId={project.id} />
-      <ProjectMeetings projectId={project.id} />
+      <DocSection title={t("meetings.title")}>
+        <div className="-mx-3">
+          <MeetingFeed
+            inSpace
+            meetings={meetings.filter((m) => m.project_id === project.id)}
+            emptyText={t("projects.meetingsEmpty")}
+          />
+        </div>
+      </DocSection>
     </div>
   );
 };

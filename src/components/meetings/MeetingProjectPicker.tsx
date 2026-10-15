@@ -1,51 +1,61 @@
-import React, { useEffect } from "react";
+import React from "react";
 import { useTranslation } from "react-i18next";
+import { ChevronDown, Folder, Sparkles } from "lucide-react";
 import type { Meeting } from "@/bindings";
 import { useMeetingStore } from "@/stores/meetingStore";
 import { useProjectStore } from "@/stores/projectStore";
-import Badge from "../ui/Badge";
-import { Select } from "../ui/Select";
 
 const UNFILED = "unfiled";
 
-/** The meeting's project, changeable by the user; marks assistant filings. */
+/**
+ * The meeting's space as a chip; a native select sits over it so the menu is
+ * the platform's own. Marks meetings the assistant filed.
+ */
 export const MeetingProjectPicker: React.FC<{ meeting: Meeting }> = ({
   meeting,
 }) => {
   const { t } = useTranslation();
   const projects = useProjectStore((s) => s.projects);
-  const loadProjects = useProjectStore((s) => s.loadProjects);
   const moveMeeting = useMeetingStore((s) => s.moveMeeting);
 
-  useEffect(() => {
-    loadProjects();
-  }, [loadProjects]);
-
-  const options = [
-    { value: UNFILED, label: t("meetings.filing.unfiled") },
-    ...projects.map((p) => ({ value: String(p.id), label: p.title })),
-  ];
+  const current = projects.find((p) => p.id === meeting.project_id);
+  const label = current?.title ?? t("meetings.filing.unfiled");
 
   return (
-    <div className="flex items-center gap-2">
-      <span className="text-xs font-medium text-mid-gray uppercase tracking-wide">
-        {t("meetings.filing.project")}
-      </span>
-      <Select
-        className="w-64"
+    <label
+      className="relative inline-flex items-center gap-1.5 h-8 ps-3 pe-2.5 rounded-full border border-line text-[13px] text-muted hover:text-text hover:border-line-strong focus-within:border-accent/70 transition-colors cursor-pointer"
+      title={
+        meeting.filed_by === "ai"
+          ? t("meetings.filing.byAssistant")
+          : t("meetings.filing.project")
+      }
+    >
+      {meeting.filed_by === "ai" ? (
+        <Sparkles className="w-3.5 h-3.5 text-accent" />
+      ) : (
+        <Folder className="w-3.5 h-3.5" />
+      )}
+      <span className="max-w-[14rem] truncate">{label}</span>
+      <ChevronDown className="w-3.5 h-3.5 text-faint" />
+      <select
+        aria-label={t("meetings.filing.project")}
+        className="absolute inset-0 opacity-0 cursor-pointer"
         value={
           meeting.project_id === null ? UNFILED : String(meeting.project_id)
         }
-        options={options}
-        onChange={(value) => {
-          const next =
-            value === null || value === UNFILED ? null : Number(value);
+        onChange={(e) => {
+          const v = e.target.value;
+          const next = v === UNFILED ? null : Number(v);
           if (next !== meeting.project_id) moveMeeting(meeting.id, next);
         }}
-      />
-      {meeting.filed_by === "ai" && (
-        <Badge variant="secondary">{t("meetings.filing.byAssistant")}</Badge>
-      )}
-    </div>
+      >
+        <option value={UNFILED}>{t("meetings.filing.unfiled")}</option>
+        {projects.map((p) => (
+          <option key={p.id} value={String(p.id)}>
+            {p.title}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 };

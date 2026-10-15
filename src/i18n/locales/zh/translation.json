@@ -395,7 +395,7 @@
       },
       "rescan": {
         "label": "重新扫描",
-        "tooltip": "重新扫描在 Handy 之外添加到模型文件夹或 Hugging Face 缓存中的模型"
+        "tooltip": "重新扫描在 Meet Assist 之外添加到模型文件夹或 Hugging Face 缓存中的模型"
       },
       "noModelsMatch": "没有符合此筛选条件的模型。"
     },
@@ -457,11 +457,11 @@
       },
       "autostart": {
         "label": "开机启动",
-        "description": "登录计算机时自动启动 Handy。"
+        "description": "登录计算机时自动启动 Meet Assist。"
       },
       "showTrayIcon": {
         "label": "显示托盘图标",
-        "description": "在系统托盘中显示 Handy 图标。"
+        "description": "在系统托盘中显示 Meet Assist 图标。"
       },
       "translateToEnglish": {
         "label": "翻译为英语",
@@ -538,7 +538,7 @@
       },
       "updateChecks": {
         "label": "检查更新",
-        "description": "自动检查 Handy 的新版本",
+        "description": "自动检查 Meet Assist 的新版本",
         "lockedDescription": "已被系统配置禁用 (HANDY_DISABLE_UPDATER)"
       },
       "whatsNewPreview": {
@@ -577,15 +577,15 @@
       "title": "关于",
       "version": {
         "title": "版本",
-        "description": "Handy 的当前版本"
+        "description": "Meet Assist 的当前版本"
       },
       "whatsNewUpdates": {
         "label": "显示新功能",
-        "description": "Handy 更新后显示发行说明"
+        "description": "Meet Assist 更新后显示发行说明"
       },
       "appDataDirectory": {
         "title": "应用数据目录",
-        "description": "Handy 存储数据的位置"
+        "description": "Meet Assist 存储数据的位置"
       },
       "sourceCode": {
         "title": "源代码",
@@ -602,7 +602,7 @@
         "ggml": {
           "title": "ggml",
           "description": "OpenAI Whisper 自动语音识别模型的高性能推理",
-          "details": "Handy 使用 ggml 进行快速的本地语音转文字处理。感谢 Georgi Gerganov 和贡献者们的出色工作。"
+          "details": "Meet Assist 使用 ggml 进行快速的本地语音转文字处理。感谢 Georgi Gerganov 和贡献者们的出色工作。"
         }
       }
     },
@@ -650,7 +650,7 @@
     "portableUpdateBrowseButton": "打开 GitHub Releases"
   },
   "whatsNew": {
-    "title": "Handy v{{version}} 新功能"
+    "title": "Meet Assist v{{version}} 新功能"
   },
   "common": {
     "loading": "加载中...",
@@ -674,11 +674,11 @@
   },
   "appLanguage": {
     "title": "应用语言",
-    "description": "更改 Handy 界面的语言"
+    "description": "更改 Meet Assist 界面的语言"
   },
   "theme": {
     "title": "应用主题",
-    "description": "选择 Handy 跟随系统主题，还是保持浅色或深色",
+    "description": "选择 Meet Assist 跟随系统主题，还是保持浅色或深色",
     "options": {
       "system": "跟随系统",
       "light": "浅色",

@@ -15,19 +15,26 @@ import {
 } from "tauri-plugin-macos-permissions-api";
 import { ModelStateEvent } from "./lib/types/events";
 import "./App.css";
-import Footer from "./components/footer";
+import { ArrowLeft } from "lucide-react";
 import Onboarding, { AssistantOnboarding } from "./components/onboarding";
-import {
-  DebugSettings,
-  type OnboardingPreviewStep,
-} from "./components/settings";
+import { type OnboardingPreviewStep } from "./components/settings";
+import { SettingsView } from "./components/settings/SettingsView";
 import { ErrorBoundary } from "./components/ErrorBoundary";
-import { Sidebar, SidebarSection, SECTIONS_CONFIG } from "./components/Sidebar";
+import {
+  Sidebar,
+  type AppView,
+  type SettingsSection,
+} from "./components/Sidebar";
+import { HomeView } from "./components/meetings/HomeView";
+import { MeetingDetail } from "./components/meetings/MeetingDetail";
+import { LiveDock } from "./components/meetings/LiveDock";
+import { ProjectDetail } from "./components/projects/ProjectDetail";
 import { WhatsNewGate } from "./components/whats-new";
 import { useSettings } from "./hooks/useSettings";
 import { useSettingsStore } from "./stores/settingsStore";
-import { commands, events } from "@/bindings";
+import { commands } from "@/bindings";
 import { useMeetingStore } from "./stores/meetingStore";
+import { useProjectStore } from "./stores/projectStore";
 import { getLanguageDirection, initializeRTL } from "@/lib/utils/rtl";
 
 type OnboardingStep = "model" | "assistant" | "done";
@@ -39,19 +46,6 @@ const MIC_PERMISSION_WAIT_MS = 20_000;
 // Stable identity so preview effects do not re-run due to callback changes.
 const NOOP = () => {};
 
-const renderSettingsContent = (
-  section: SidebarSection,
-  onPreviewOnboarding: (step: OnboardingPreviewStep) => void,
-) => {
-  if (section === "debug") {
-    return <DebugSettings onPreviewOnboarding={onPreviewOnboarding} />;
-  }
-
-  const ActiveComponent =
-    SECTIONS_CONFIG[section]?.component || SECTIONS_CONFIG.general.component;
-  return <ActiveComponent />;
-};
-
 function App() {
   const { t, i18n } = useTranslation();
   const [onboardingStep, setOnboardingStep] = useState<OnboardingStep | null>(
@@ -59,8 +53,13 @@ function App() {
   );
   const [onboardingPreview, setOnboardingPreview] =
     useState<OnboardingPreviewStep | null>(null);
-  const [currentSection, setCurrentSection] =
-    useState<SidebarSection>("projects");
+  const [view, setView] = useState<AppView>("home");
+  const [settingsSection, setSettingsSection] =
+    useState<SettingsSection>("assistant");
+  const activeMeetingId = useMeetingStore((s) => s.activeMeetingId);
+  const closeMeeting = useMeetingStore((s) => s.closeMeeting);
+  const liveMeetingId = useMeetingStore((s) => s.live.meeting_id);
+  const liveStatus = useMeetingStore((s) => s.live.status);
   const { settings, updateSetting } = useSettings();
   const direction = getLanguageDirection(i18n.language);
   const refreshAudioDevices = useSettingsStore(
@@ -70,7 +69,7 @@ function App() {
     (state) => state.refreshOutputDevices,
   );
   const hasCompletedPostOnboardingInit = useRef(false);
-  const settingsScrollRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const isShowingOnboarding =
     onboardingPreview !== null ||
     onboardingStep === "model" ||
@@ -85,10 +84,18 @@ function App() {
     return () => document.documentElement.removeAttribute(attribute);
   }, [isShowingOnboarding]);
 
-  // Reset the scroll position whenever the active section changes.
+  // Each page opens at its top.
+  const activeProjectId = useProjectStore((s) => s.activeProjectId);
   useLayoutEffect(() => {
-    settingsScrollRef.current?.scrollTo({ top: 0 });
-  }, [currentSection]);
+    scrollRef.current?.scrollTo({ top: 0 });
+  }, [view, activeProjectId, activeMeetingId, settingsSection]);
+
+  const navigate = (next: AppView, projectId?: number) => {
+    closeMeeting();
+    if (next === "space" && projectId !== undefined)
+      useProjectStore.getState().openProject(projectId);
+    setView(next);
+  };
 
   useEffect(() => {
     checkOnboardingStatus();
@@ -110,6 +117,29 @@ function App() {
       refreshOutputDevices();
     }
   }, [onboardingStep, refreshAudioDevices, refreshOutputDevices]);
+
+  // Meetings and spaces are shown on every page (sidebar, feed, dock), so the
+  // shell subscribes to their events once for the whole session.
+  const ready = onboardingStep === "done";
+  useEffect(() => {
+    if (!ready) return;
+    const meetings = useMeetingStore.getState();
+    const projects = useProjectStore.getState();
+    meetings.loadMeetings(null);
+    meetings.refreshLive();
+    projects.loadProjects();
+    const unMeetings = meetings.subscribe();
+    const unProjects = projects.subscribe();
+    return () => {
+      unMeetings.then((fn) => fn());
+      unProjects.then((fn) => fn());
+    };
+  }, [ready]);
+
+  // A meeting starting or ending changes the feed.
+  useEffect(() => {
+    if (ready) useMeetingStore.getState().loadMeetings(null);
+  }, [ready, liveMeetingId, liveStatus]);
 
   // Handle keyboard shortcuts for debug mode toggle
   useEffect(() => {
@@ -135,30 +165,6 @@ function App() {
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, [settings?.debug_mode, updateSetting]);
-
-  // "Open meeting" on the intervention card: show the Meetings section with
-  // that meeting open (the section may not be mounted to hear it itself).
-  useEffect(() => {
-    const unlisten = events.openMeetingPayload.listen((e) => {
-      useMeetingStore.getState().openMeeting(e.payload.meeting_id);
-      setCurrentSection("meetings");
-    });
-    return () => {
-      unlisten.then((fn) => fn());
-    };
-  }, []);
-
-  // Rust asks the window to jump to a section (e.g. toggle with no projects).
-  useEffect(() => {
-    const unlisten = listen<string>("navigate-section", (e) => {
-      if (e.payload in SECTIONS_CONFIG) {
-        setCurrentSection(e.payload as SidebarSection);
-      }
-    });
-    return () => {
-      unlisten.then((fn) => fn());
-    };
-  }, []);
 
   // A shortcut, tray, or CLI start that failed opens the window; say why.
   useEffect(() => {
@@ -263,11 +269,11 @@ function App() {
         unstyled: true,
         classNames: {
           toast:
-            "bg-background border border-mid-gray/20 rounded-lg shadow-lg px-4 py-3 flex items-center gap-3 text-sm",
+            "bg-surface text-text border border-line-strong rounded-xl shadow-[0_16px_40px_-12px_rgb(0_0_0/0.45)] px-4 py-3 flex items-center gap-3 text-sm w-[356px]",
           title: "font-medium",
-          description: "text-mid-gray",
+          description: "text-muted",
           actionButton:
-            "px-2 py-1 text-xs font-medium rounded-lg border bg-mid-gray/10 border-mid-gray/20 hover:bg-background-ui/30 hover:border-logo-primary cursor-pointer whitespace-nowrap",
+            "h-7 px-2.5 text-xs font-medium rounded-lg bg-text text-background hover:bg-text/85 cursor-pointer whitespace-nowrap",
         },
       }}
     />
@@ -292,7 +298,7 @@ function App() {
         <button
           type="button"
           onClick={() => setOnboardingPreview(null)}
-          className="fixed top-4 end-4 z-50 rounded-lg border border-mid-gray/20 bg-background px-4 py-2 text-sm font-medium text-text shadow-lg hover:bg-background-ui/30 cursor-pointer"
+          className="fixed top-4 end-4 z-50 rounded-lg border border-line-strong bg-surface px-4 py-2 text-sm font-medium text-text shadow-lg hover:bg-surface-hover cursor-pointer"
         >
           {t("settings.debug.onboardingPreview.exitButton")}
         </button>
@@ -303,31 +309,50 @@ function App() {
   } else if (onboardingStep === "assistant") {
     content = <AssistantOnboarding onComplete={handleAssistantComplete} />;
   } else {
+    let page: ReactNode;
+    if (activeMeetingId !== null) page = <MeetingDetail />;
+    else if (view === "space" && activeProjectId !== null)
+      page = <ProjectDetail onDeleted={() => navigate("home")} />;
+    else if (view === "settings")
+      page = (
+        <SettingsView
+          section={settingsSection}
+          onSectionChange={setSettingsSection}
+          onPreviewOnboarding={setOnboardingPreview}
+        />
+      );
+    else page = <HomeView />;
+
     content = (
       <div
         dir={direction}
-        className="h-screen flex flex-col select-none cursor-default"
+        className="h-screen flex bg-background select-none cursor-default"
       >
         <ErrorBoundary context="What's New">
           <WhatsNewGate />
         </ErrorBoundary>
-        {/* Main content area that takes remaining space */}
-        <div className="flex-1 flex overflow-hidden">
-          <Sidebar
-            activeSection={currentSection}
-            onSectionChange={setCurrentSection}
-          />
-          {/* Scrollable content area */}
-          <div className="flex-1 flex flex-col overflow-hidden">
-            <div ref={settingsScrollRef} className="flex-1 overflow-y-auto">
-              <div className="flex flex-col items-center p-4 gap-4">
-                {renderSettingsContent(currentSection, setOnboardingPreview)}
-              </div>
-            </div>
+        <Sidebar view={view} onNavigate={navigate} />
+        <main className="relative flex-1 min-w-0 flex flex-col">
+          <div
+            data-tauri-drag-region
+            className="h-12 shrink-0 flex items-center px-4"
+          >
+            {activeMeetingId !== null && (
+              <button
+                type="button"
+                onClick={closeMeeting}
+                className="inline-flex items-center gap-1.5 h-8 ps-2 pe-3 rounded-full border border-line text-[13px] text-muted hover:text-text hover:border-line-strong transition-colors cursor-pointer"
+              >
+                <ArrowLeft className="w-3.5 h-3.5 rtl:rotate-180" />
+                {t("nav.back")}
+              </button>
+            )}
           </div>
-        </div>
-        {/* Fixed footer at bottom */}
-        <Footer />
+          <div ref={scrollRef} className="@container flex-1 overflow-y-auto">
+            {page}
+          </div>
+          <LiveDock />
+        </main>
       </div>
     );
   }

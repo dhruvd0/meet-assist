@@ -45,3 +45,7 @@ result
 
 # Python bytecode (scripts/)
 __pycache__/
+
+# Impeccable dev-only artifacts
+.impeccable/preview/
+.impeccable/review/

@@ -25,7 +25,7 @@ Meeting bots that join the call as a participant are intrusive, record everyone,
 2. **Speak only when useful.** Silence is the default answer. A nudge that interrupts flow is worse than none.
 3. **Only you hear it.** The assistant never speaks into the call. You decide whether to say it out loud.
 4. **Reuse Handy's engine.** Transcription, models, and audio capture come from Handy. Dictation output (paste, post-processing, history) was removed; the global shortcut starts and ends meetings.
-5. **Same look.** Meet Assist keeps Handy's design language and components. New screens use the existing primitives.
+5. **Notes-first look.** t3.codes tokens (zinc neutrals, one blue accent, DM Sans, Newsreader titles, JetBrains Mono) in a Granola-style shell: spaces in the sidebar, a home feed by day, each meeting as a document. See [DESIGN.md](../DESIGN.md).
 
 ## Non-goals for v1
 
