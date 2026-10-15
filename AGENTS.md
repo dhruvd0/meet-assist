@@ -173,7 +173,7 @@ For translation contribution guidelines, see [CONTRIBUTING_TRANSLATIONS.md](CONT
 - Tailwind CSS for styling
 - Path aliases: `@/` → `./src/`
 
-**Tests:** typecheck, clippy, lint, and the 7 data-safety tests (settings migration, store, summary). Do not add UI, end-to-end, or unit tests outside that core.
+**Tests:** typecheck, clippy, lint, and the 10 data-safety tests (settings migration, store, summary). Do not add UI, end-to-end, or unit tests outside that core.
 
 ## CLI Parameters
 

@@ -209,14 +209,19 @@ struct RunState {
 pub struct FilingContext {
     store: ProjectStore,
     meeting_id: i64,
+    /// Title and creation time when the run started.
+    start_title: String,
+    created_at: i64,
     state: Mutex<RunState>,
 }
 
 impl FilingContext {
-    pub fn new(store: ProjectStore, meeting_id: i64) -> Self {
+    pub fn new(store: ProjectStore, meeting_id: i64, start_title: String, created_at: i64) -> Self {
         Self {
             store,
             meeting_id,
+            start_title,
+            created_at,
             state: Mutex::new(RunState::default()),
         }
     }
@@ -316,9 +321,17 @@ impl FilingContext {
                 if st.renamed {
                     return Err("meeting already renamed".into());
                 }
+                // Only an untouched auto title may be replaced; create_meeting
+                // stamps its own time, so allow the minute before.
+                let auto = |ts| crate::meeting::session::MeetingManager::auto_title_at(ts);
+                if self.start_title != auto(self.created_at)
+                    && self.start_title != auto(self.created_at - 60_000)
+                {
+                    return Err("meeting title was set by the user".into());
+                }
                 if !self
                     .store
-                    .rename_meeting_ai(self.meeting_id, &title)
+                    .rename_meeting_ai(self.meeting_id, &title, &self.start_title)
                     .map_err(e)?
                 {
                     return Err("meeting was filed by the user".into());
@@ -408,7 +421,12 @@ impl LlmFiler {
         let lines = store
             .lines_in_range(meeting_id, None, None, 10_000)
             .map_err(|e| FilingError::Other(e.to_string()))?;
-        let ctx = FilingContext::new(store.clone_handle(), meeting_id);
+        let ctx = FilingContext::new(
+            store.clone_handle(),
+            meeting_id,
+            meeting.title.clone(),
+            meeting.created_at,
+        );
         let handler = |c: &ToolCall| ctx.handle(c);
         let defs = tool_defs();
         let fut = llm_client::send_with_tools_with_client(
@@ -482,10 +500,20 @@ pub fn final_attempt(
     })();
     if due {
         if let Some(p) = attempt(filer, store, tracker, meeting_id) {
-            notify(app, &p);
+            if let Ok(Some(stored)) = store.get_meeting(meeting_id) {
+                if still_ai_filed(&stored, &p) {
+                    notify(app, &p);
+                }
+            }
         }
     }
     tracker.forget(meeting_id);
+}
+
+/// Whether the stored meeting still carries the assistant's filing `payload`
+/// (the user did not move it while the run was going).
+pub fn still_ai_filed(stored: &Meeting, payload: &MeetingFiledPayload) -> bool {
+    stored.filed_by.as_deref() == Some(FILED_BY_AI) && stored.project_id == payload.project_id
 }
 
 /// Tells the main window and shows the floating card. No beep: filing is

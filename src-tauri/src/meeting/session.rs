@@ -354,6 +354,7 @@ impl MeetingManager {
     }
 
     /// Project of the running (live or paused) meeting, if any.
+    #[allow(dead_code)] // public accessor with no caller yet
     pub fn active_project_id(&self) -> Option<i64> {
         self.lock_active().as_ref().and_then(|a| a.project_id)
     }
@@ -393,9 +394,15 @@ impl MeetingManager {
         }
         self.filing.record_attempt(meeting_id, lines);
         if let Some(filed) = filing::attempt(filer, &self.store, &self.filing, meeting_id) {
-            self.set_active_project(meeting_id, filed.project_id);
-            if let Some(app) = &self.app {
-                filing::notify(app, &filed);
+            // The user may have moved the meeting while the run was going;
+            // the store is the truth.
+            if let Ok(Some(stored)) = self.store.get_meeting(meeting_id) {
+                self.set_active_project(meeting_id, stored.project_id);
+                if let Some(app) = &self.app {
+                    if filing::still_ai_filed(&stored, &filed) {
+                        filing::notify(app, &filed);
+                    }
+                }
             }
         }
     }
@@ -545,8 +552,11 @@ impl MeetingManager {
         Self::transcribe_and_store(&self.store, self.transcriber.as_ref(), session_id, utt)
     }
 
-    fn auto_title() -> String {
-        chrono::Local::now()
+    /// The title a new meeting gets when created at `ts_ms`.
+    pub fn auto_title_at(ts_ms: i64) -> String {
+        chrono::DateTime::from_timestamp_millis(ts_ms)
+            .unwrap_or_else(chrono::Utc::now)
+            .with_timezone(&chrono::Local)
             .format("Meeting %b %-d %H:%M")
             .to_string()
     }
@@ -570,7 +580,10 @@ impl MeetingManager {
                     ..m
                 }
             }
-            None => self.store.create_meeting(project_id, &Self::auto_title())?,
+            None => self.store.create_meeting(
+                project_id,
+                &Self::auto_title_at(chrono::Utc::now().timestamp_millis()),
+            )?,
         };
         let session = self.store.create_session(meeting.id)?;
         let (capture, worker) = match self.start_capture_and_worker(meeting.id, session.id) {

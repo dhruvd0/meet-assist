@@ -913,13 +913,19 @@ impl ProjectStore {
     }
 
     /// Renames the meeting for the assistant unless the user chose its
-    /// project. Returns whether the title changed.
-    pub fn rename_meeting_ai(&self, meeting_id: i64, title: &str) -> Result<bool> {
+    /// project or changed the title from `expected_title`. Returns whether
+    /// the title changed.
+    pub fn rename_meeting_ai(
+        &self,
+        meeting_id: i64,
+        title: &str,
+        expected_title: &str,
+    ) -> Result<bool> {
         let conn = self.conn()?;
         let changed = conn.execute(
             "UPDATE meetings SET title = ?1, updated_at = ?2
-             WHERE id = ?3 AND (filed_by IS NULL OR filed_by = 'ai')",
-            params![title, now(), meeting_id],
+             WHERE id = ?3 AND (filed_by IS NULL OR filed_by = 'ai') AND title = ?4",
+            params![title, now(), meeting_id, expected_title],
         )?;
         Ok(changed == 1)
     }
@@ -1372,7 +1378,7 @@ mod tests {
             .create_project_and_file_ai(m.id, "New", "brief")
             .unwrap()
             .is_none());
-        assert!(!s.rename_meeting_ai(m.id, "AI title").unwrap());
+        assert!(!s.rename_meeting_ai(m.id, "AI title", &m.title).unwrap());
         let got = s.get_meeting(m.id).unwrap().unwrap();
         assert_eq!(got.project_id, Some(b.id));
         assert_eq!(got.filed_by.as_deref(), Some(FILED_BY_USER));
