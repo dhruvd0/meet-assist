@@ -29,10 +29,10 @@ pub const DEDUPE_RECENT: usize = 5;
 pub const CONTEXT_MAX_CHARS: usize = 4096;
 /// Max characters of an intervention card's text.
 pub const CARD_TEXT_MAX_CHARS: usize = 100;
-/// Max characters of a "loop" card, which is a checklist of up to
-/// `LOOP_MAX_LINES` lines.
-pub const LOOP_TEXT_MAX_CHARS: usize = 160;
-pub const LOOP_MAX_LINES: usize = 3;
+/// Max characters of a "loop" card: a "Circle:" line naming the topic,
+/// then a checklist, `LOOP_MAX_LINES` lines in all.
+pub const LOOP_TEXT_MAX_CHARS: usize = 200;
+pub const LOOP_MAX_LINES: usize = 4;
 /// Consecutive judge failures after which the observer slows down.
 pub const BACKOFF_AFTER_FAILURES: u32 = 5;
 /// Interval multiplier while backing off.
@@ -272,7 +272,7 @@ pub fn build_prompt(
          {sensitivity_rule}\n{tools_rule}\n\
          Never give generic process advice (summarize, document, align, clarify, take notes, ask for feedback). Only speak about a concrete point from this meeting.\n\
          Answer with JSON only, exactly this shape: {{\"intervene\": boolean, \"kind\": \"loop\"|\"stuck\"|\"info\"|\"idea\"|null, \"text\": string|null, \"reason\": string}}. \
-         \"text\" is null when silent. For kind \"loop\", \"text\" is a checklist of up to three lines separated by \"\\n\", each starting with its label and at most 8 words after it, using only the lines that apply: \"Decided: <what the meeting already agreed>\", \"Decide now: <the open point to settle>\", \"Park: <a point to take up later>\". Include at least a \"Decide now\" or a \"Park\" line, and a \"Decided\" line only for something actually agreed; when tools are available, you must call read_transcript for this meeting before answering kind \"loop\", to find what was already decided and which side topics could be parked; the transcript below is only the last three minutes. For every other kind, \"text\" is one short line of at most 12 words naming the concrete point, like a note passed under the table. Never repeat a recent intervention."
+         \"text\" is null when silent. For kind \"loop\", \"text\" is a checklist of up to four lines separated by \"\\n\", each starting with its label and at most 8 words after it. The first line is always \"Circle: <the topic or pain point the talk keeps circling, in 2 to 4 words>\", a name the room would recognize, like \"Launch market\" or \"Onboarding drop-off\". Then only the lines that apply: \"Decided: <what the meeting already agreed>\", \"Decide now: <the open point to settle>\", \"Park: <a point to take up later>\". Include at least a \"Decide now\" or a \"Park\" line, and a \"Decided\" line only for something actually agreed; when tools are available, you must call read_transcript for this meeting before answering kind \"loop\", to find what was already decided and which side topics could be parked; the transcript below is only the last three minutes. For every other kind, \"text\" is one short line of at most 12 words naming the concrete point, like a note passed under the table. Never repeat a recent intervention."
     );
     let mut user = String::new();
     user.push_str("## Project brief\n");

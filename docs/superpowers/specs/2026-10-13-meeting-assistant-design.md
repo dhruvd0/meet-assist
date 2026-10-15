@@ -48,7 +48,7 @@ Intervention (belongs to Session)
 - **Pause / Resume:** capture stops, session stays open. Resume appends to same session.
 - **End:** capture stops, session closed, session summary generated, rolling summary updated, meeting `ended`.
 - **Continue:** from list, any `ended` or `paused` meeting. New session under same meeting. Observer gets rolling summary of past sessions plus live window.
-- **Intervention:** beep plus floating card (always-on-top window, top-right). Kind icon plus one short line (at most 12 words, 100 chars); a "going in circles" card is instead a checklist of up to three lines: "Decided: …", "Decide now: …", "Park: …". Dismiss or open meeting. Auto-hide after 30 s unless hovered. Also appears in meeting timeline.
+- **Intervention:** beep plus floating card (always-on-top window, top-right). Kind icon plus one short line (at most 12 words, 100 chars); a "going in circles" card instead names the circle first ("Circle: …", the topic or pain point in 2 to 4 words), then a checklist: "Decided: …", "Decide now: …", "Park: …" (four lines at most). Dismiss or open meeting. Auto-hide after 30 s unless hovered. Also appears in meeting timeline.
 
 ### Screens
 
