@@ -38,6 +38,7 @@ Settled during brainstorming:
    - filing is not marked unavailable for this meeting,
 
    the observer calls `filing::run`. The judge tick then runs as usual in the same loop iteration; after a successful filing it sees the project.
+
 4. **End trigger.** When a meeting ends, the summary background thread (`spawn_summaries`) first makes one last filing attempt if the meeting is still eligible, has at least 5 lines, and the assistant is ready; then it writes the session summary. Meetings under 5 lines stay unfiled.
 5. **Notify.** After a run that filed the meeting, emit `meeting-filed` and show the filed card. No beep.
 
@@ -59,13 +60,13 @@ The result of a run is what the tools did, not what the final answer claims: `Fi
 
 **Tools** (separate from `tools::tool_defs`; never offered to the observer):
 
-| Tool | Input | Output |
-| --- | --- | --- |
-| `list_projects` | none | `id`, `title`, brief excerpt (first 300 chars), meeting count, `updated_at` for every project |
-| `read_project` | `project_id` | full brief, source titles with digests, rolling summaries of the 3 most recent meetings |
-| `assign_meeting` | `project_id` | `{ "ok": true, "project_title" }` |
-| `create_project` | `title` (1–80 chars), `brief` (≤ 2000 chars) | `{ "ok": true, "project_id", "reused": bool }` |
-| `rename_meeting` | `title` (1–80 chars) | `{ "ok": true }` |
+| Tool             | Input                                        | Output                                                                                        |
+| ---------------- | -------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `list_projects`  | none                                         | `id`, `title`, brief excerpt (first 300 chars), meeting count, `updated_at` for every project |
+| `read_project`   | `project_id`                                 | full brief, source titles with digests, rolling summaries of the 3 most recent meetings       |
+| `assign_meeting` | `project_id`                                 | `{ "ok": true, "project_title" }`                                                             |
+| `create_project` | `title` (1–80 chars), `brief` (≤ 2000 chars) | `{ "ok": true, "project_id", "reused": bool }`                                                |
+| `rename_meeting` | `title` (1–80 chars)                         | `{ "ok": true }`                                                                              |
 
 **Safety rules, enforced in Rust:**
 

@@ -36,35 +36,37 @@
 
 ## File Structure
 
-| File | Change | Responsibility |
-| --- | --- | --- |
-| `src-tauri/src/meeting/store.rs` | modify | `filed_by` migration and column; conditional filing writes; move; undo; line count; 3 tests |
-| `src-tauri/src/llm_client.rs` | modify | `ToolClientCache` (moved out of `LlmJudge`) |
-| `src-tauri/src/meeting/observer.rs` | modify | use `ToolClientCache`; call `mm.maybe_file_live` before the tick |
-| `src-tauri/src/meeting/filing.rs` | create | prompt, tools, `FilingContext`, `FilingTracker`, `LlmFiler`, `MeetingFiledPayload`, `notify`, `final_attempt` |
-| `src-tauri/src/meeting/mod.rs` | modify | `pub mod filing;` |
-| `src-tauri/src/intervention.rs` | modify | `show_filed`, shared `present` helper |
-| `src-tauri/src/meeting/session.rs` | modify | own the filer and tracker; `set_active_project`; `maybe_file_live`; final attempt on end |
-| `src-tauri/src/meeting/toggle.rs` | modify | always start unfiled |
-| `src-tauri/src/commands/meeting.rs` | modify | `move_meeting`, `undo_filing` commands |
-| `src-tauri/src/lib.rs` | modify | register commands and `MeetingFiledPayload` |
-| `src/bindings.ts` | regenerate | — |
-| `src/intervention/InterventionCard.tsx` | modify | nudge or filed card |
-| `src/stores/meetingStore.ts` | modify | `moveMeeting`; `meetingFiledPayload` listener |
-| `src/components/meetings/MeetingProjectPicker.tsx` | create | project picker plus "Filed by assistant" badge |
-| `src/components/meetings/MeetingDetail.tsx` | modify | render the picker |
-| `src/components/meetings/MeetingList.tsx` | modify | project / Unfiled label per row |
-| `src/i18n/locales/en/translation.json` | modify | `meetings.filing.*` |
-| `docs/ARCHITECTURE.md`, `AGENTS.md` | modify | toggle behaviour, filing module, flow |
+| File                                               | Change     | Responsibility                                                                                                |
+| -------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------- |
+| `src-tauri/src/meeting/store.rs`                   | modify     | `filed_by` migration and column; conditional filing writes; move; undo; line count; 3 tests                   |
+| `src-tauri/src/llm_client.rs`                      | modify     | `ToolClientCache` (moved out of `LlmJudge`)                                                                   |
+| `src-tauri/src/meeting/observer.rs`                | modify     | use `ToolClientCache`; call `mm.maybe_file_live` before the tick                                              |
+| `src-tauri/src/meeting/filing.rs`                  | create     | prompt, tools, `FilingContext`, `FilingTracker`, `LlmFiler`, `MeetingFiledPayload`, `notify`, `final_attempt` |
+| `src-tauri/src/meeting/mod.rs`                     | modify     | `pub mod filing;`                                                                                             |
+| `src-tauri/src/intervention.rs`                    | modify     | `show_filed`, shared `present` helper                                                                         |
+| `src-tauri/src/meeting/session.rs`                 | modify     | own the filer and tracker; `set_active_project`; `maybe_file_live`; final attempt on end                      |
+| `src-tauri/src/meeting/toggle.rs`                  | modify     | always start unfiled                                                                                          |
+| `src-tauri/src/commands/meeting.rs`                | modify     | `move_meeting`, `undo_filing` commands                                                                        |
+| `src-tauri/src/lib.rs`                             | modify     | register commands and `MeetingFiledPayload`                                                                   |
+| `src/bindings.ts`                                  | regenerate | —                                                                                                             |
+| `src/intervention/InterventionCard.tsx`            | modify     | nudge or filed card                                                                                           |
+| `src/stores/meetingStore.ts`                       | modify     | `moveMeeting`; `meetingFiledPayload` listener                                                                 |
+| `src/components/meetings/MeetingProjectPicker.tsx` | create     | project picker plus "Filed by assistant" badge                                                                |
+| `src/components/meetings/MeetingDetail.tsx`        | modify     | render the picker                                                                                             |
+| `src/components/meetings/MeetingList.tsx`          | modify     | project / Unfiled label per row                                                                               |
+| `src/i18n/locales/en/translation.json`             | modify     | `meetings.filing.*`                                                                                           |
+| `docs/ARCHITECTURE.md`, `AGENTS.md`                | modify     | toggle behaviour, filing module, flow                                                                         |
 
 ---
 
 ### Task 1: Store support for filing
 
 **Files:**
+
 - Modify: `src-tauri/src/meeting/store.rs` (migrations list at top; `Meeting` struct ~line 604; `MEETING_COLS` ~line 654; `map_meeting`; `create_meeting`; new methods after `delete_meeting`; tests at bottom)
 
 **Interfaces:**
+
 - Consumes: nothing new.
 - Produces:
   - `Meeting.filed_by: Option<String>`
@@ -389,6 +391,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ### Task 2: Filing module, shared tool client, filed card backend
 
 **Files:**
+
 - Modify: `src-tauri/src/llm_client.rs` (add `ToolClientCache` next to `create_tool_client`, ~line 564)
 - Modify: `src-tauri/src/meeting/observer.rs` (`LlmJudge` uses the cache)
 - Create: `src-tauri/src/meeting/filing.rs`
@@ -397,6 +400,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 - Modify: `src-tauri/src/lib.rs` (register `MeetingFiledPayload` in `collect_events!`)
 
 **Interfaces:**
+
 - Consumes (Task 1): `file_meeting_ai`, `create_project_and_file_ai`, `rename_meeting_ai`, `count_meeting_lines`, `Meeting.filed_by`.
 - Produces:
   - `llm_client::ToolClientCache` with `fn get(&self, provider: &LlmProvider, api_key: &str) -> Result<reqwest::Client, String>`; `Default`.
@@ -1022,11 +1026,13 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ### Task 3: Wire filing into meetings, the observer, and the shortcut
 
 **Files:**
+
 - Modify: `src-tauri/src/meeting/session.rs` (`MeetingManager` fields and `new`; `spawn_summary`/`spawn_summaries`; `end`; new methods)
 - Modify: `src-tauri/src/meeting/observer.rs` (`spawn_observer` loop)
 - Modify: `src-tauri/src/meeting/toggle.rs`
 
 **Interfaces:**
+
 - Consumes (Task 2): `filing::{LlmFiler, FilingTracker, eligible, attempt, final_attempt, notify}`; (Task 1): `count_meeting_lines`.
 - Produces:
   - `MeetingManager::set_active_project(&self, meeting_id: i64, project_id: Option<i64>)`
@@ -1220,11 +1226,13 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ### Task 4: Move and undo commands, bindings
 
 **Files:**
+
 - Modify: `src-tauri/src/commands/meeting.rs`
 - Modify: `src-tauri/src/lib.rs` (`collect_commands!`)
 - Regenerate: `src/bindings.ts`
 
 **Interfaces:**
+
 - Consumes: `ProjectStore::{move_meeting, undo_filing}` (Task 1); `MeetingManager::set_active_project` (Task 3); `filing::MeetingFiledPayload` (Task 2).
 - Produces (TS): `commands.moveMeeting(meetingId: number, projectId: number | null)`, `commands.undoFiling(meetingId: number, createdProjectId: number | null, createdBrief: string | null)`, `events.meetingFiledPayload`, `Meeting.filed_by: string | null`. Card window invokes `"undo_filing"` with `{ meetingId, createdProjectId, createdBrief }`.
 
@@ -1331,10 +1339,12 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ### Task 5: Filed card
 
 **Files:**
+
 - Modify: `src/intervention/InterventionCard.tsx` (full replacement below)
 - Modify: `src/i18n/locales/en/translation.json` (`meetings.filing`)
 
 **Interfaces:**
+
 - Consumes: window events `"intervention:show"` (nudge, unchanged) and `"intervention:filed"` (payload = `MeetingFiledPayload` JSON, snake_case); commands `focus_meeting { meetingId }`, `undo_filing { meetingId, createdProjectId, createdBrief }`, `hide_intervention_window`, `dismiss_intervention { id }`.
 - Produces: i18n keys `meetings.filing.{project,unfiled,byAssistant,pending,pickProject}` and `meetings.filing.card.{title,filedInto,created,change,undo}` (Task 6 uses the first five).
 
@@ -1398,7 +1408,9 @@ type Filed = {
   created_brief: string | null;
 };
 
-type Card = { type: "nudge"; iv: Intervention } | { type: "filed"; filed: Filed };
+type Card =
+  | { type: "nudge"; iv: Intervention }
+  | { type: "filed"; filed: Filed };
 
 const ICON: Record<string, React.ComponentType<{ className?: string }>> = {
   loop: Repeat,
@@ -1581,12 +1593,14 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ### Task 6: Project picker and Unfiled labels in the main window
 
 **Files:**
+
 - Modify: `src/stores/meetingStore.ts`
 - Create: `src/components/meetings/MeetingProjectPicker.tsx`
 - Modify: `src/components/meetings/MeetingDetail.tsx`
 - Modify: `src/components/meetings/MeetingList.tsx`
 
 **Interfaces:**
+
 - Consumes: `commands.moveMeeting`, `events.meetingFiledPayload`, `Meeting.filed_by` (Task 4); i18n keys from Task 5; `useProjectStore` (`projects`, `loadProjects`); `Select` (named export, `value: string | null`, `options: SelectOption[]`, `onChange(value: string | null)`); `Badge` (default export, variants `primary|success|secondary`).
 - Produces: `useMeetingStore().moveMeeting(id: number, projectId: number | null): Promise<void>`.
 
@@ -1598,7 +1612,7 @@ In `src/stores/meetingStore.ts`:
 2. In the store's type, after `renameMeeting: ...`, add:
 
 ```ts
-  moveMeeting: (id: number, projectId: number | null) => Promise<void>;
+moveMeeting: (id: number, projectId: number | null) => Promise<void>;
 ```
 
 3. In the implementation, after the `renameMeeting` action, add:
@@ -1615,21 +1629,21 @@ In `src/stores/meetingStore.ts`:
 4. In `subscribe`, after the `un7` listener, add:
 
 ```ts
-    const un8 = await events.meetingFiledPayload.listen((e) => {
-      const { meeting_id, project_id, meeting_title, by } = e.payload;
-      const patch = { project_id, title: meeting_title, filed_by: by };
-      set((s) => ({
-        meetings: s.meetings.map((m) =>
-          m.id === meeting_id ? { ...m, ...patch } : m,
-        ),
-        detail:
-          s.detail && s.detail.meeting.id === meeting_id
-            ? { ...s.detail, meeting: { ...s.detail.meeting, ...patch } }
-            : s.detail,
-      }));
-      // A project may have been created or deleted.
-      useProjectStore.getState().loadProjects();
-    });
+const un8 = await events.meetingFiledPayload.listen((e) => {
+  const { meeting_id, project_id, meeting_title, by } = e.payload;
+  const patch = { project_id, title: meeting_title, filed_by: by };
+  set((s) => ({
+    meetings: s.meetings.map((m) =>
+      m.id === meeting_id ? { ...m, ...patch } : m,
+    ),
+    detail:
+      s.detail && s.detail.meeting.id === meeting_id
+        ? { ...s.detail, meeting: { ...s.detail.meeting, ...patch } }
+        : s.detail,
+  }));
+  // A project may have been created or deleted.
+  useProjectStore.getState().loadProjects();
+});
 ```
 
 and add `un8();` to the returned cleanup function after `un7();`.
@@ -1677,7 +1691,8 @@ export const MeetingProjectPicker: React.FC<{ meeting: Meeting }> = ({
         }
         options={options}
         onChange={(value) => {
-          const next = value === null || value === UNFILED ? null : Number(value);
+          const next =
+            value === null || value === UNFILED ? null : Number(value);
           if (next !== meeting.project_id) moveMeeting(meeting.id, next);
         }}
       />
@@ -1694,7 +1709,7 @@ export const MeetingProjectPicker: React.FC<{ meeting: Meeting }> = ({
 Add `import { MeetingProjectPicker } from "./MeetingProjectPicker";` with the other local imports. Directly after the closing `</div>` of the header row (the `flex items-center gap-2` div that ends with `<MeetingControls meetingId={m.id} />`), add:
 
 ```tsx
-      <MeetingProjectPicker meeting={m} />
+<MeetingProjectPicker meeting={m} />
 ```
 
 - [ ] **Step 4: Project or Unfiled label in `MeetingList.tsx`**
@@ -1704,29 +1719,29 @@ Add imports: `import { useEffect } from "react";` (merge into the existing `impo
 In the component body, after `const deleteMeeting = ...`, add:
 
 ```tsx
-  const observer = useMeetingStore((s) => s.observer);
-  const projects = useProjectStore((s) => s.projects);
-  const loadProjects = useProjectStore((s) => s.loadProjects);
+const observer = useMeetingStore((s) => s.observer);
+const projects = useProjectStore((s) => s.projects);
+const loadProjects = useProjectStore((s) => s.loadProjects);
 
-  useEffect(() => {
-    loadProjects();
-  }, [loadProjects]);
+useEffect(() => {
+  loadProjects();
+}, [loadProjects]);
 
-  const projectLabel = (m: (typeof meetings)[number]) => {
-    if (m.project_id !== null)
-      return projects.find((p) => p.id === m.project_id)?.title ?? "";
-    if (live.meeting_id === m.id && m.filed_by === null)
-      return observer.readiness === "ready"
-        ? t("meetings.filing.pending")
-        : t("meetings.filing.pickProject");
-    return t("meetings.filing.unfiled");
-  };
+const projectLabel = (m: (typeof meetings)[number]) => {
+  if (m.project_id !== null)
+    return projects.find((p) => p.id === m.project_id)?.title ?? "";
+  if (live.meeting_id === m.id && m.filed_by === null)
+    return observer.readiness === "ready"
+      ? t("meetings.filing.pending")
+      : t("meetings.filing.pickProject");
+  return t("meetings.filing.unfiled");
+};
 ```
 
 In each row, directly after the title `<div className="text-sm font-semibold text-text">{m.title}</div>`, add:
 
 ```tsx
-                <div className="text-xs text-mid-gray">{projectLabel(m)}</div>
+<div className="text-xs text-mid-gray">{projectLabel(m)}</div>
 ```
 
 - [ ] **Step 5: Typecheck, lint, format, commit**
@@ -1749,6 +1764,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ### Task 7: Docs
 
 **Files:**
+
 - Modify: `docs/ARCHITECTURE.md` (toggle paragraph ~line 27; meeting module table ~line 59)
 - Modify: `AGENTS.md` (Meeting Subsystem module list; Application Flow step 3)
 
@@ -1761,7 +1777,7 @@ Replace the sentence "It ends a running (live or paused) meeting; otherwise it s
 In the meeting module table, add a row after `meeting/toggle.rs` (keep the table's column padding style):
 
 ```markdown
-| `meeting/filing.rs`         | Assistant filing of unfiled meetings: prompt, filing tools, attempt tracker, `LlmFiler`, `MeetingFiledPayload` |
+| `meeting/filing.rs` | Assistant filing of unfiled meetings: prompt, filing tools, attempt tracker, `LlmFiler`, `MeetingFiledPayload` |
 ```
 
 Update the `meeting/toggle.rs` row text to: "`toggle_meeting`: the single entry point for shortcut, tray, CLI, and SIGUSR2; starts an unfiled meeting".
