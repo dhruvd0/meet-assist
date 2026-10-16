@@ -83,7 +83,39 @@ static MIGRATIONS: &[M] = &[
         CREATE INDEX interventions_session_idx ON interventions(session_id);",
     ),
     M::up("ALTER TABLE meetings ADD COLUMN filed_by TEXT;"),
+    M::up(
+        "CREATE TABLE observer_context (
+            meeting_id INTEGER PRIMARY KEY REFERENCES meetings(id) ON DELETE CASCADE,
+            through_line_id INTEGER NOT NULL,
+            context_json TEXT NOT NULL
+        );
+        CREATE TABLE observer_checks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id INTEGER NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+            ts INTEGER NOT NULL,
+            through_line_id INTEGER NOT NULL,
+            outcome TEXT NOT NULL,
+            remaining_ms INTEGER NOT NULL,
+            kind TEXT,
+            text TEXT,
+            reason TEXT NOT NULL
+        );
+        CREATE INDEX observer_checks_session_idx ON observer_checks(session_id, ts);",
+    ),
 ];
+
+/// Durable result of a judged window, including candidates the backend suppressed.
+pub struct ObserverCheck {
+    pub session_id: i64,
+    pub ts: i64,
+    pub through_line_id: i64,
+    pub outcome: String,
+    pub remaining_ms: i64,
+    pub kind: Option<String>,
+    pub text: Option<String>,
+    pub reason: String,
+    pub context_json: String,
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize, Type)]
 pub struct Project {
@@ -1209,30 +1241,6 @@ impl ProjectStore {
         })
     }
 
-    pub fn add_intervention(
-        &self,
-        session_id: i64,
-        kind: &str,
-        text: &str,
-        reason: &str,
-    ) -> Result<Intervention> {
-        let conn = self.conn()?;
-        let ts = now();
-        conn.execute(
-            "INSERT INTO interventions (session_id, ts, kind, text, reason) VALUES (?1, ?2, ?3, ?4, ?5)",
-            params![session_id, ts, kind, text, reason],
-        )?;
-        Ok(Intervention {
-            id: conn.last_insert_rowid(),
-            session_id,
-            ts,
-            kind: kind.into(),
-            text: text.into(),
-            reason: reason.into(),
-            dismissed: false,
-        })
-    }
-
     pub fn list_interventions(&self, meeting_id: i64) -> Result<Vec<Intervention>> {
         let conn = self.conn()?;
         let mut stmt = conn.prepare(&format!(
@@ -1265,6 +1273,86 @@ impl ProjectStore {
 
     pub fn lines_since(&self, meeting_id: i64, since_ts: i64) -> Result<Vec<TranscriptLine>> {
         self.lines_in_range(meeting_id, Some(since_ts), None, 10_000)
+    }
+
+    /// Restore the live ledger and its cursor after a restart or Continue.
+    pub fn observer_context(&self, meeting_id: i64) -> Result<Option<(i64, String)>> {
+        Ok(self
+            .conn()?
+            .query_row(
+                "SELECT through_line_id, context_json FROM observer_context WHERE meeting_id = ?1",
+                params![meeting_id],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .optional()?)
+    }
+
+    /// Bounded, insertion-ordered catch-up so an outage cannot silently skip old lines.
+    pub fn observer_lines(
+        &self,
+        meeting_id: i64,
+        after_id: i64,
+        limit: usize,
+    ) -> Result<Vec<TranscriptLine>> {
+        let conn = self.conn()?;
+        let mut stmt = conn.prepare(
+            "SELECT l.id, l.session_id, l.ts, l.speaker, l.text FROM transcript_lines l
+             JOIN sessions s ON s.id = l.session_id
+             WHERE s.meeting_id = ?1 AND l.id > ?2 ORDER BY l.id LIMIT ?3",
+        )?;
+        let rows = stmt.query_map(params![meeting_id, after_id, limit as i64], Self::map_line)?;
+        Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+    }
+
+    /// Commit memory, audit, and an optional card together; a failed write must
+    /// never advance the cursor past a lost intervention.
+    pub fn save_observer_check(&self, check: &ObserverCheck) -> Result<Option<Intervention>> {
+        let mut conn = self.conn()?;
+        let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let meeting_id: i64 = tx.query_row(
+            "SELECT meeting_id FROM sessions WHERE id = ?1",
+            params![check.session_id],
+            |r| r.get(0),
+        )?;
+        tx.execute(
+            "INSERT INTO observer_context (meeting_id, through_line_id, context_json) VALUES (?1, ?2, ?3)
+             ON CONFLICT(meeting_id) DO UPDATE SET through_line_id = excluded.through_line_id, context_json = excluded.context_json",
+            params![meeting_id, check.through_line_id, check.context_json],
+        )?;
+        tx.execute(
+            "INSERT INTO observer_checks (session_id, ts, through_line_id, outcome, remaining_ms, kind, text, reason)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![check.session_id, check.ts, check.through_line_id, check.outcome,
+                check.remaining_ms, check.kind, check.text, check.reason],
+        )?;
+        let intervention = if check.outcome == "emitted" {
+            let kind = check
+                .kind
+                .as_deref()
+                .ok_or_else(|| anyhow!("missing intervention kind"))?;
+            let text = check
+                .text
+                .as_deref()
+                .filter(|t| !t.trim().is_empty())
+                .ok_or_else(|| anyhow!("missing intervention text"))?;
+            tx.execute(
+                "INSERT INTO interventions (session_id, ts, kind, text, reason) VALUES (?1, ?2, ?3, ?4, ?5)",
+                params![check.session_id, check.ts, kind, text, check.reason],
+            )?;
+            Some(Intervention {
+                id: tx.last_insert_rowid(),
+                session_id: check.session_id,
+                ts: check.ts,
+                kind: kind.into(),
+                text: text.into(),
+                reason: check.reason.clone(),
+                dismissed: false,
+            })
+        } else {
+            None
+        };
+        tx.commit()?;
+        Ok(intervention)
     }
 
     pub fn lines_in_range(
@@ -1300,21 +1388,47 @@ impl ProjectStore {
     }
 
     /// `(title, rolling_summary)` of the most recently updated other meeting in the project.
-    pub fn previous_meeting_summary(
+    /// The project's latest `limit` other meetings that have a summary and
+    /// at least `min_lines` transcript lines (so short test recordings do not
+    /// crowd out real ones), newest first.
+    pub fn recent_meeting_recaps(
         &self,
         project_id: i64,
         exclude_meeting_id: i64,
-    ) -> Result<Option<(String, Option<String>)>> {
+        min_lines: i64,
+        limit: i64,
+    ) -> Result<Vec<MeetingRecap>> {
         let conn = self.conn()?;
-        Ok(conn
-            .query_row(
-                "SELECT title, rolling_summary FROM meetings WHERE project_id = ?1 AND id != ?2
-                 ORDER BY updated_at DESC, id DESC LIMIT 1",
-                params![project_id, exclude_meeting_id],
-                |r| Ok((r.get(0)?, r.get(1)?)),
-            )
-            .optional()?)
+        let mut stmt = conn.prepare(
+            "SELECT m.title, m.created_at, m.rolling_summary FROM meetings m
+             WHERE m.project_id = ?1 AND m.id != ?2
+               AND TRIM(COALESCE(m.rolling_summary, '')) != ''
+               AND (SELECT COUNT(*) FROM transcript_lines l
+                    JOIN sessions s ON s.id = l.session_id
+                    WHERE s.meeting_id = m.id) >= ?3
+             ORDER BY m.created_at DESC, m.id DESC LIMIT ?4",
+        )?;
+        let rows = stmt.query_map(
+            params![project_id, exclude_meeting_id, min_lines, limit],
+            |r| {
+                Ok(MeetingRecap {
+                    title: r.get(0)?,
+                    created_at: r.get(1)?,
+                    summary: r.get(2)?,
+                })
+            },
+        )?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
+}
+
+/// An earlier meeting as the observer sees it.
+#[derive(Clone, Debug, PartialEq)]
+pub struct MeetingRecap {
+    pub title: String,
+    /// Unix ms the meeting was created.
+    pub created_at: i64,
+    pub summary: String,
 }
 
 #[cfg(test)]
@@ -1416,7 +1530,7 @@ mod tests {
         {
             // A database as it was before the `filed_by` migration.
             let mut conn = Connection::open(&path).unwrap();
-            Migrations::new(MIGRATIONS[..MIGRATIONS.len() - 1].to_vec())
+            Migrations::new(MIGRATIONS[..5].to_vec())
                 .to_latest(&mut conn)
                 .unwrap();
             conn.execute(
@@ -1435,6 +1549,112 @@ mod tests {
         assert_eq!(meetings.len(), 1);
         assert_eq!(meetings[0].project_id, Some(1));
         assert_eq!(meetings[0].filed_by, None);
+    }
+
+    #[test]
+    fn observer_checkpoint_and_audit_survive_reopen_and_cascade() {
+        let (dir, s) = store();
+        let m = s.create_meeting(None, "Live").unwrap();
+        let session = s.create_session(m.id).unwrap();
+        let line = s
+            .append_line(session.id, "them", "Return twenty candidates", TS)
+            .unwrap();
+        let check = ObserverCheck {
+            session_id: session.id,
+            ts: TS,
+            through_line_id: line.id,
+            outcome: "global_cooldown".into(),
+            remaining_ms: 10_000,
+            kind: Some("info".into()),
+            text: Some("Endpoint contract changed".into()),
+            reason: "Caller now needs twenty candidates".into(),
+            context_json: "{\"contracts\":[\"twenty candidates\"]}".into(),
+        };
+        assert!(s.save_observer_check(&check).unwrap().is_none());
+        let reopened = ProjectStore::open(dir.path().join("meet.db")).unwrap();
+        assert_eq!(
+            reopened.observer_context(m.id).unwrap(),
+            Some((line.id, check.context_json.clone()))
+        );
+        assert!(reopened
+            .observer_lines(m.id, line.id, 100)
+            .unwrap()
+            .is_empty());
+        assert!(reopened.list_interventions(m.id).unwrap().is_empty());
+        let audit: (String, i64, String) = reopened
+            .conn()
+            .unwrap()
+            .query_row(
+                "SELECT outcome, remaining_ms, text FROM observer_checks WHERE session_id = ?1",
+                params![session.id],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            )
+            .unwrap();
+        assert_eq!(
+            audit,
+            (check.outcome, check.remaining_ms, check.text.unwrap())
+        );
+        reopened.delete_meeting(m.id).unwrap();
+        assert!(reopened.observer_context(m.id).unwrap().is_none());
+        let count: i64 = reopened
+            .conn()
+            .unwrap()
+            .query_row("SELECT count(*) FROM observer_checks", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 0);
+    }
+
+    #[test]
+    fn observer_failed_card_write_rolls_back_memory_and_audit() {
+        let (_dir, s) = store();
+        let m = s.create_meeting(None, "Live").unwrap();
+        let session = s.create_session(m.id).unwrap();
+        let line = s.append_line(session.id, "me", "Which token?", TS).unwrap();
+        let mut check = ObserverCheck {
+            session_id: session.id,
+            ts: TS,
+            through_line_id: line.id,
+            outcome: "emitted".into(),
+            remaining_ms: 0,
+            kind: Some("stuck".into()),
+            text: None,
+            reason: "Identity flow unresolved".into(),
+            context_json: "{}".into(),
+        };
+        assert!(s.save_observer_check(&check).is_err());
+        assert!(s.observer_context(m.id).unwrap().is_none());
+        let count: i64 = s
+            .conn()
+            .unwrap()
+            .query_row("SELECT count(*) FROM observer_checks", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 0);
+        assert_eq!(s.observer_lines(m.id, 0, 1).unwrap()[0].id, line.id);
+        check.text = Some("Booking calls need which token?".into());
+        let iv = s.save_observer_check(&check).unwrap().unwrap();
+        assert_eq!(iv.ts, TS);
+        assert_eq!(s.list_interventions(m.id).unwrap().len(), 1);
+        assert_eq!(s.observer_context(m.id).unwrap().unwrap().0, line.id);
+    }
+
+    #[test]
+    fn observer_migration_preserves_existing_transcripts_and_cards() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("meet.db");
+        {
+            let mut conn = Connection::open(&path).unwrap();
+            Migrations::new(MIGRATIONS[..6].to_vec())
+                .to_latest(&mut conn)
+                .unwrap();
+            conn.execute_batch("INSERT INTO meetings (id, title, created_at, updated_at) VALUES (1, 'Existing', 1, 1);
+                INSERT INTO sessions (id, meeting_id, started_at) VALUES (1, 1, 1);
+                INSERT INTO transcript_lines (session_id, ts, speaker, text) VALUES (1, 1, 'me', 'Keep this');
+                INSERT INTO interventions (session_id, ts, kind, text) VALUES (1, 1, 'info', 'Existing card');").unwrap();
+        }
+        let s = ProjectStore::open(path).unwrap();
+        assert_eq!(s.session_lines(1).unwrap()[0].text, "Keep this");
+        assert_eq!(s.list_interventions(1).unwrap()[0].text, "Existing card");
+        assert!(s.observer_context(1).unwrap().is_none());
     }
 
     #[test]

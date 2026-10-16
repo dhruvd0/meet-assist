@@ -236,8 +236,10 @@
           "circle": "Going in circles",
           "argument": "Pointless argument",
           "tangent": "Tangent",
-          "repetition": "Repetition"
-        }
+          "repetition": "Repetition",
+          "recurring": "Recurring"
+        },
+        "acrossSpace": "Space history: still unsettled from earlier conversations"
       }
     },
     "capture": {

@@ -109,7 +109,7 @@ export const ProviderSettings: React.FC = () => {
             value={state.apiKey}
             onBlur={state.handleApiKeyChange}
             placeholder={t(
-              state.selectedProviderId === "openrouter"
+              state.usesBundledKey
                 ? "settings.assistant.provider.apiKey.bundledPlaceholder"
                 : "settings.assistant.provider.apiKey.placeholder",
             )}

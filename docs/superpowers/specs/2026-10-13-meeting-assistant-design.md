@@ -95,26 +95,30 @@ Meeting gains project_id (nullable; quick meetings without a project remain poss
 
 All new code under `src-tauri/src/meeting/` unless noted.
 
-| Module                | Responsibility                                                                                                                                                                                                                                                                                            |
-| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `mod.rs`              | `MeetingManager` (Tauri state). Session state machine `Idle → Live ⇄ Paused → Ended`. Public: `start(meeting_id?)`, `pause`, `resume`, `end`, `update_context`, `dismiss_intervention`.                                                                                                                   |
-|                       | Implemented as `session.rs` (manager and transcriber thread) plus `segment.rs`; event names are the tauri-specta derived ones.                                                                                                                                                                            |
-| `capture.rs`          | `MeetingCapture`. Two sources: mic via handy-recorder (reuse `open_microphone` in `managers/audio.rs`), system audio via `audio_toolkit/audio/system_capture/`. Both resampled to 16 kHz mono. One `CaptureVad` per source. Emits `Utterance { speaker, samples, started_at }` on speech end.             |
-| `transcriber.rs`      | Worker thread. Consumes utterances in order, calls `TranscriptionManager::transcribe()`, appends `TranscriptLine`, emits `meeting:transcript-line`. Keeps model loaded for session via existing unload-timeout.                                                                                           |
-| `observer.rs`         | Timer loop, default 20 s. Runs only when new lines exist. Builds the base prompt and runs the tool loop (section 3a) via `llm_client::send_with_tools`. Cooldown 60 s, dedupe against recent interventions. On intervene: beep via `audio_feedback`, store, emit `meeting:intervention`.                  |
-| `tools.rs`            | MCP-shaped tool definitions and handlers: `list_sources`, `search_context`, `read_source`, `read_transcript`, `list_meetings`. One implementation, reusable by a future MCP server.                                                                                                                       |
-| `indexer.rs`          | Background source indexing: folder walk (`ignore` crate), link fetch and HTML-to-text, image copy and digest, chunking, FTS5 writes.                                                                                                                                                                      |
-| `summary.rs`          | On session end: session summary, then rolling summary merge.                                                                                                                                                                                                                                              |
-| `manager.rs`          | `ProjectManager` (Tauri state). Owns the store, runs source indexing on a worker thread, resumes `pending` sources at startup, emits `source-status-payload`.                                                                                                                                             |
-| `store.rs`            | SQLite via rusqlite (WAL journal), same pattern as `managers/history.rs`. Tables `projects`, `sources`, `source_chunks` (FTS5, `porter unicode61` tokenizer), `meetings`, `sessions`, `transcript_lines`, `interventions`. Schema version column for migrations. Audio not stored unless setting enabled. |
-| `commands/meeting.rs` | Tauri commands with specta bindings: `list_meetings`, `get_meeting`, `start_meeting(project_id?)`, `pause_meeting`, `resume_meeting`, `end_meeting`, `update_meeting_context`, `update_meeting_title`, `delete_meeting`, `dismiss_intervention`.                                                          |
-| `commands/project.rs` | `list_projects`, `get_project`, `create_project`, `update_project_brief`, `update_project_title`, `delete_project`, `add_source`, `remove_source`, `reindex_source`, `set_source_caption`.                                                                                                                |
+| Module                | Responsibility                                                                                                                                                                                                                                                                                                                                                          |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `mod.rs`              | `MeetingManager` (Tauri state). Session state machine `Idle → Live ⇄ Paused → Ended`. Public: `start(meeting_id?)`, `pause`, `resume`, `end`, `update_context`, `dismiss_intervention`.                                                                                                                                                                                 |
+|                       | Implemented as `session.rs` (manager and transcriber thread) plus `segment.rs`; event names are the tauri-specta derived ones.                                                                                                                                                                                                                                          |
+| `capture.rs`          | `MeetingCapture`. Two sources: mic via handy-recorder (reuse `open_microphone` in `managers/audio.rs`), system audio via `audio_toolkit/audio/system_capture/`. Both resampled to 16 kHz mono. One `CaptureVad` per source. Emits `Utterance { speaker, samples, started_at }` on speech end.                                                                           |
+| `transcriber.rs`      | Worker thread. Consumes utterances in order, calls `TranscriptionManager::transcribe()`, appends `TranscriptLine`, emits `meeting:transcript-line`. Keeps model loaded for session via existing unload-timeout.                                                                                                                                                         |
+| `observer.rs`         | Timer loop, default 20 s. Runs only when new lines exist. Builds the base prompt and runs the tool loop (section 3a) via `llm_client::send_with_tools`. Cooldown 180 s globally and 600 s per kind, dedupe against recent interventions; persist live context and explicit check outcomes. On intervene: beep via `audio_feedback`, store, emit `meeting:intervention`. |
+| `tools.rs`            | MCP-shaped tool definitions and handlers: `list_sources`, `search_context`, `read_source`, `read_transcript`, `list_meetings`. One implementation, reusable by a future MCP server.                                                                                                                                                                                     |
+| `indexer.rs`          | Background source indexing: folder walk (`ignore` crate), link fetch and HTML-to-text, image copy and digest, chunking, FTS5 writes.                                                                                                                                                                                                                                    |
+| `summary.rs`          | On session end: session summary, then rolling summary merge.                                                                                                                                                                                                                                                                                                            |
+| `manager.rs`          | `ProjectManager` (Tauri state). Owns the store, runs source indexing on a worker thread, resumes `pending` sources at startup, emits `source-status-payload`.                                                                                                                                                                                                           |
+| `store.rs`            | SQLite via rusqlite (WAL journal), same pattern as `managers/history.rs`. Tables `projects`, `sources`, `source_chunks` (FTS5, `porter unicode61` tokenizer), `meetings`, `sessions`, `transcript_lines`, `interventions`. Schema version column for migrations. Audio not stored unless setting enabled.                                                               |
+| `commands/meeting.rs` | Tauri commands with specta bindings: `list_meetings`, `get_meeting`, `start_meeting(project_id?)`, `pause_meeting`, `resume_meeting`, `end_meeting`, `update_meeting_context`, `update_meeting_title`, `delete_meeting`, `dismiss_intervention`.                                                                                                                        |
+| `commands/project.rs` | `list_projects`, `get_project`, `create_project`, `update_project_brief`, `update_project_title`, `delete_project`, `add_source`, `remove_source`, `reindex_source`, `set_source_caption`.                                                                                                                                                                              |
 
 `Judge` trait wraps the LLM call so tests inject a fake.
 
 ### 3a. Observer tool loop
 
-Base prompt per tick, in order: system prompt, project brief, rolling summary of the most recent other meeting in the same project, current meeting context, recent interventions, last ~3 minutes of transcript. Everything else is retrieved on demand.
+Base prompt per tick, in order: system prompt, project brief, rolling summaries of the project's 3 most recent other meetings with at least 20 transcript lines (newest first, 1,500 characters each; shorter recordings are tests and are skipped), this meeting's own rolling summary of its earlier sessions (after Continue), current meeting context, a persistent live ledger, recent interventions, and the last ~3 minutes of transcript plus unprocessed lines. Everything else is retrieved on demand.
+
+The live ledger tracks explicit decisions, unresolved questions/blockers, interface contracts, and parked topics (up to 12 entries of 240 characters per category). Every successful check returns a complete updated ledger, even when silent or suppressed. SQLite stores it per meeting with the highest processed transcript line ID; Continue and restarts reuse it. After downtime, ordered batches of at most 100 unprocessed lines rebuild the ledger without emitting stale nudges. A transaction saves the ledger, cursor, check audit, and any emitted intervention together. Failed model calls or writes leave the cursor unchanged.
+
+Each judged check is persisted in `observer_checks` with candidate kind/text, model rationale, processed line ID, outcome, and remaining cooldown milliseconds. Outcomes distinguish `model_silent`, `invalid_kind`, `empty_text`, `duplicate`, `global_cooldown`, `same_kind_cooldown`, `catching_up`, `inactive_session`, and `emitted`; the same fields are logged. Provider/parse failures remain explicit errors and are retried. Global (3 minutes) and same-kind (10 minutes) cooldowns also use persisted interventions after restart.
 
 Tools (JSON schema in MCP tool format, defined once in `meeting/tools.rs`):
 
@@ -126,7 +130,7 @@ Tools (JSON schema in MCP tool format, defined once in `meeting/tools.rs`):
 | `read_transcript` | `meeting_id?`, `from_ts?`, `to_ts?`       | transcript lines from any session in the project             |
 | `list_meetings`   | none                                      | id, title, dates, rolling summary per meeting in the project |
 
-Loop limits: 5 tool calls per tick, 15 s wall budget, tool results capped at 4 KB each. When limits hit, the model is asked for its final answer with the same `{intervene, kind, text, reason}` schema.
+Loop limits: 5 tool calls per tick, 15 s wall budget, tool results capped at 4 KB each. When limits hit, the model is asked for its final answer with the same `{intervene, kind, text, reason, live_context}` schema.
 
 `llm_client` gains `send_with_tools(messages, tools, handler)` supporting tool calls in both OpenAI and Anthropic formats. If the provider rejects tools, the observer runs the no-tools path with only the base prompt and shows a banner. Session and rolling summaries use the same loop so they can verify against sources.
 
@@ -139,7 +143,13 @@ Loop limits: 5 tool calls per tick, 15 s wall budget, tool results capped at 4 K
   "intervene": false,
   "kind": "loop | stuck | info | idea | null",
   "text": "string | null",
-  "reason": "string"
+  "reason": "string",
+  "live_context": {
+    "decisions": [],
+    "open_questions": [],
+    "contracts": [],
+    "parked_topics": []
+  }
 }
 ```
 
@@ -180,9 +190,9 @@ Loop limits: 5 tool calls per tick, 15 s wall budget, tool results capped at 4 K
 Observer system prompt (fixed in v1):
 
 - Role: silent meeting copilot for one participant. Intervene only when clearly useful. Default `intervene=false`.
-- Signals: same point restated three or more times without decision (`loop`); long pause or explicit "not sure how" (`stuck`); factual question nobody answers (`info`); discussion converging with an obvious untried alternative (`idea`).
-- Sensitivity: low adds "only loop and explicit stuck"; high adds "offer ideas freely".
-- Message order: project brief, previous meeting's rolling summary, meeting context, recent interventions (do not repeat), last ~3 minutes of transcript. Instruction: use tools to check sources before asserting project facts; prefer silence over an unverified claim.
+- Signals: an unresolved decision resurfacing, incompatible answers, or parked scope reopening (`loop`), with no minimum time gap or repetition count; a concrete next step blocked by a missing choice or dependency, even without an explicit admission (`stuck`); a verifiable missing fact or material contract change whose consequences are unaddressed (`info`); a concrete alternative or missing assumption before commitment (`idea`). Acknowledgments are not decisions. Productive exploration and intentional, understood changes do not warrant nudges.
+- Sensitivity: low limits nudges to decisions, scope, and blockers threatening the immediate next step; medium includes contract changes and missing facts; high also surfaces concrete alternatives and missing assumptions.
+- Message order: project brief, earlier meetings' rolling summaries, this meeting's earlier sessions, meeting context, persistent live ledger, recent interventions (do not repeat), transcript evidence (recent window or ordered catch-up batch). Instruction: use tools to check sources before asserting project facts; prefer silence over an unverified claim.
 
 Session summary prompt: decisions, open questions, action items, three-line recap, and an efficiency report in the same call: a 0–100 score (share of the talk that moved things forward), a one-line verdict, and issues worst first, each a kind (`circle`, `argument`, `tangent`, `repetition`), a 2–4 word topic, a one-sentence note, and rough minutes from the line timestamps. The report is judged by the kind of conversation (a debate is not inefficient for lacking decisions). It is stored inside the session summary JSON; a malformed report is dropped without losing the summary, and summaries written before it simply have none. Rolling summary prompt: merge previous rolling summary with new session summary, cap ~300 words.
 

@@ -65,7 +65,7 @@ export const AssistantOnboarding: React.FC<AssistantOnboardingProps> = ({
               onBlur={state.handleApiKeyChange}
               disabled={state.isApiKeyUpdating}
               placeholder={t(
-                state.selectedProviderId === "openrouter"
+                state.usesBundledKey
                   ? "settings.assistant.provider.apiKey.bundledPlaceholder"
                   : "settings.assistant.provider.apiKey.placeholder",
               )}

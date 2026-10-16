@@ -530,6 +530,7 @@ jobs:
           AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          MEET_ASSIST_OPENROUTER_KEY: ${{ secrets.MEET_ASSIST_OPENROUTER_KEY }}
         run: |
           export_if_set() {
             for name in "$@"; do
@@ -540,6 +541,8 @@ jobs:
           }
           # Updater bundles are signed whenever the key exists.
           export_if_set TAURI_SIGNING_PRIVATE_KEY TAURI_SIGNING_PRIVATE_KEY_PASSWORD
+          # Compiled into the app as its default OpenRouter key.
+          export_if_set MEET_ASSIST_OPENROUTER_KEY
           if [[ "$SIGN_BINARIES" == "true" ]]; then
             export_if_set APPLE_ID APPLE_ID_PASSWORD APPLE_PASSWORD APPLE_TEAM_ID \
               APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD \
