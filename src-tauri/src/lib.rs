@@ -650,6 +650,7 @@ pub fn run(cli_args: CliArgs) {
             shortcut::set_llm_provider,
             shortcut::fetch_llm_models,
             shortcut::ping_llm_model,
+            shortcut::has_bundled_llm_key,
             shortcut::update_custom_words,
             shortcut::suspend_all_bindings,
             shortcut::resume_all_bindings,

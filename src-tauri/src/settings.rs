@@ -521,9 +521,14 @@ fn default_show_tray_icon() -> bool {
 }
 
 /// OpenRouter key shipped with the app, used while the user has not entered
-/// their own.
-pub const BUNDLED_OPENROUTER_API_KEY: &str =
-    "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";
+/// their own. Baked in at build time from the `MEET_ASSIST_OPENROUTER_KEY`
+/// environment variable (a CI secret), never stored in the repository:
+/// public keys are found by secret scanning and revoked within minutes.
+/// Empty in builds made without it.
+pub const BUNDLED_OPENROUTER_API_KEY: &str = match option_env!("MEET_ASSIST_OPENROUTER_KEY") {
+    Some(key) => key,
+    None => "",
+};
 /// OpenRouter model used while the user has not picked one.
 pub const BUNDLED_OPENROUTER_MODEL: &str = "anthropic/claude-haiku-5.5";
 

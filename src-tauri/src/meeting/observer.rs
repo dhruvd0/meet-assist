@@ -5,7 +5,9 @@
 use crate::audio_feedback;
 use crate::llm_client::{self, ToolLoopError};
 use crate::meeting::session::MeetingManager;
-use crate::meeting::store::{Intervention, ProjectStore, TranscriptLine};
+use crate::meeting::store::{
+    Intervention, Meeting, MeetingRecap, ObserverCheck, ProjectStore, TranscriptLine,
+};
 use crate::meeting::tools::{handle_tool, tool_defs, ToolContext};
 use crate::settings::{AppSettings, LlmProvider, MeetingSensitivity};
 use anyhow::Result;
@@ -27,6 +29,107 @@ pub const DEDUPE_RECENT: usize = 5;
 /// Max characters of the meeting's context pasted into the prompt; the model
 /// can read sources and the transcript through tools for more.
 pub const CONTEXT_MAX_CHARS: usize = 4096;
+/// Earlier meetings of the project shown on every check.
+pub const EARLIER_MEETINGS: i64 = 3;
+/// Meetings with fewer transcript lines are tests or false starts, not history.
+pub const EARLIER_MIN_LINES: i64 = 20;
+/// Max characters of each summary in the history.
+pub const RECAP_MAX_CHARS: usize = 1500;
+/// Bound both catch-up work and the durable model-written ledger.
+pub const CATCHUP_LINES: usize = 100;
+pub const LEDGER_ITEMS: usize = 12;
+pub const LEDGER_ITEM_CHARS: usize = 240;
+
+/// Working memory updated on every successful check, including silent ones.
+#[derive(Debug, Default, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct LiveContext {
+    pub decisions: Vec<String>,
+    pub open_questions: Vec<String>,
+    pub contracts: Vec<String>,
+    pub parked_topics: Vec<String>,
+}
+
+impl LiveContext {
+    fn bounded(mut self) -> Self {
+        for items in [
+            &mut self.decisions,
+            &mut self.open_questions,
+            &mut self.contracts,
+            &mut self.parked_topics,
+        ] {
+            *items = items
+                .iter()
+                .map(|s| truncate_chars(s.trim(), LEDGER_ITEM_CHARS).0.to_string())
+                .filter(|s| !s.is_empty())
+                .take(LEDGER_ITEMS)
+                .collect();
+        }
+        self
+    }
+}
+
+/// What came before this check: the project's earlier meetings and this
+/// meeting's own earlier sessions.
+#[derive(Default)]
+pub struct History {
+    /// Newest first.
+    pub earlier: Vec<MeetingRecap>,
+    /// This meeting's rolling summary: its sessions before a Continue.
+    pub this_meeting: Option<String>,
+    pub live: LiveContext,
+}
+
+impl History {
+    /// The project's earlier meetings (see `EARLIER_*`) and this meeting's
+    /// own earlier sessions.
+    pub fn load(store: &ProjectStore, meeting: &Meeting) -> Result<Self> {
+        Ok(Self {
+            earlier: match meeting.project_id {
+                Some(pid) => store.recent_meeting_recaps(
+                    pid,
+                    meeting.id,
+                    EARLIER_MIN_LINES,
+                    EARLIER_MEETINGS,
+                )?,
+                None => Vec::new(),
+            },
+            this_meeting: meeting.rolling_summary.clone(),
+            live: LiveContext::default(),
+        })
+    }
+
+    /// Prompt sections for the history; shared by the observer and the
+    /// end-of-session report.
+    pub fn render(&self, out: &mut String) {
+        out.push_str("## Earlier conversations in this project (newest first)\n");
+        if self.earlier.is_empty() {
+            out.push_str("(none)");
+        }
+        for m in &self.earlier {
+            let date = chrono::DateTime::from_timestamp_millis(m.created_at)
+                .map(|d| d.with_timezone(&chrono::Local).format("%b %-d").to_string())
+                .unwrap_or_default();
+            let (summary, cut) = truncate_chars(m.summary.trim(), RECAP_MAX_CHARS);
+            out.push_str(&format!(
+                "### {} ({date})\n{summary}{}\n",
+                m.title,
+                if cut { " [truncated]" } else { "" }
+            ));
+        }
+        out.push_str("\n## This conversation's earlier sessions\n");
+        match self.this_meeting.as_deref().map(str::trim) {
+            Some(s) if !s.is_empty() => {
+                let (summary, cut) = truncate_chars(s, RECAP_MAX_CHARS);
+                out.push_str(summary);
+                if cut {
+                    out.push_str(" [truncated]");
+                }
+            }
+            _ => out.push_str("(none: this is the first session)"),
+        }
+    }
+}
 /// Max characters of an intervention card's text.
 pub const CARD_TEXT_MAX_CHARS: usize = 100;
 /// Max characters of a "loop" card: a "Circle:" line naming the topic,
@@ -50,6 +153,7 @@ pub struct Verdict {
     pub text: Option<String>,
     #[serde(default)]
     pub reason: String,
+    pub live_context: LiveContext,
 }
 
 pub fn verdict_schema() -> Value {
@@ -59,9 +163,20 @@ pub fn verdict_schema() -> Value {
             "intervene": { "type": "boolean" },
             "kind": { "type": ["string", "null"], "enum": ["loop", "stuck", "info", "idea", null] },
             "text": { "type": ["string", "null"] },
-            "reason": { "type": "string" }
+            "reason": { "type": "string" },
+            "live_context": {
+                "type": "object",
+                "properties": {
+                    "decisions": {"type": "array", "items": {"type": "string"}, "maxItems": LEDGER_ITEMS},
+                    "open_questions": {"type": "array", "items": {"type": "string"}, "maxItems": LEDGER_ITEMS},
+                    "contracts": {"type": "array", "items": {"type": "string"}, "maxItems": LEDGER_ITEMS},
+                    "parked_topics": {"type": "array", "items": {"type": "string"}, "maxItems": LEDGER_ITEMS}
+                },
+                "required": ["decisions", "open_questions", "contracts", "parked_topics"],
+                "additionalProperties": false
+            }
         },
-        "required": ["intervene", "kind", "text", "reason"],
+        "required": ["intervene", "kind", "text", "reason", "live_context"],
         "additionalProperties": false
     })
 }
@@ -239,7 +354,7 @@ impl Judge for LlmJudge {
 
 pub fn build_prompt(
     brief: &str,
-    prev_meeting: Option<(&str, Option<&str>)>,
+    history: &History,
     context: &str,
     recent: &[Intervention],
     lines: &[TranscriptLine],
@@ -248,13 +363,13 @@ pub fn build_prompt(
 ) -> JudgeInput {
     let sensitivity_rule = match sensitivity {
         MeetingSensitivity::Low => {
-            "Sensitivity LOW: intervene only on loops and explicit stuck moments."
+            "Sensitivity LOW: intervene on unresolved decisions, reopened scope, and blockers only when they threaten the immediate next step."
         }
         MeetingSensitivity::Medium => {
-            "Sensitivity MEDIUM: intervene on loops, stuck moments, and clearly missing facts."
+            "Sensitivity MEDIUM: intervene on unresolved decisions, reopened scope, blockers, contract changes, and clearly missing facts."
         }
         MeetingSensitivity::High => {
-            "Sensitivity HIGH: also offer an idea when a specific, concrete alternative is clearly untried."
+            "Sensitivity HIGH: also surface a concrete missing assumption or alternative before the room commits to an approach."
         }
     };
     let tools_rule = if tools_available {
@@ -267,14 +382,16 @@ pub fn build_prompt(
          Speakers: `me` is the user's own microphone; `them` is everything else they hear (other people on a call, or audio playing on their computer). The user may only be listening, so `me` can be silent throughout.\n\
          The transcript is raw speech-to-text: it has fragments, misheard words, mixed languages (for example Hindi and English), and the same sentence sometimes appears twice. None of that is a reason to speak, and never comment on the conversation being unclear.\n\
          Signals:\n\
-         - kind \"loop\": the same open question, claim, or dispute comes back in at least two separate exchanges at least two minutes apart, still unresolved. Repeated or echoed lines are not a loop, and neither is agreement: acknowledging or confirming a point (\"that makes sense\", \"yeah\", restating it to confirm) settles it.\n\
-         - kind \"stuck\": someone says they do not know how to proceed, and nobody offers a way forward.\n\
-         - kind \"info\": a factual question nobody answers that you can answer.\n\
-         - kind \"idea\": the discussion is converging while a specific alternative is clearly untried.\n\
+         - kind \"loop\": an unresolved decision resurfaces, incompatible answers remain in play, or a parked/out-of-scope topic is reopened without explicitly changing the scope. There is no minimum time gap or repetition count. A brief acknowledgment (\"yeah\", \"makes sense\") is not resolution: look for an explicit choice, answered constraint, or agreed deferral. Do not interrupt productive exploration, transcript echoes, or an intentional revision whose consequences are already addressed.\n\
+         - kind \"stuck\": a concrete next step is blocked by a missing choice, dependency, or conflicting assumptions, even if nobody says they are stuck. Name the exact missing choice; do not invent its answer. Stay silent if the room is already resolving it.\n\
+         - kind \"info\": an unanswered factual question you can verify, or a material contract change/conflict grounded in the transcript or memory (payload, result count, identity flow, ownership, or interface). Point out the old-to-new implication that the room has not addressed; a deliberate change already understood is not itself a problem.\n\
+         - kind \"idea\": the discussion is converging while a concrete alternative or missing assumption could change the outcome. Ask a specific design question rather than asserting an unverified project fact.\n\
          {sensitivity_rule}\n{tools_rule}\n\
+         Use the earlier conversations and earlier sessions below as memory: an open question from them that comes back still unresolved is kind \"loop\" (name when it was first raised, e.g. \"open since Oct 14\"), and reopening something they already decided merits a nudge only when a material conflict or consequence is being missed. Do not repeat their content otherwise.\n\
+         Maintain live_context on EVERY check, including silence and candidates that may be suppressed. Return the complete updated ledger, not a delta: decisions (explicit agreements), open_questions (unresolved choices and blockers), contracts (interfaces, ownership, inputs/outputs and meaningful changes), parked_topics (deferrals and MVP boundaries). Carry forward still-relevant entries, remove resolved questions, replace superseded decisions/contracts, and retain the highest-impact items, at most 12 per list and 240 characters each. Include a transcript timestamp or earlier-meeting date in each entry. Do not invent facts, treat your own proposed nudge as an agreement, or record a generic acknowledgment as resolution. Separate a deferred feature from the minimum fallback still needed now.\n\
          Never give generic process advice (summarize, document, align, clarify, take notes, ask for feedback). Only speak about a concrete point from this conversation.\n\
-         Answer with JSON only, exactly this shape: {{\"intervene\": boolean, \"kind\": \"loop\"|\"stuck\"|\"info\"|\"idea\"|null, \"text\": string|null, \"reason\": string}}. \
-         \"text\" is null when silent. For kind \"loop\", \"text\" is a checklist of up to four lines separated by \"\\n\", each starting with its label and at most 8 words after it. The first line is always \"Circle: <the topic or pain point the talk keeps circling, in 2 to 4 words>\", a name the room would recognize, like \"Launch market\" or \"Onboarding drop-off\". Then only the lines that apply: \"Decided: <what was already settled>\", \"Decide now: <the open point to settle>\", \"Park: <a point to take up later>\". Include at least a \"Decide now\" or a \"Park\" line, and a \"Decided\" line only for something actually agreed; when tools are available, you must call read_transcript for this conversation before answering kind \"loop\", to find what was already decided and which side topics could be parked; the transcript below is only the last three minutes. For every other kind, \"text\" is one short line of at most 12 words naming the concrete point, like a note passed under the table. Never repeat a recent intervention."
+         Answer with JSON only, exactly this shape: {{\"intervene\": boolean, \"kind\": \"loop\"|\"stuck\"|\"info\"|\"idea\"|null, \"text\": string|null, \"reason\": string, \"live_context\": {{\"decisions\": [string], \"open_questions\": [string], \"contracts\": [string], \"parked_topics\": [string]}}}}. \
+         \"text\" is null when silent. For kind \"loop\", \"text\" is a checklist of up to four lines separated by \"\\n\", each starting with its label and at most 8 words after it. The first line is always \"Circle: <the topic or pain point the talk keeps circling, in 2 to 4 words>\", a name the room would recognize, like \"Launch market\" or \"Onboarding drop-off\". Then only the lines that apply: \"Decided: <what was already settled>\", \"Decide now: <the open point to settle>\", \"Park: <a point to take up later>\". Include at least a \"Decide now\" or a \"Park\" line, and a \"Decided\" line only for something actually agreed; use the live ledger and supplied transcript to find what was decided and what could be parked; call read_transcript when that evidence is insufficient, rather than requiring a tool call for every loop. For every other kind, \"text\" is one short line of at most 12 words naming the concrete point, like a note passed under the table. Never repeat a recent intervention."
     );
     let mut user = String::new();
     user.push_str("## Project brief\n");
@@ -283,12 +400,8 @@ pub fn build_prompt(
     } else {
         brief
     });
-    user.push_str("\n\n## Previous conversation in this project\n");
-    match prev_meeting {
-        Some((title, Some(summary))) => user.push_str(&format!("{title}: {summary}")),
-        Some((title, None)) => user.push_str(&format!("{title}: (no summary yet)")),
-        None => user.push_str("(none)"),
-    }
+    user.push_str("\n\n");
+    history.render(&mut user);
     user.push_str("\n\n## This conversation's context\n");
     if context.trim().is_empty() {
         user.push_str("(none)");
@@ -299,6 +412,9 @@ pub fn build_prompt(
             user.push_str("\n[truncated]");
         }
     }
+    user.push_str("\n\n## Persistent live ledger (update even when silent)\n");
+    // Serializing string arrays cannot fail; use the JSON value directly.
+    user.push_str(&json!(history.live).to_string());
     user.push_str("\n\n## Recent interventions (do not repeat)\n");
     if recent.is_empty() {
         user.push_str("(none)");
@@ -307,7 +423,7 @@ pub fn build_prompt(
             user.push_str(&format!("- [{}] {}\n", i.kind, i.text));
         }
     }
-    user.push_str("\n\n## Transcript (last 3 minutes)\n");
+    user.push_str("\n\n## Transcript evidence (recent window or ordered catch-up batch)\n");
     for l in lines {
         user.push_str(&format!("[{}] {}: {}\n", l.ts, l.speaker, l.text));
     }
@@ -316,10 +432,6 @@ pub fn build_prompt(
 
 #[derive(Debug, Default, Clone)]
 pub struct ObserverState {
-    pub last_intervention_ts: i64,
-    /// Highest transcript line id judged successfully; failed ticks leave it
-    /// alone so the same window is retried.
-    pub last_seen_line_id: i64,
     pub consecutive_failures: u32,
     pub tools_unavailable: bool,
     /// Short description of the most recent judge failure, cleared on success.
@@ -361,43 +473,51 @@ pub fn short_error(e: &str) -> String {
     }
 }
 
-pub fn should_emit(
+/// A machine-readable gate outcome and the time until it can clear.
+pub fn suppression_reason(
     verdict: &Verdict,
     now_ms: i64,
-    state: &ObserverState,
     recent: &[Intervention],
-) -> bool {
+) -> Option<(&'static str, i64)> {
     if !verdict.intervene {
-        return false;
+        return Some(("model_silent", 0));
     }
-    let Some(kind) = verdict.kind.as_deref() else {
-        return false;
+    let Some(kind) = verdict.kind.as_deref().filter(|k| VALID_KINDS.contains(k)) else {
+        return Some(("invalid_kind", 0));
     };
-    if !VALID_KINDS.contains(&kind) {
-        return false;
-    }
     let Some(text) = verdict
         .text
         .as_deref()
         .map(str::trim)
         .filter(|t| !t.is_empty())
     else {
-        return false;
+        return Some(("empty_text", 0));
     };
-    if now_ms - state.last_intervention_ts < COOLDOWN_MS {
-        return false;
+    // Compare the actual card, including truncation, against what was shown.
+    let norm = card_text(kind, text).to_lowercase();
+    if norm.is_empty() {
+        return Some(("empty_text", 0));
     }
     if recent
         .iter()
-        .any(|i| i.kind == kind && now_ms - i.ts < SAME_KIND_COOLDOWN_MS)
-    {
-        return false;
-    }
-    let norm = text.to_lowercase();
-    !recent
-        .iter()
         .take(DEDUPE_RECENT)
         .any(|i| i.text.trim().to_lowercase() == norm)
+    {
+        return Some(("duplicate", 0));
+    }
+    if let Some(last) = recent.first() {
+        let remaining = COOLDOWN_MS - now_ms.saturating_sub(last.ts);
+        if remaining > 0 {
+            return Some(("global_cooldown", remaining));
+        }
+    }
+    if let Some(last) = recent.iter().find(|i| i.kind == kind) {
+        let remaining = SAME_KIND_COOLDOWN_MS - now_ms.saturating_sub(last.ts);
+        if remaining > 0 {
+            return Some(("same_kind_cooldown", remaining));
+        }
+    }
+    None
 }
 
 /// The card's text: a checklist of at most `LOOP_MAX_LINES` lines for
@@ -429,10 +549,21 @@ pub fn tick(
     let (Some(meeting_id), Some(session_id)) = (st.meeting_id, st.session_id) else {
         return Ok(None);
     };
+    let (through_id, live) = match store.observer_context(meeting_id)? {
+        Some((id, json)) => (id, serde_json::from_str::<LiveContext>(&json)?.bounded()),
+        None => (0, LiveContext::default()),
+    };
     let latest = store.latest_line_id(meeting_id)?.unwrap_or(0);
-    if latest <= state.last_seen_line_id {
+    if latest <= through_id {
         return Ok(None);
     }
+    let batch = store.observer_lines(meeting_id, through_id, CATCHUP_LINES)?;
+    let Some(last_line) = batch.last() else {
+        return Ok(None);
+    };
+    let judged_through = last_line.id;
+    // Rebuild memory in order after downtime, without nudging about stale talk.
+    let catching_up = judged_through < latest || last_line.ts < now_ms - WINDOW_MS;
 
     let meeting = store
         .get_meeting(meeting_id)?
@@ -441,15 +572,22 @@ pub fn tick(
         Some(pid) => store.get_project(pid)?.map(|p| p.brief).unwrap_or_default(),
         None => String::new(),
     };
-    let prev = match meeting.project_id {
-        Some(pid) => store.previous_meeting_summary(pid, meeting_id)?,
-        None => None,
+    let mut history = History::load(store, &meeting)?;
+    history.live = live;
+    // A global cooldown allows at most four cards in a same-kind window.
+    // Keep enough history to enforce that gate across restarts as well.
+    let recent = store.recent_interventions(meeting_id, 20)?;
+    let mut lines = if catching_up {
+        Vec::new()
+    } else {
+        store.lines_since(meeting_id, now_ms - WINDOW_MS)?
     };
-    let recent = store.recent_interventions(meeting_id, DEDUPE_RECENT)?;
-    let lines = store.lines_since(meeting_id, now_ms - WINDOW_MS)?;
+    lines.extend(batch);
+    lines.sort_by_key(|l| l.id);
+    lines.dedup_by_key(|l| l.id);
     let input = build_prompt(
         &brief,
-        prev.as_ref().map(|(t, s)| (t.as_str(), s.as_deref())),
+        &history,
         &meeting.context,
         &recent,
         &lines,
@@ -469,7 +607,7 @@ pub fn tick(
             state.tools_unavailable = true;
             let input = build_prompt(
                 &brief,
-                prev.as_ref().map(|(t, s)| (t.as_str(), s.as_deref())),
+                &history,
                 &meeting.context,
                 &recent,
                 &lines,
@@ -493,20 +631,36 @@ pub fn tick(
             return Ok(None);
         }
     };
+    let current = mm.state();
+    let suppression = if catching_up {
+        Some(("catching_up", 0))
+    } else if current.session_id != Some(session_id) || !mm.is_live() {
+        Some(("inactive_session", 0))
+    } else {
+        suppression_reason(&verdict, now_ms, &recent)
+    };
+    let (outcome, remaining_ms) = suppression.unwrap_or(("emitted", 0));
+    let text = verdict
+        .text
+        .as_deref()
+        .map(|text| card_text(verdict.kind.as_deref().unwrap_or_default(), text));
+    let check = ObserverCheck {
+        session_id,
+        ts: now_ms,
+        through_line_id: judged_through,
+        outcome: outcome.into(),
+        remaining_ms,
+        kind: verdict.kind,
+        text,
+        reason: verdict.reason,
+        context_json: serde_json::to_string(&verdict.live_context.bounded())?,
+    };
+    let iv = store.save_observer_check(&check)?;
     state.consecutive_failures = 0;
     state.last_error = None;
-    state.last_seen_line_id = latest;
-    if !should_emit(&verdict, now_ms, state, &recent) {
-        info!("observer: no intervention ({})", verdict.reason);
-        state.remember(now_ms, &verdict.reason, false);
-        return Ok(None);
-    }
-    let kind = verdict.kind.unwrap_or_default();
-    let text = card_text(&kind, &verdict.text.unwrap_or_default());
-    let iv = store.add_intervention(session_id, &kind, &text, &verdict.reason)?;
-    state.last_intervention_ts = now_ms;
-    state.remember(now_ms, &verdict.reason, true);
-    Ok(Some(iv))
+    info!("observer: meeting={meeting_id} session={session_id} through_line={judged_through} outcome={outcome} remaining_ms={remaining_ms} kind={:?} candidate={:?} reason={}", check.kind, check.text, check.reason);
+    state.remember(now_ms, &check.reason, iv.is_some());
+    Ok(iv)
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Type, tauri_specta::Event)]
@@ -608,7 +762,11 @@ pub fn spawn_observer(
                         }
                     }
                     Ok(None) => {}
-                    Err(e) => warn!("observer tick error: {e:#}"),
+                    Err(e) => {
+                        state.consecutive_failures += 1;
+                        state.last_error = Some(short_error(&format!("{e:#}")));
+                        warn!("observer: outcome=check_failed error={e:#}");
+                    }
                 }
                 emit_status(&state);
             }

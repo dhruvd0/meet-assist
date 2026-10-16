@@ -880,6 +880,13 @@ pub fn set_llm_provider(app: AppHandle, provider_id: String) -> Result<(), Strin
     Ok(())
 }
 
+/// Whether this build ships a default OpenRouter key.
+#[tauri::command]
+#[specta::specta]
+pub fn has_bundled_llm_key() -> bool {
+    !settings::BUNDLED_OPENROUTER_API_KEY.is_empty()
+}
+
 /// Reply to `ping_llm_model`: what the model said and how long it took.
 #[derive(Serialize, Type)]
 pub struct LlmPing {

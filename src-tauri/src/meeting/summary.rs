@@ -2,6 +2,7 @@
 //! summary that carries the meeting's state across sessions.
 
 use crate::llm_client;
+use crate::meeting::observer::History;
 use crate::meeting::store::{ProjectStore, TranscriptLine};
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
@@ -59,7 +60,8 @@ pub struct EfficiencyIssue {
 }
 
 /// Ways a conversation loses time, as the report names them.
-pub const EFFICIENCY_KINDS: [&str; 4] = ["circle", "argument", "tangent", "repetition"];
+pub const EFFICIENCY_KINDS: [&str; 5] =
+    ["circle", "argument", "tangent", "repetition", "recurring"];
 
 /// Emitted when a session summary has been stored.
 #[derive(Clone, Debug, Serialize, Deserialize, Type, tauri_specta::Event)]
@@ -86,6 +88,7 @@ pub trait Summarizer: Send + Sync {
         &self,
         title: &str,
         context: &str,
+        history: &History,
         lines: &[TranscriptLine],
     ) -> Result<SessionSummary>;
     fn merge_rolling(&self, previous: Option<&str>, new_session: &SessionSummary)
@@ -140,7 +143,12 @@ fn rolling_schema() -> Value {
 }
 
 /// (system, user) prompts for summarizing one session's transcript.
-pub fn session_prompt(title: &str, context: &str, lines: &[TranscriptLine]) -> (String, String) {
+pub fn session_prompt(
+    title: &str,
+    context: &str,
+    history: &History,
+    lines: &[TranscriptLine],
+) -> (String, String) {
     let system = "You summarize one session of a conversation (a meeting or call, interview, \
 debate, class or talk, or a broadcast) for the user, who may have taken part or only listened. \
 Transcript lines are labelled `me` (the user's microphone) or `them` (everything else they \
@@ -153,7 +161,11 @@ progress, or a settled point), `verdict` (one plain sentence), and `issues`, eac
 (rough time spent, from the timestamps). Kinds: \"circle\" (the same question or point \
 returns without progress), \"argument\" (back-and-forth disagreement that produced no \
 resolution or new information), \"tangent\" (a detour away from the subject), \
-\"repetition\" (a point restated without adding anything). List only issues the \
+\"repetition\" (a point restated without adding anything), \"recurring\" (a question, \
+problem or debate that the earlier conversations in this space or this conversation's \
+earlier sessions already raised and that comes back here still unsettled; its note names \
+where it came up before, e.g. \"also open in Hotel scoring on Oct 15\"; use it only \
+with that history to point to). List only issues the \
 transcript clearly shows, worst first; a focused session has none. Judge by the kind \
 of conversation: a debate or broadcast is not inefficient for lacking decisions. \
 None of these are issues: agreeing, acknowledging or confirming (\"that makes sense\", \
@@ -168,7 +180,9 @@ says; do not invent items. Use empty arrays when there is nothing to report."
     if !context.trim().is_empty() {
         user.push_str(&format!("Context:\n{}\n", context.trim()));
     }
-    user.push_str("\nTranscript (minutes:seconds from the start):\n");
+    user.push('\n');
+    history.render(&mut user);
+    user.push_str("\n\nTranscript (minutes:seconds from the start):\n");
     let start = lines.first().map_or(0, |l| l.ts);
     for l in lines {
         let secs = (l.ts - start).max(0) / 1000;
@@ -251,9 +265,10 @@ impl Summarizer for LlmSummarizer {
         &self,
         title: &str,
         context: &str,
+        history: &History,
         lines: &[TranscriptLine],
     ) -> Result<SessionSummary> {
-        let (system, user) = session_prompt(title, context, lines);
+        let (system, user) = session_prompt(title, context, history, lines);
         let mut v = self.call(system, user, session_summary_schema())?;
         // Providers without structured output only see the report's shape in
         // the prompt. A malformed report is dropped, never the summary.
@@ -310,7 +325,9 @@ pub fn run_summary_job(
     if lines.is_empty() {
         return Ok(None);
     }
-    let summary = summarizer.summarize_session(&meeting.title, &meeting.context, &lines)?;
+    let history = History::load(store, &meeting)?;
+    let summary =
+        summarizer.summarize_session(&meeting.title, &meeting.context, &history, &lines)?;
     let rolling = summarizer.merge_rolling(meeting.rolling_summary.as_deref(), &summary)?;
     // `set_rolling_summary` truncates at its cap rather than erroring.
     store.set_session_summary(session_id, &serde_json::to_string(&summary)?)?;
@@ -331,6 +348,7 @@ mod tests {
             &self,
             _t: &str,
             _c: &str,
+            _h: &History,
             lines: &[TranscriptLine],
         ) -> Result<SessionSummary> {
             Ok(SessionSummary {
@@ -382,6 +400,7 @@ mod tests {
             &self,
             _t: &str,
             _c: &str,
+            _h: &History,
             _l: &[TranscriptLine],
         ) -> Result<SessionSummary> {
             Ok(SessionSummary::default())

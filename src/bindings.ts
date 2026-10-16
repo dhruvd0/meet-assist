@@ -225,6 +225,12 @@ async pingLlmModel() : Promise<Result<LlmPing, string>> {
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * Whether this build ships a default OpenRouter key.
+ */
+async hasBundledLlmKey() : Promise<boolean> {
+    return await TAURI_INVOKE("has_bundled_llm_key");
+},
 async updateCustomWords(words: string[]) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("update_custom_words", { words }) };

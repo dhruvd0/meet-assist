@@ -1,10 +1,13 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { commands } from "@/bindings";
 import { useSettings } from "../../../../hooks/useSettings";
 import type { LlmApiFormat, LlmProvider } from "@/bindings";
 import type { ModelOption } from "./types";
 import type { DropdownOption } from "../../../ui/Dropdown";
 
 type LlmProviderState = {
+  /** The empty OpenRouter key field falls back to the build's bundled key. */
+  usesBundledKey: boolean;
   providerOptions: DropdownOption[];
   selectedProviderId: string;
   selectedProvider: LlmProvider | undefined;
@@ -188,7 +191,15 @@ export const useLlmProviderState = (): LlmProviderState => {
 
   // No automatic fetching - user must click refresh button
 
+  // Builds made with a key fall back to it when the OpenRouter field is empty.
+  const [bundledKey, setBundledKey] = useState(false);
+  useEffect(() => {
+    commands.hasBundledLlmKey().then(setBundledKey, () => setBundledKey(false));
+  }, []);
+  const usesBundledKey = bundledKey && selectedProviderId === "openrouter";
+
   return {
+    usesBundledKey,
     providerOptions,
     selectedProviderId,
     selectedProvider,

@@ -15,7 +15,13 @@ interface Report {
   issues: Issue[];
 }
 
-const ISSUE_KINDS = ["circle", "argument", "tangent", "repetition"];
+const ISSUE_KINDS = [
+  "circle",
+  "argument",
+  "tangent",
+  "repetition",
+  "recurring",
+];
 
 const num = (v: unknown) => (typeof v === "number" && isFinite(v) ? v : 0);
 const str = (v: unknown) => (typeof v === "string" ? v : "");
@@ -55,8 +61,38 @@ export const sessionReports = (sessions: Session[]) =>
     .filter((x): x is { id: number; n: number; report: Report } => !!x.report)
     .reverse();
 
+const IssueList: React.FC<{ issues: Issue[] }> = ({ issues }) => {
+  const { t } = useTranslation();
+  return (
+    <ul className="space-y-2.5">
+      {issues.map((issue, i) => (
+        <li key={i} className="text-[13px] leading-snug">
+          <div className="flex flex-wrap items-baseline gap-x-1.5">
+            <span className="text-[11px] font-medium uppercase tracking-wide text-accent">
+              {t(`meetings.summary.efficiency.kind.${issue.kind}`)}
+            </span>
+            <span className="font-medium text-text">{issue.topic}</span>
+            {issue.minutes > 0 && (
+              <span className="text-faint">
+                {t("meetings.summary.efficiency.minutes", {
+                  count: issue.minutes,
+                })}
+              </span>
+            )}
+          </div>
+          {issue.note && <p className="mt-0.5 text-muted">{issue.note}</p>}
+        </li>
+      ))}
+    </ul>
+  );
+};
+
 const ReportView: React.FC<{ report: Report }> = ({ report }) => {
   const { t } = useTranslation();
+  // Issues carried over from earlier conversations in the space get their
+  // own group; the rest are about this session alone.
+  const here = report.issues.filter((i) => i.kind !== "recurring");
+  const space = report.issues.filter((i) => i.kind === "recurring");
   return (
     <div>
       <div className="flex items-baseline gap-2.5">
@@ -70,31 +106,22 @@ const ReportView: React.FC<{ report: Report }> = ({ report }) => {
           </p>
         )}
       </div>
-      {report.issues.length === 0 ? (
+      {here.length === 0 ? (
         <p className="mt-2 text-[13px] text-faint">
           {t("meetings.summary.efficiency.none")}
         </p>
       ) : (
-        <ul className="mt-3 space-y-2.5">
-          {report.issues.map((issue, i) => (
-            <li key={i} className="text-[13px] leading-snug">
-              <div className="flex flex-wrap items-baseline gap-x-1.5">
-                <span className="text-[11px] font-medium uppercase tracking-wide text-accent">
-                  {t(`meetings.summary.efficiency.kind.${issue.kind}`)}
-                </span>
-                <span className="font-medium text-text">{issue.topic}</span>
-                {issue.minutes > 0 && (
-                  <span className="text-faint">
-                    {t("meetings.summary.efficiency.minutes", {
-                      count: issue.minutes,
-                    })}
-                  </span>
-                )}
-              </div>
-              {issue.note && <p className="mt-0.5 text-muted">{issue.note}</p>}
-            </li>
-          ))}
-        </ul>
+        <div className="mt-3">
+          <IssueList issues={here} />
+        </div>
+      )}
+      {space.length > 0 && (
+        <div className="mt-4">
+          <h3 className="mb-2 text-[12px] font-medium text-muted">
+            {t("meetings.summary.efficiency.acrossSpace")}
+          </h3>
+          <IssueList issues={space} />
+        </div>
       )}
     </div>
   );

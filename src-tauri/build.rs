@@ -1,4 +1,6 @@
 fn main() {
+    // Bundled OpenRouter key (settings.rs reads it with option_env!).
+    println!("cargo:rerun-if-env-changed=MEET_ASSIST_OPENROUTER_KEY");
     generate_tray_translations();
 
     // Linux ships transcribe-cpp as a shared libtranscribe + loadable ggml
