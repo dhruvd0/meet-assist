@@ -14,7 +14,7 @@ One person on calls all day: an engineer, lead, or founder who runs many back-to
 
 ## Product Purpose
 
-Meet Assist is a private meeting copilot. It listens to both sides of a call (microphone and system audio), transcribes locally, and nudges only the user with a beep and a small card when the conversation is looping, someone is stuck, a quick fact is missing, or an idea is worth raising. Meetings are threads that continue across sessions; each session ends with a summary merged into the meeting's rolling summary. Success: the user says the useful thing during the call, and afterwards finds every meeting's notes without hunting.
+CASE is a private meeting copilot. It listens to both sides of a call (microphone and system audio), transcribes locally, and nudges only the user with a beep and a small card when the conversation is looping, someone is stuck, a quick fact is missing, or an idea is worth raising. Meetings are threads that continue across sessions; each session ends with a summary merged into the meeting's rolling summary. Success: the user says the useful thing during the call, and afterwards finds every meeting's notes without hunting.
 
 ## Positioning
 
@@ -30,7 +30,7 @@ Local-first and silent by default. It never joins the call as a participant, nev
 
 ## Capabilities and Constraints
 
-- Transcription engine, VAD, and model management come from Handy (upstream). Credit to Handy stays in About and docs; the product UI carries no Handy branding.
+- Local transcription, VAD, and model management reuse the shared speech engine. Required copyright and license notices are retained in license files; product identity is CASE.
 - One LLM provider for observer, summaries, filing, and vision. No chat-over-meetings feature yet (an "Ask anything" bar is deliberately not built).
 - No calendar integration, no sharing, no cloud sync.
 - All UI strings go through i18next; English is the source locale.
@@ -38,7 +38,9 @@ Local-first and silent by default. It never joins the call as a participant, nev
 
 ## Brand Commitments
 
-- Name: Meet Assist.
+- Name: CASE. Uppercase, without an acronym.
+- Mark: two curved conversational strokes and an offset dot; blue app icon, monochrome native tray variants.
+- All product surfaces, executable names, logs, and installers use CASE.
 - Visual tokens follow t3.codes (zinc neutrals, one blue accent, DM Sans and JetBrains Mono, 8/12/16 radii), as the user requested on 2026-10-15.
 - Experience modeled on Granola: quiet sidebar with spaces, home feed grouped by day, each meeting read as a centered document with a serif title. User-confirmed 2026-10-15, with serif titles.
 

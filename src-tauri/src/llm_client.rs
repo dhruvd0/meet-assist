@@ -103,13 +103,13 @@ fn build_headers(provider: &LlmProvider, api_key: &str) -> Result<HeaderMap, Str
     headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
     headers.insert(
         REFERER,
-        HeaderValue::from_static("https://github.com/cjpais/Handy"),
+        HeaderValue::from_static("https://github.com/dhruvd0/meet-assist"),
     );
     headers.insert(
         USER_AGENT,
-        HeaderValue::from_static("Handy/1.0 (+https://github.com/cjpais/Handy)"),
+        HeaderValue::from_static("CASE/1.0 (+https://github.com/dhruvd0/meet-assist)"),
     );
-    headers.insert("X-Title", HeaderValue::from_static("Meet Assist"));
+    headers.insert("X-Title", HeaderValue::from_static("CASE"));
 
     // Provider-specific auth headers
     if !api_key.is_empty() {

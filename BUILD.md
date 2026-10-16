@@ -1,6 +1,6 @@
 # Build Instructions
 
-This guide covers how to set up the development environment and build Meet Assist from source across different platforms. Meet Assist is a fork of [Handy](https://github.com/cjpais/Handy); the build steps are inherited and the binary is still named `handy`.
+This guide covers how to set up the development environment and build CASE from source across different platforms. The executable is named `case` and packaged applications use the name CASE.
 
 ## Prerequisites
 
@@ -91,8 +91,8 @@ ORT_LIB_LOCATION=$(brew --prefix onnxruntime)/lib ORT_PREFER_DYNAMIC_LINK=1 bun 
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/dhruvd0/meet-assist.git
-cd meet-assist
+git clone https://github.com/dhruvd0/meet-assist.git case
+cd case
 ```
 
 ### 2. Install Dependencies
@@ -117,28 +117,28 @@ This compiles a release binary and generates platform-specific bundles (deb, rpm
 
 ## Linux Install (from source)
 
-The raw binary (`src-tauri/target/release/handy`) cannot run standalone — it needs Tauri resource files (tray icons, sounds, VAD model) to be co-located at the expected path.
+The raw binary (`src-tauri/target/release/case`) cannot run standalone — it needs Tauri resource files (tray icons, sounds, VAD model) to be co-located at the expected path.
 
 **Install from the deb bundle** (works on any Linux distro):
 
 ```bash
 cd /tmp
-ar x /path/to/Handy/src-tauri/target/release/bundle/deb/Handy_*_amd64.deb data.tar.gz
+ar x /path/to/CASE/src-tauri/target/release/bundle/deb/Handy_*_amd64.deb data.tar.gz
 tar xzf data.tar.gz
-sudo cp usr/bin/handy /usr/bin/
+sudo cp usr/bin/case /usr/bin/
 sudo cp -a usr/lib/. /usr/lib/
 sudo cp -r usr/share/icons/hicolor/* /usr/share/icons/hicolor/
-sudo cp usr/share/applications/Handy.desktop /usr/share/applications/
+sudo cp usr/share/applications/CASE.desktop /usr/share/applications/
 ```
 
-The runtime libraries live in the app-private `/usr/lib/Handy/` (on the binary's rpath), so no `ldconfig` step is needed.
+The runtime libraries live in the app-private `/usr/lib/CASE/` (on the binary's rpath), so no `ldconfig` step is needed.
 
 After subsequent rebuilds, copy the binary and any refreshed runtime libraries:
 
 ```bash
-sudo cp src-tauri/target/release/handy /usr/bin/
-sudo mkdir -p /usr/lib/Handy
-sudo cp -a src-tauri/transcribe-libs/. /usr/lib/Handy/
+sudo cp src-tauri/target/release/case /usr/bin/
+sudo mkdir -p /usr/lib/CASE
+sudo cp -a src-tauri/transcribe-libs/. /usr/lib/CASE/
 ```
 
 Resources only need re-copying if they change upstream (new icons, sounds, models, etc.).
@@ -149,19 +149,19 @@ Resources only need re-copying if they change upstream (new icons, sounds, model
 
 On macOS the meeting shortcut uses the Tauri global shortcut by default, which needs no
 Accessibility permission. Accessibility is only needed if you switch **Advanced >
-Keyboard Implementation** to Handy Keys. Without it, Meet Assist falls back to the Tauri
+Keyboard Implementation** to Native shortcuts. Without it, CASE falls back to the Tauri
 shortcut on launch and saves that choice.
 
 Local builds use the ad-hoc `signingIdentity: "-"`, so a rebuild can have a new macOS code
 identity while the old **System Settings > Privacy & Security > Accessibility** entry
-remains visibly enabled but no longer applies. If you use Handy Keys and it stops working
-after a rebuild, quit Meet Assist, clear only its stale Accessibility record, reopen it,
+remains visibly enabled but no longer applies. If you use Native shortcuts and it stops working
+after a rebuild, quit CASE, clear only its stale Accessibility record, reopen it,
 and grant Accessibility again:
 
 ```bash
-osascript -e 'tell application id "com.meetassist.app" to quit' || true
-tccutil reset Accessibility com.meetassist.app
-open "/Applications/Meet Assist.app"
+osascript -e 'tell application id "com.case.app" to quit' || true
+tccutil reset Accessibility com.case.app
+open "/Applications/CASE.app"
 ```
 
 This does not reset Microphone or other TCC services, and official releases normally do
@@ -171,8 +171,8 @@ For optional diagnosis, compare the designated requirements of the previous and 
 bundles:
 
 ```bash
-codesign -dr - "/path/to/previous/Meet Assist.app" 2>&1
-codesign -dr - "/Applications/Meet Assist.app" 2>&1
+codesign -dr - "/path/to/previous/CASE.app" 2>&1
+codesign -dr - "/Applications/CASE.app" 2>&1
 ```
 
 An ad-hoc requirement contains a `cdhash`; a changed requirement confirms the rebuild is
@@ -194,7 +194,7 @@ Tauri swallows the real linuxdeploy error. To see it, run linuxdeploy manually:
 ```bash
 cd src-tauri/target/release/bundle/appimage
 ~/.cache/tauri/linuxdeploy-x86_64.AppImage --appimage-extract-and-run \
-  --appdir Handy.AppDir --plugin gtk --output appimage
+  --appdir CASE.AppDir --plugin gtk --output appimage
 ```
 
 **Workaround:** The binary, deb, and rpm bundles all build fine — only the AppImage step fails. To skip it:
@@ -249,7 +249,7 @@ around either case with a short Cargo target directory:
 $env:CARGO_TARGET_DIR = "C:\h"
 
 # Or persist it for all future terminals (note: redirects ALL your
-# Rust projects' build output, not just Handy):
+# Rust projects' build output, not just CASE):
 [Environment]::SetEnvironmentVariable('CARGO_TARGET_DIR', 'C:\h', 'User')
 ```
 
@@ -260,11 +260,11 @@ and `bun run tauri build` work normally.
 
 ### Windows `tauri build` fails at bundling with `program not found`
 
-If the build compiles all the way to `Built application at: ...\handy.exe` and
+If the build compiles all the way to `Built application at: ...\case.exe` and
 then fails with:
 
 ```
-Signing C:\...\handy.exe with a custom signing command
+Signing C:\...\case.exe with a custom signing command
 failed to bundle project `program not found`
 ```
 
@@ -279,3 +279,14 @@ bun run tauri dev
 # Or compile a release binary without the installer/signing step:
 bun run tauri build --no-bundle
 ```
+
+### macOS SDK and linker mismatch
+
+If CMake reports an unknown architecture while reading `libSystem.tbd`, use the SDK bundled with the selected Xcode for that build:
+
+```sh
+CASE_BUILD_SDK="$(xcrun --sdk macosx --show-sdk-path)"
+SDKROOT="$CASE_BUILD_SDK" TRANSCRIBE_CMAKE_ARGS="-DCMAKE_OSX_SYSROOT=$CASE_BUILD_SDK" CMAKE_POLICY_VERSION_MINIMUM=3.5 bun run tauri build --bundles app
+```
+
+This changes the build environment only; it does not change the system Xcode selection.

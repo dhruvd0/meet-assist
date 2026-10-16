@@ -2220,7 +2220,7 @@ From `src-tauri/`: `cargo test --lib 2>&1 | grep "test result" | tail -1` (all p
 
 - [ ] **Step 3: Docs**
 
-`docs/ARCHITECTURE.md`: in the "Existing (Meet Assist)" backend table add rows for `meeting/segment.rs`, `meeting/capture.rs`, `meeting/session.rs` (`MeetingManager`), `commands/meeting.rs`; remove the planned rows for `meeting/mod.rs` (manager), `meeting/capture.rs`, `meeting/transcriber.rs` and note that `session.rs` holds the state machine and the transcriber thread; store row lists the three new tables; events list adds `meeting-state-payload` and `transcript-line-payload`; frontend existing table adds `stores/meetingStore.ts`, `components/meetings/*`; delivery order marks step 3 done. In the spec's section 3 table, add one line under `mod.rs`: "Implemented as `session.rs` (manager and transcriber thread) plus `segment.rs`; event names are the tauri-specta derived ones."
+`docs/ARCHITECTURE.md`: in the "Existing (CASE)" backend table add rows for `meeting/segment.rs`, `meeting/capture.rs`, `meeting/session.rs` (`MeetingManager`), `commands/meeting.rs`; remove the planned rows for `meeting/mod.rs` (manager), `meeting/capture.rs`, `meeting/transcriber.rs` and note that `session.rs` holds the state machine and the transcriber thread; store row lists the three new tables; events list adds `meeting-state-payload` and `transcript-line-payload`; frontend existing table adds `stores/meetingStore.ts`, `components/meetings/*`; delivery order marks step 3 done. In the spec's section 3 table, add one line under `mod.rs`: "Implemented as `session.rs` (manager and transcriber thread) plus `segment.rs`; event names are the tauri-specta derived ones."
 
 - [ ] **Step 4: Commit**
 

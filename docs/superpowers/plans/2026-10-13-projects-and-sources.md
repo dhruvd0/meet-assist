@@ -1189,7 +1189,7 @@ pub fn html_to_chunks(html: &str) -> Vec<(String, String)> {
 pub async fn chunks_for_link(url: &str) -> Result<Vec<(String, String)>> {
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(20))
-        .user_agent("MeetAssist/0.1")
+        .user_agent("CASE/0.1")
         .build()?;
     let resp = client.get(url).send().await.with_context(|| format!("fetch {}", url))?;
     let status = resp.status();

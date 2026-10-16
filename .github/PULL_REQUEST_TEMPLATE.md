@@ -13,7 +13,7 @@
 
 ## Spec or Plan
 
-<!-- Meeting-subsystem work: link the spec section in docs/superpowers/specs/ or the plan task in docs/superpowers/plans/ this PR implements. If the change is not in the spec, open a spec change first. Dictation bug fixes: link the issue, and the upstream Handy issue or PR if one exists. -->
+<!-- Meeting-subsystem work: link the spec section in docs/superpowers/specs/ or the plan task in docs/superpowers/plans/ this PR implements. If the change is not in the spec, open a spec change first. Dictation bug fixes: link the issue, and the upstream CASE issue or PR if one exists. -->
 
 ## Related Issues
 

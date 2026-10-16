@@ -244,7 +244,7 @@
     },
     "capture": {
       "systemAudioUnavailable": "System audio is unavailable; transcribing your microphone only. {{message}}",
-      "systemAudioHint": "On macOS, allow Meet Assist under System Settings, Privacy & Security, Screen & System Audio Recording, then end and start the meeting again."
+      "systemAudioHint": "On macOS, allow CASE under System Settings, Privacy & Security, Screen & System Audio Recording, then end and start the meeting again."
     },
     "start": "Start meeting",
     "dock": {
@@ -413,7 +413,7 @@
     "assistant": {
       "provider": {
         "title": "AI provider",
-        "description": "The model Meet Assist uses for nudges, summaries, and image digests.",
+        "description": "The model CASE uses for nudges, summaries, and image digests.",
         "test": {
           "button": "Test model",
           "testing": "Testing…",
@@ -470,7 +470,7 @@
       },
       "rescan": {
         "label": "Rescan",
-        "tooltip": "Rescan for models added to the models folder or Hugging Face cache outside Meet Assist"
+        "tooltip": "Rescan for models added to the models folder or Hugging Face cache outside CASE"
       },
       "noModelsMatch": "No models match this filter."
     },
@@ -532,11 +532,11 @@
       },
       "autostart": {
         "label": "Launch on Startup",
-        "description": "Automatically start Meet Assist when you log in to your computer."
+        "description": "Automatically start CASE when you log in to your computer."
       },
       "showTrayIcon": {
         "label": "Show Tray Icon",
-        "description": "Display the Meet Assist icon in the system tray."
+        "description": "Display the CASE icon in the system tray."
       },
       "translateToEnglish": {
         "label": "Translate to English",
@@ -613,8 +613,8 @@
       },
       "updateChecks": {
         "label": "Check for Updates",
-        "description": "Automatically check for new versions of Meet Assist",
-        "lockedDescription": "Disabled by system configuration (HANDY_DISABLE_UPDATER)"
+        "description": "Automatically check for new versions of CASE",
+        "lockedDescription": "Disabled by system configuration (CASE_DISABLE_UPDATER)"
       },
       "whatsNewPreview": {
         "title": "Preview What's New",
@@ -638,6 +638,8 @@
         "description": "Sensitivity for custom word corrections"
       },
       "keyboardImplementation": {
+        "systemLabel": "System shortcuts",
+        "nativeLabel": "Native shortcuts",
         "title": "Keyboard Implementation",
         "description": "Choose the keyboard shortcut backend.",
         "bindingsReset": "Keyboard shortcuts were incompatible and reset to defaults"
@@ -652,32 +654,27 @@
       "title": "About",
       "version": {
         "title": "Version",
-        "description": "Current version of Meet Assist"
+        "description": "Current version of CASE"
       },
       "whatsNewUpdates": {
         "label": "Show What's New",
-        "description": "Show release notes after Meet Assist updates"
+        "description": "Show release notes after CASE updates"
       },
       "appDataDirectory": {
         "title": "App Data Directory",
-        "description": "Location where Meet Assist stores its data"
+        "description": "Location where CASE stores its data"
       },
       "sourceCode": {
         "title": "Source Code",
         "description": "View source code and contribute",
         "button": "View on GitHub"
       },
-      "supportDevelopment": {
-        "title": "Support Development",
-        "description": "Support Handy, the open source engine Meet Assist is built on",
-        "button": "Donate"
-      },
       "acknowledgments": {
         "title": "Acknowledgments",
         "ggml": {
           "title": "ggml",
           "description": "High-performance tensor library for on-device machine learning inference",
-          "details": "Meet Assist's local speech-to-text comes from Handy and is built on transcribe.cpp and ggml. Thanks to Georgi Gerganov and contributors."
+          "details": "CASE uses transcribe.cpp and ggml for local speech recognition. Built with open-source software; copyright and license notices are included with the source."
         }
       }
     },
@@ -729,7 +726,7 @@
     "portableUpdateBrowseButton": "Open GitHub Releases"
   },
   "whatsNew": {
-    "title": "New in Meet Assist v{{version}}"
+    "title": "New in CASE v{{version}}"
   },
   "common": {
     "loading": "Loading...",
@@ -762,18 +759,18 @@
     "meetingToggleFailedTitle": "Couldn't start the meeting",
     "micPermissionDenied": {
       "windows": "Enable microphone access in Settings → Privacy & security → Microphone (including desktop app access).",
-      "macos": "Enable microphone access for Meet Assist in System Settings → Privacy & Security → Microphone."
+      "macos": "Enable microphone access for CASE in System Settings → Privacy & Security → Microphone."
     },
     "modelLoadFailed": "Failed to load model: {{model}}",
     "modelLoadFailedUnknown": "unknown model"
   },
   "appLanguage": {
     "title": "Application Language",
-    "description": "Change the language of the Meet Assist interface"
+    "description": "Change the language of the CASE interface"
   },
   "theme": {
     "title": "Application Theme",
-    "description": "Choose whether Meet Assist follows your system theme or stays light or dark",
+    "description": "Choose whether CASE follows your system theme or stays light or dark",
     "options": {
       "system": "System",
       "light": "Light",

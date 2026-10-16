@@ -14,7 +14,7 @@ export { ChannelSelector } from "./ChannelSelector";
 export { OutputDeviceSelector } from "./OutputDeviceSelector";
 export { AudioFeedback } from "./AudioFeedback";
 export { GlobalShortcutInput } from "./GlobalShortcutInput";
-export { HandyKeysShortcutInput } from "./HandyKeysShortcutInput";
+export { NativeKeysShortcutInput } from "./NativeKeysShortcutInput";
 export { ShortcutInput } from "./ShortcutInput";
 export { TranslateToEnglish } from "./TranslateToEnglish";
 export { CustomWords } from "./CustomWords";

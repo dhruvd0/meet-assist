@@ -1,11 +1,11 @@
-# Meet Assist: Meeting Assistant Design
+# CASE: Meeting Assistant Design
 
 Date: 2026-10-13
 Status: approved. Amended 2026-10-13 with projects, sources, and agentic context retrieval (sections 2a, 3a, 5).
 
 ## 1. Intent
 
-Turn this Handy fork into **Meet Assist**: a private meeting copilot. It listens to a live call, keeps a transcript, and speaks up (to the user only) when the conversation loops, someone is stuck, a quick fact is missing, or an obvious idea is untried.
+Turn this CASE fork into **CASE**: a private meeting copilot. It listens to a live call, keeps a transcript, and speaks up (to the user only) when the conversation loops, someone is stuck, a quick fact is missing, or an obvious idea is untried.
 
 Agreed decisions:
 
@@ -16,7 +16,7 @@ Agreed decisions:
 - **Approach:** meeting mode is a new subsystem beside dictation. Dictation stays intact.
 - **Product model:** projects contain meetings. Meetings are persisted threads of sessions. Start, pause, resume, end, and continue later.
 - **Context:** projects hold sources (pasted text, local files and folders including checked-out repos, links, images). The observer loads a small base prompt and retrieves the rest through MCP-shaped internal tools.
-- **Visuals:** keep Handy's design language and components. Minor differences only.
+- **Visuals:** keep CASE's design language and components. Minor differences only.
 
 Non-goals for v1: speaking into the call, web search, speaker diarization beyond me/them, calendar or chat integrations, user-editable observer prompt, Windows/Linux system-audio parity if blocked (mic-only there is acceptable), folder watching, embeddings or vector search, remote GitHub API access, a standalone MCP server process, cloud sync.
 
@@ -205,7 +205,7 @@ Session summary prompt: decisions, open questions, action items, three-line reca
 
 ## 7. Docs and vision (first deliverable)
 
-- `README.md`: new name, pitch, how it works, privacy stance, early status, credit Handy upstream.
+- `README.md`: new name, pitch, how it works, privacy stance, early status, credit CASE upstream.
 - `AGENTS.md`: add meeting subsystem, keep dictation sections, replace upstream feature-freeze and PR-template mandates with fork rules.
 - `docs/VISION.md`: why, principles (private copilot, local-first, speak only when useful), roadmap.
 - `docs/ARCHITECTURE.md`: meeting pipeline, data model, capture per OS.

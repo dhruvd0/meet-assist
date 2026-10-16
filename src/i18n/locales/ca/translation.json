@@ -79,7 +79,9 @@
       "errors": {
         "add": "Could not add source.",
         "remove": "Could not remove source.",
-        "reindex": "Could not re-index source."
+        "reindex": "Could not re-index source.",
+        "load": "Could not load sources.",
+        "pick": "Could not open the picker: {{error}}"
       },
       "digestLabel": "Digest",
       "digestByModel": "Summarized by {{model}}",
@@ -89,8 +91,10 @@
       "load": "Could not load projects.",
       "create": "Could not create project.",
       "delete": "Could not delete project.",
-      "save": "Could not save."
-    }
+      "save": "Could not save.",
+      "notFound": "This project no longer exists."
+    },
+    "meetingsEmpty": "No meetings in this space yet."
   },
   "meetings": {
     "title": "Meetings",
@@ -125,7 +129,14 @@
       "empty": "Nothing transcribed yet. Say something.",
       "session": "Session {{n}}",
       "me": "You",
-      "them": "Them"
+      "them": "Them",
+      "show_one": "Show {{count}} line",
+      "show_other": "Show {{count}} lines",
+      "hide": "Hide",
+      "playLine": "Play this line",
+      "pauseLine": "Pause",
+      "playAll": "Play recording",
+      "stopAll": "Stop"
     },
     "errors": {
       "load": "Could not load meetings.",
@@ -133,7 +144,8 @@
       "control": "Could not change the meeting state.",
       "save": "Could not save.",
       "delete": "Could not delete the meeting.",
-      "capture": "Microphone stopped delivering audio."
+      "capture": "Microphone stopped delivering audio.",
+      "notFound": "This meeting no longer exists."
     },
     "intervention": {
       "kind": {
@@ -146,7 +158,11 @@
       "open": "Open meeting",
       "timeline": "Assistant nudges",
       "empty": "No nudges yet.",
-      "dismissed": "Dismissed"
+      "dismissed": "Dismissed",
+      "errors": {
+        "dismiss": "Couldn't dismiss: {{error}}",
+        "open": "Couldn't open the meeting: {{error}}"
+      }
     },
     "observer": {
       "toolsUnavailable": "This provider does not support tools; the assistant answers from the transcript only.",
@@ -158,7 +174,12 @@
         "unsupported_provider": "{{detail}} cannot run the meeting assistant. Choose another provider in Assistant.",
         "missing_api_key": "No API key for {{detail}}. Add one in Assistant.",
         "no_model": "No model is selected for {{detail}}. Pick one in Assistant."
-      }
+      },
+      "listening": "AI is listening",
+      "pausedListening": "AI is paused with the meeting",
+      "lastCheck": "checked {{time}}",
+      "firstCheck": "First check runs once someone speaks.",
+      "nudged": "Nudged:"
     },
     "summary": {
       "title": "Summary",
@@ -170,11 +191,48 @@
       "none": "No summary yet.",
       "retry": "Retry",
       "generating": "Generating summary...",
-      "failed": "Summary could not be read."
+      "failed": "Summary could not be read.",
+      "failedToGenerate": "The summary could not be generated.",
+      "efficiency": {
+        "title": "How the time was used",
+        "none": "No time lost to circles, arguments or tangents.",
+        "minutes_one": "~{{count}} min",
+        "minutes_other": "~{{count}} min",
+        "kind": {
+          "circle": "Going in circles",
+          "argument": "Pointless argument",
+          "tangent": "Tangent",
+          "repetition": "Repetition",
+          "recurring": "Recurring"
+        },
+        "acrossSpace": "Space history: still unsettled from earlier conversations"
+      }
     },
     "capture": {
       "systemAudioUnavailable": "System audio is unavailable; transcribing your microphone only. {{message}}",
-      "systemAudioHint": "On macOS, allow Meet Assist under System Settings, Privacy & Security, Screen & System Audio Recording, then end and start the meeting again."
+      "systemAudioHint": "On macOS, allow CASE under System Settings, Privacy & Security, Screen & System Audio Recording, then end and start the meeting again."
+    },
+    "filing": {
+      "project": "Space",
+      "unfiled": "Unfiled",
+      "byAssistant": "Filed by assistant",
+      "pending": "Assistant will file this soon",
+      "pickProject": "Unfiled · pick a project",
+      "card": {
+        "title": "Filed by assistant",
+        "filedInto": "Filed into {{project}} as “{{title}}”",
+        "created": "Created {{project}} and filed “{{title}}”",
+        "change": "Change",
+        "undo": "Undo",
+        "undoFailed": "Couldn't undo: {{error}}"
+      }
+    },
+    "start": "Start meeting",
+    "dock": {
+      "label": "Current meeting",
+      "recording": "Recording",
+      "aiListening": "AI listening",
+      "open": "Open meeting"
     }
   },
   "onboarding": {
@@ -336,9 +394,12 @@
     "assistant": {
       "provider": {
         "title": "AI provider",
-        "description": "The model Meet Assist uses for nudges, summaries, and image digests.",
+        "description": "The model CASE uses for nudges, summaries, and image digests.",
         "test": {
-          "button": "Test connection"
+          "button": "Test connection",
+          "testing": "Testing…",
+          "ok": "Replied “{{reply}}” in {{seconds}} s.",
+          "failure": "Failed: {{error}}"
         },
         "select": {
           "title": "Proveïdor",
@@ -361,7 +422,8 @@
         "apiKey": {
           "title": "Clau de l'API",
           "description": "Clau de l'API del proveïdor seleccionat.",
-          "placeholder": "sk-..."
+          "placeholder": "sk-...",
+          "bundledPlaceholder": "Using the built-in key. Paste your own to replace it."
         },
         "model": {
           "title": "Model",
@@ -389,7 +451,7 @@
       },
       "rescan": {
         "label": "Torna a cercar",
-        "tooltip": "Torna a cercar models afegits a la carpeta de models o a la memòria cau de Hugging Face des de fora del Meet Assist"
+        "tooltip": "Torna a cercar models afegits a la carpeta de models o a la memòria cau de Hugging Face des de fora del CASE"
       },
       "noModelsMatch": "Cap model no coincideix amb aquest filtre."
     },
@@ -451,11 +513,11 @@
       },
       "autostart": {
         "label": "Inicia en entrar a la sessió",
-        "description": "Inicia automàticament el Meet Assist quan entreu a la sessió de l'ordinador."
+        "description": "Inicia automàticament el CASE quan entreu a la sessió de l'ordinador."
       },
       "showTrayIcon": {
         "label": "Mostra la icona a la safata",
-        "description": "Mostra la icona del Meet Assist a la safata del sistema."
+        "description": "Mostra la icona del CASE a la safata del sistema."
       },
       "translateToEnglish": {
         "label": "Traduïu a l'anglès",
@@ -532,8 +594,8 @@
       },
       "updateChecks": {
         "label": "Comproveu si hi ha actualitzacions",
-        "description": "Comprova automàticament si hi ha versions noves del Meet Assist",
-        "lockedDescription": "Desactivat per la configuració del sistema (HANDY_DISABLE_UPDATER)"
+        "description": "Comprova automàticament si hi ha versions noves del CASE",
+        "lockedDescription": "Desactivat per la configuració del sistema (CASE_DISABLE_UPDATER)"
       },
       "whatsNewPreview": {
         "title": "Previsualització de les novetats",
@@ -559,7 +621,9 @@
       "keyboardImplementation": {
         "title": "Implementació del teclat",
         "description": "Tria el motor de dreceres de teclat.",
-        "bindingsReset": "Les dreceres de teclat eren incompatibles i s'han restablert als valors per defecte"
+        "bindingsReset": "Les dreceres de teclat eren incompatibles i s'han restablert als valors per defecte",
+        "systemLabel": "System shortcuts",
+        "nativeLabel": "Native shortcuts"
       },
       "paths": {
         "appData": "Dades de l'aplicació:",
@@ -571,32 +635,27 @@
       "title": "Quant a",
       "version": {
         "title": "Versió",
-        "description": "Versió actual del Meet Assist"
+        "description": "Versió actual del CASE"
       },
       "whatsNewUpdates": {
         "label": "Mostra les novetats",
-        "description": "Mostra les notes de la versió després d'actualitzar el Meet Assist"
+        "description": "Mostra les notes de la versió després d'actualitzar el CASE"
       },
       "appDataDirectory": {
         "title": "Directori de dades de l'aplicació",
-        "description": "Ubicació on el Meet Assist desa les dades"
+        "description": "Ubicació on el CASE desa les dades"
       },
       "sourceCode": {
         "title": "Codi font",
         "description": "Consulta el codi font i col·laboreu-hi",
         "button": "Mostra al GitHub"
       },
-      "supportDevelopment": {
-        "title": "Dona suport al desenvolupament",
-        "description": "Ajudeu-nos a continuar desenvolupant el Handy",
-        "button": "Feu una donació"
-      },
       "acknowledgments": {
         "title": "Agraïments",
         "ggml": {
           "title": "ggml",
           "description": "Biblioteca de tensors d'alt rendiment per a la inferència d'aprenentatge automàtic al dispositiu",
-          "details": "La transcripció local de veu a text del Meet Assist es basa en el transcribe.cpp i el ggml. Gràcies a la gran feina de Georgi Gerganov i dels col·laboradors."
+          "details": "CASE uses transcribe.cpp and ggml for local speech recognition. Built with open-source software; copyright and license notices are included with the source."
         }
       }
     },
@@ -625,6 +684,10 @@
       "systemAudio": {
         "label": "Capture system audio",
         "description": "Hear the other side of the call. Takes effect when the next meeting starts."
+      },
+      "maxLine": {
+        "label": "Longest transcript line",
+        "description": "Seconds of non-stop speech before it is cut into a new line. Lower values give the assistant new lines, and so checks, more often during long monologues, but may split a sentence. Takes effect when the next meeting starts."
       }
     }
   },
@@ -644,7 +707,7 @@
     "portableUpdateBrowseButton": "Obriu GitHub Releases"
   },
   "whatsNew": {
-    "title": "Novetats del Meet Assist v{{version}}"
+    "title": "Novetats del CASE v{{version}}"
   },
   "common": {
     "loading": "S'està carregant...",
@@ -661,18 +724,34 @@
     "meetingToggleFailedTitle": "Couldn't start the meeting",
     "micPermissionDenied": {
       "windows": "Activa l'accés al micròfon a Configuració → Privadesa i seguretat → Micròfon (inclòs l'accés de les aplicacions d'escriptori).",
-      "macos": "Enable microphone access for Meet Assist in System Settings → Privacy & Security → Microphone."
+      "macos": "Enable microphone access for CASE in System Settings → Privacy & Security → Microphone."
     },
     "modelLoadFailed": "No s'ha pogut carregar el model: {{model}}",
-    "modelLoadFailedUnknown": "model desconegut"
+    "modelLoadFailedUnknown": "model desconegut",
+    "settingSaveFailed": "Couldn't save the setting: {{error}}",
+    "modelListFailed": "Couldn't load the provider's models: {{error}}",
+    "settingsLoadFailed": "Couldn't load settings: {{error}}",
+    "devicesLoadFailed": "Couldn't list audio devices: {{error}}",
+    "soundTestFailed": "Couldn't play the sound: {{error}}",
+    "openFolderFailed": "Couldn't open the folder: {{error}}",
+    "updateCheckFailed": "Couldn't check for updates: {{error}}",
+    "updateInstallFailed": "Couldn't install the update: {{error}}",
+    "models": {
+      "load": "Couldn't load models: {{error}}",
+      "rescan": "Couldn't rescan models: {{error}}",
+      "select": "Couldn't switch model: {{error}}",
+      "cancel": "Couldn't cancel the download: {{error}}",
+      "delete": "Couldn't delete the model: {{error}}",
+      "download": "Couldn't download the model: {{error}}"
+    }
   },
   "appLanguage": {
     "title": "Llengua de l'aplicació",
-    "description": "Canvia la llengua de la interfície del Meet Assist"
+    "description": "Canvia la llengua de la interfície del CASE"
   },
   "theme": {
     "title": "Tema de l'aplicació",
-    "description": "Tria si el Meet Assist segueix el tema del sistema o es manté en mode clar o fosc",
+    "description": "Tria si el CASE segueix el tema del sistema o es manté en mode clar o fosc",
     "options": {
       "system": "Sistema",
       "light": "Clar",
@@ -682,5 +761,24 @@
   "secureInput": {
     "learnMore": "Com es resol",
     "recorderBlocked": "Ara no se'n poden enregistrar dreceres: l'entrada segura del macOS bloca els esdeveniments de tecla. Resol primer l'avís d'entrada segura."
+  },
+  "nav": {
+    "label": "Main",
+    "home": "Home",
+    "spaces": "Spaces",
+    "newSpace": "New space",
+    "spacesEmpty": "The assistant creates spaces as it files your meetings. Add one yourself with +.",
+    "settings": "Settings",
+    "back": "Back"
+  },
+  "home": {
+    "title": "Home",
+    "idleTitle": "Nothing recording",
+    "idleHintBefore": "Press",
+    "idleHintAfter": "anywhere to start. The assistant files it into a space once it knows the topic.",
+    "idleHintNoShortcut": "Start here or from the tray. The assistant files the meeting into a space once it knows the topic.",
+    "startedAt": "Started {{time}}",
+    "openNotes": "Open notes",
+    "empty": "Meetings you record show up here, grouped by day."
   }
 }

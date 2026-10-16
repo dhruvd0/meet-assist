@@ -2,7 +2,7 @@
 
 This file provides guidance to AI coding assistants working with code in this repository.
 
-**This is Meet Assist**, a private meeting copilot forked from [Handy](https://github.com/cjpais/Handy). Read [docs/VISION.md](docs/VISION.md) first, then [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). The meeting subsystem is specified in [docs/superpowers/specs/2026-10-13-meeting-assistant-design.md](docs/superpowers/specs/2026-10-13-meeting-assistant-design.md); implementation plans live in `docs/superpowers/plans/`.
+**This is CASE**, a private meeting companion. Read [docs/VISION.md](docs/VISION.md) first, then [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). The meeting subsystem is specified in [docs/superpowers/specs/2026-10-13-meeting-assistant-design.md](docs/superpowers/specs/2026-10-13-meeting-assistant-design.md); implementation plans live in `docs/superpowers/plans/`.
 
 ## Development Commands
 
@@ -53,7 +53,7 @@ For detailed platform-specific build setup, see [BUILD.md](BUILD.md).
 
 ## Architecture Overview
 
-Meet Assist is a cross-platform, meeting-only desktop app built with Tauri 2.x (Rust backend + React/TypeScript frontend). It reuses Handy's transcription engine; the dictation output path (paste, post-processing, history, overlay) was removed. See `docs/ARCHITECTURE.md`. The meeting modules are listed in the Meeting Subsystem section.
+CASE is a cross-platform, meeting-only desktop app built with Tauri 2.x (Rust backend + React/TypeScript frontend). It reuses the shared transcription engine; the dictation output path (paste, post-processing, history, overlay) was removed. See `docs/ARCHITECTURE.md`. The meeting modules are listed in the Meeting Subsystem section.
 
 ### Backend Structure (src-tauri/src/)
 
@@ -110,7 +110,7 @@ Built; see `docs/ARCHITECTURE.md` for the full table. Backend code lives under `
 - `transcribe-rs` - ONNX speech recognition (Parakeet, Moonshine, SenseVoice, etc.)
 - `handy-recorder` - Microphone capture: device selection, resampling to 16 kHz, failure detection
 - `transcribe-cpp` (Silero VAD v6, CPU-only, in-process) / `earshot` - Voice Activity Detection
-- `handy-keys` - Global keyboard shortcuts
+- `native-keys` - Global keyboard shortcuts
 - `rodio` - Audio playback for feedback sounds
 
 ### Application Flow
@@ -177,7 +177,7 @@ For translation contribution guidelines, see [CONTRIBUTING_TRANSLATIONS.md](CONT
 
 ## CLI Parameters
 
-Meet Assist supports command-line parameters on all platforms for integration with scripts, window managers, and autostart configurations.
+CASE supports command-line parameters on all platforms for integration with scripts, window managers, and autostart configurations.
 
 **Implementation:** `cli.rs` (definitions), `main.rs` (parsing), `lib.rs` (applying), `meeting/toggle.rs` (shared logic)
 
@@ -203,9 +203,9 @@ Access debug features: `Cmd+Shift+D` (macOS) or `Ctrl+Shift+D` (Windows/Linux)
 ## Platform Notes
 
 - **macOS**: Metal acceleration, microphone and audio capture permissions required
-- **Windows**: Vulkan acceleration, code signing. Implicit Vulkan layers (overlays, capture hooks) are disabled for the Handy process via `VK_LOADER_LAYERS_DISABLE=~implicit~` set in `main.rs`; opt out with `HANDY_KEEP_VULKAN_IMPLICIT_LAYERS=1` or by setting `VK_LOADER_LAYERS_DISABLE` yourself
+- **Windows**: Vulkan acceleration, code signing. Implicit Vulkan layers (overlays, capture hooks) are disabled for the CASE process via `VK_LOADER_LAYERS_DISABLE=~implicit~` set in `main.rs`; opt out with `CASE_KEEP_VULKAN_IMPLICIT_LAYERS=1` or by setting `VK_LOADER_LAYERS_DISABLE` yourself
 - **Linux**: OpenBLAS + Vulkan, limited Wayland support
-- **Nix/NixOS**: the Nix package sets `HANDY_DISABLE_UPDATER=1` to force-disable the self-updater at runtime without touching the persisted setting (self-update can't work against an immutable `/nix/store`)
+- **Nix/NixOS**: the Nix package sets `CASE_DISABLE_UPDATER=1` to force-disable the self-updater at runtime without touching the persisted setting (self-update can't work against an immutable `/nix/store`)
 
 ## Troubleshooting
 
@@ -213,11 +213,11 @@ See the [Troubleshooting](README.md#troubleshooting) section in README.md.
 
 ## GitHub workflow for AI coding assistants
 
-This fork is not under Handy's feature freeze. Meeting-subsystem features are in scope when they follow the design spec. Keep these rules:
+Meeting-subsystem features are in scope when they follow the design spec. Keep these rules:
 
 - **Opening a PR:** Read [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md) and fill every section. The "Spec or Plan" section must link the spec section or plan task the PR implements. Leave "Human Written Description" as a TODO for the human contributor.
 - **Opening an issue:** Use [`.github/ISSUE_TEMPLATE/bug_report.md`](.github/ISSUE_TEMPLATE/bug_report.md) for bugs. Feature ideas for the meeting subsystem go in a spec change under `docs/superpowers/specs/`, not an issue.
-- **Upstream sync:** Engine, audio, and model fixes from Handy are welcome; dictation-output changes no longer apply. Cherry-pick with the upstream commit referenced in the message.
+- **Upstream sync:** Engine, audio, and model fixes from shared dependencies are welcome; dictation-output changes no longer apply. Cherry-pick with the upstream commit referenced in the message.
 - **Translations:** Follow [CONTRIBUTING_TRANSLATIONS.md](CONTRIBUTING_TRANSLATIONS.md). New `meetings.*` keys land in `en/translation.json` first; other locales fall back to English.
 
 **Commits:** Use conventional commit prefixes (`feat:`, `fix:`, `docs:`, `refactor:`, `chore:`). Focus the message on _why_, not _what_.

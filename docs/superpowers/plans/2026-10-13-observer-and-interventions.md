@@ -1526,7 +1526,7 @@ Copy into all 25 locales at the same positions (throwaway script, delete before 
 
 - [ ] **Step 2: Window entry**
 
-`src/intervention/index.html`: copy `src/overlay/index.html`, change the script to `/src/intervention/main.tsx` and the title to `Meet Assist`. `main.tsx`: copy `src/overlay/main.tsx`, render `<InterventionCard />`.
+`src/intervention/index.html`: copy `src/overlay/index.html`, change the script to `/src/intervention/main.tsx` and the title to `CASE`. `main.tsx`: copy `src/overlay/main.tsx`, render `<InterventionCard />`.
 
 `InterventionCard.tsx`:
 

@@ -1,13 +1,13 @@
-# Handy to Meet Assist Transition Design
+# CASE to CASE Transition Design
 
 Date: 2026-10-14
 Status: Draft, awaiting review
 
 ## Goal
 
-Meet Assist still carries Handy's dictation product: paste into the active app, post-processing, push-to-talk, a dictation history, Handy's test and CI surface. A user who only wants meetings must pass through those concepts. The clearest symptom: to give the meeting assistant an API key, the user enables "post processing", opens the Post Processing page that then appears, and adds the key there.
+CASE still carries CASE's dictation product: paste into the active app, post-processing, push-to-talk, a dictation history, CASE's test and CI surface. A user who only wants meetings must pass through those concepts. The clearest symptom: to give the meeting assistant an API key, the user enables "post processing", opens the Post Processing page that then appears, and adds the key there.
 
-This change makes Meet Assist a meeting product. Dictation output is removed. The transcription engine, audio capture, and models stay. Provider setup becomes a first-class, always-visible Assistant page. The test suite is cut to a small core plus typecheck and lint.
+This change makes CASE a meeting product. Dictation output is removed. The transcription engine, audio capture, and models stay. Provider setup becomes a first-class, always-visible Assistant page. The test suite is cut to a small core plus typecheck and lint.
 
 ## Decisions
 
@@ -31,7 +31,7 @@ This spec gives the shortcut an interim start behaviour (below) that sub-project
 
 ## Non-goals
 
-- Renaming crates or internal identifiers such as `handy-recorder` or `handy_keys`. No user benefit, high churn.
+- Renaming crates or internal identifiers such as `handy-recorder` or `native_keys`. No user benefit, high churn.
 - Visual rebrand (logo, icons, colours). Sub-project 3.
 - AI project filing. Sub-project 2.
 - Changing meeting capture, the observer, summaries, or the intervention card behaviour.
@@ -85,7 +85,7 @@ Meetings depend on `AudioRecordingManager` and the transcription manager. They d
 
 ### Shortcut
 
-- Shortcut infrastructure (`shortcut/tauri_impl.rs`, `shortcut/handy_keys.rs`, `shortcut/mod.rs`) stays.
+- Shortcut infrastructure (`shortcut/tauri_impl.rs`, `shortcut/native_keys.rs`, `shortcut/mod.rs`) stays.
 - Bindings shrink to one: `toggle_meeting`. Push-to-talk and activation modes are removed, and so are the transcribe, post-process, and cancel bindings.
 - Interim behaviour: if a meeting is live, end it. Otherwise start a new meeting in the most recently used project: the project of the meeting with the latest session start, or the newest project if no meeting exists. If there are no projects, show and focus the main window on Projects.
 - The action calls `MeetingManager` through the same paths the meeting commands use. No new meeting logic.
@@ -163,7 +163,7 @@ Each guards against losing or corrupting user data:
 
 ## Documentation
 
-- `docs/VISION.md`: principle 4 becomes "Reuse Handy's engine. Transcription, models, and audio capture come from Handy; dictation output was removed." Remove "Dictation keeps working."
+- `docs/VISION.md`: principle 4 becomes "Reuse CASE's engine. Transcription, models, and audio capture come from CASE; dictation output was removed." Remove "Dictation keeps working."
 - `docs/ARCHITECTURE.md`: drop the dictation pipeline section. Describe the shortcut and tray as meeting toggles.
 - `AGENTS.md`: replace the dictation module list and application flow with the meeting flow. Update the CLI table. Upstream cherry-picks are limited to engine, audio, and model fixes. Note the test policy: typecheck, clippy, lint, and the core tests only, with no new UI or end-to-end tests.
 
@@ -178,7 +178,7 @@ Automated:
 
 Manual, on macOS with `bun run tauri dev`:
 
-1. An existing Handy-era settings store loads. The provider, key, and model show on the Assistant page.
+1. An existing CASE-era settings store loads. The provider, key, and model show on the Assistant page.
 2. Fresh install: onboarding is model, then assistant, then done. No accessibility prompt.
 3. On the Assistant page, turn the assistant on, pick a provider, paste a key, run "Test connection". All on one page.
 4. The shortcut starts a meeting in the last-used project and ends it on the second press. The tray entry matches.

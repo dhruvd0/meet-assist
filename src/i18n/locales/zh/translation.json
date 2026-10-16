@@ -79,7 +79,9 @@
       "errors": {
         "add": "Could not add source.",
         "remove": "Could not remove source.",
-        "reindex": "Could not re-index source."
+        "reindex": "Could not re-index source.",
+        "load": "Could not load sources.",
+        "pick": "Could not open the picker: {{error}}"
       },
       "digestLabel": "Digest",
       "digestByModel": "Summarized by {{model}}",
@@ -89,8 +91,10 @@
       "load": "Could not load projects.",
       "create": "Could not create project.",
       "delete": "Could not delete project.",
-      "save": "Could not save."
-    }
+      "save": "Could not save.",
+      "notFound": "This project no longer exists."
+    },
+    "meetingsEmpty": "No meetings in this space yet."
   },
   "meetings": {
     "title": "Meetings",
@@ -125,7 +129,14 @@
       "empty": "Nothing transcribed yet. Say something.",
       "session": "Session {{n}}",
       "me": "You",
-      "them": "Them"
+      "them": "Them",
+      "show_one": "Show {{count}} line",
+      "show_other": "Show {{count}} lines",
+      "hide": "Hide",
+      "playLine": "Play this line",
+      "pauseLine": "Pause",
+      "playAll": "Play recording",
+      "stopAll": "Stop"
     },
     "errors": {
       "load": "Could not load meetings.",
@@ -133,7 +144,8 @@
       "control": "Could not change the meeting state.",
       "save": "Could not save.",
       "delete": "Could not delete the meeting.",
-      "capture": "Microphone stopped delivering audio."
+      "capture": "Microphone stopped delivering audio.",
+      "notFound": "This meeting no longer exists."
     },
     "intervention": {
       "kind": {
@@ -146,7 +158,11 @@
       "open": "Open meeting",
       "timeline": "Assistant nudges",
       "empty": "No nudges yet.",
-      "dismissed": "Dismissed"
+      "dismissed": "Dismissed",
+      "errors": {
+        "dismiss": "Couldn't dismiss: {{error}}",
+        "open": "Couldn't open the meeting: {{error}}"
+      }
     },
     "observer": {
       "toolsUnavailable": "This provider does not support tools; the assistant answers from the transcript only.",
@@ -158,7 +174,12 @@
         "unsupported_provider": "{{detail}} cannot run the meeting assistant. Choose another provider in Assistant.",
         "missing_api_key": "No API key for {{detail}}. Add one in Assistant.",
         "no_model": "No model is selected for {{detail}}. Pick one in Assistant."
-      }
+      },
+      "listening": "AI is listening",
+      "pausedListening": "AI is paused with the meeting",
+      "lastCheck": "checked {{time}}",
+      "firstCheck": "First check runs once someone speaks.",
+      "nudged": "Nudged:"
     },
     "summary": {
       "title": "Summary",
@@ -170,11 +191,48 @@
       "none": "No summary yet.",
       "retry": "Retry",
       "generating": "Generating summary...",
-      "failed": "Summary could not be read."
+      "failed": "Summary could not be read.",
+      "failedToGenerate": "The summary could not be generated.",
+      "efficiency": {
+        "title": "How the time was used",
+        "none": "No time lost to circles, arguments or tangents.",
+        "minutes_one": "~{{count}} min",
+        "minutes_other": "~{{count}} min",
+        "kind": {
+          "circle": "Going in circles",
+          "argument": "Pointless argument",
+          "tangent": "Tangent",
+          "repetition": "Repetition",
+          "recurring": "Recurring"
+        },
+        "acrossSpace": "Space history: still unsettled from earlier conversations"
+      }
     },
     "capture": {
       "systemAudioUnavailable": "System audio is unavailable; transcribing your microphone only. {{message}}",
-      "systemAudioHint": "On macOS, allow Meet Assist under System Settings, Privacy & Security, Screen & System Audio Recording, then end and start the meeting again."
+      "systemAudioHint": "On macOS, allow CASE under System Settings, Privacy & Security, Screen & System Audio Recording, then end and start the meeting again."
+    },
+    "filing": {
+      "project": "Space",
+      "unfiled": "Unfiled",
+      "byAssistant": "Filed by assistant",
+      "pending": "Assistant will file this soon",
+      "pickProject": "Unfiled · pick a project",
+      "card": {
+        "title": "Filed by assistant",
+        "filedInto": "Filed into {{project}} as “{{title}}”",
+        "created": "Created {{project}} and filed “{{title}}”",
+        "change": "Change",
+        "undo": "Undo",
+        "undoFailed": "Couldn't undo: {{error}}"
+      }
+    },
+    "start": "Start meeting",
+    "dock": {
+      "label": "Current meeting",
+      "recording": "Recording",
+      "aiListening": "AI listening",
+      "open": "Open meeting"
     }
   },
   "onboarding": {
@@ -336,9 +394,12 @@
     "assistant": {
       "provider": {
         "title": "AI provider",
-        "description": "The model Meet Assist uses for nudges, summaries, and image digests.",
+        "description": "The model CASE uses for nudges, summaries, and image digests.",
         "test": {
-          "button": "Test connection"
+          "button": "Test connection",
+          "testing": "Testing…",
+          "ok": "Replied “{{reply}}” in {{seconds}} s.",
+          "failure": "Failed: {{error}}"
         },
         "select": {
           "title": "提供商",
@@ -361,7 +422,8 @@
         "apiKey": {
           "title": "API 密钥",
           "description": "所选提供商的 API 密钥。",
-          "placeholder": "sk-..."
+          "placeholder": "sk-...",
+          "bundledPlaceholder": "Using the built-in key. Paste your own to replace it."
         },
         "model": {
           "title": "模型",
@@ -389,7 +451,7 @@
       },
       "rescan": {
         "label": "重新扫描",
-        "tooltip": "重新扫描在 Meet Assist 之外添加到模型文件夹或 Hugging Face 缓存中的模型"
+        "tooltip": "重新扫描在 CASE 之外添加到模型文件夹或 Hugging Face 缓存中的模型"
       },
       "noModelsMatch": "没有符合此筛选条件的模型。"
     },
@@ -451,11 +513,11 @@
       },
       "autostart": {
         "label": "开机启动",
-        "description": "登录计算机时自动启动 Meet Assist。"
+        "description": "登录计算机时自动启动 CASE。"
       },
       "showTrayIcon": {
         "label": "显示托盘图标",
-        "description": "在系统托盘中显示 Meet Assist 图标。"
+        "description": "在系统托盘中显示 CASE 图标。"
       },
       "translateToEnglish": {
         "label": "翻译为英语",
@@ -532,8 +594,8 @@
       },
       "updateChecks": {
         "label": "检查更新",
-        "description": "自动检查 Meet Assist 的新版本",
-        "lockedDescription": "已被系统配置禁用 (HANDY_DISABLE_UPDATER)"
+        "description": "自动检查 CASE 的新版本",
+        "lockedDescription": "已被系统配置禁用 (CASE_DISABLE_UPDATER)"
       },
       "whatsNewPreview": {
         "title": "预览新功能",
@@ -559,7 +621,9 @@
       "keyboardImplementation": {
         "title": "键盘实现",
         "description": "选择键盘快捷键的后端。",
-        "bindingsReset": "键盘快捷键不兼容，已重置为默认值"
+        "bindingsReset": "键盘快捷键不兼容，已重置为默认值",
+        "systemLabel": "System shortcuts",
+        "nativeLabel": "Native shortcuts"
       },
       "paths": {
         "appData": "应用数据:",
@@ -571,32 +635,27 @@
       "title": "关于",
       "version": {
         "title": "版本",
-        "description": "Meet Assist 的当前版本"
+        "description": "CASE 的当前版本"
       },
       "whatsNewUpdates": {
         "label": "显示新功能",
-        "description": "Meet Assist 更新后显示发行说明"
+        "description": "CASE 更新后显示发行说明"
       },
       "appDataDirectory": {
         "title": "应用数据目录",
-        "description": "Meet Assist 存储数据的位置"
+        "description": "CASE 存储数据的位置"
       },
       "sourceCode": {
         "title": "源代码",
         "description": "查看源代码并贡献",
         "button": "在 GitHub 上查看"
       },
-      "supportDevelopment": {
-        "title": "支持开发",
-        "description": "帮助我们继续开发 Handy",
-        "button": "捐赠"
-      },
       "acknowledgments": {
         "title": "致谢",
         "ggml": {
           "title": "ggml",
           "description": "OpenAI Whisper 自动语音识别模型的高性能推理",
-          "details": "Meet Assist 使用 ggml 进行快速的本地语音转文字处理。感谢 Georgi Gerganov 和贡献者们的出色工作。"
+          "details": "CASE uses transcribe.cpp and ggml for local speech recognition. Built with open-source software; copyright and license notices are included with the source."
         }
       }
     },
@@ -625,6 +684,10 @@
       "systemAudio": {
         "label": "Capture system audio",
         "description": "Hear the other side of the call. Takes effect when the next meeting starts."
+      },
+      "maxLine": {
+        "label": "Longest transcript line",
+        "description": "Seconds of non-stop speech before it is cut into a new line. Lower values give the assistant new lines, and so checks, more often during long monologues, but may split a sentence. Takes effect when the next meeting starts."
       }
     }
   },
@@ -644,7 +707,7 @@
     "portableUpdateBrowseButton": "打开 GitHub Releases"
   },
   "whatsNew": {
-    "title": "Meet Assist v{{version}} 新功能"
+    "title": "CASE v{{version}} 新功能"
   },
   "common": {
     "loading": "加载中...",
@@ -661,18 +724,34 @@
     "meetingToggleFailedTitle": "Couldn't start the meeting",
     "micPermissionDenied": {
       "windows": "在设置 → 隐私和安全性 → 麦克风（包括桌面应用访问）中启用麦克风访问。",
-      "macos": "Enable microphone access for Meet Assist in System Settings → Privacy & Security → Microphone."
+      "macos": "Enable microphone access for CASE in System Settings → Privacy & Security → Microphone."
     },
     "modelLoadFailed": "加载模型失败: {{model}}",
-    "modelLoadFailedUnknown": "未知模型"
+    "modelLoadFailedUnknown": "未知模型",
+    "settingSaveFailed": "Couldn't save the setting: {{error}}",
+    "modelListFailed": "Couldn't load the provider's models: {{error}}",
+    "settingsLoadFailed": "Couldn't load settings: {{error}}",
+    "devicesLoadFailed": "Couldn't list audio devices: {{error}}",
+    "soundTestFailed": "Couldn't play the sound: {{error}}",
+    "openFolderFailed": "Couldn't open the folder: {{error}}",
+    "updateCheckFailed": "Couldn't check for updates: {{error}}",
+    "updateInstallFailed": "Couldn't install the update: {{error}}",
+    "models": {
+      "load": "Couldn't load models: {{error}}",
+      "rescan": "Couldn't rescan models: {{error}}",
+      "select": "Couldn't switch model: {{error}}",
+      "cancel": "Couldn't cancel the download: {{error}}",
+      "delete": "Couldn't delete the model: {{error}}",
+      "download": "Couldn't download the model: {{error}}"
+    }
   },
   "appLanguage": {
     "title": "应用语言",
-    "description": "更改 Meet Assist 界面的语言"
+    "description": "更改 CASE 界面的语言"
   },
   "theme": {
     "title": "应用主题",
-    "description": "选择 Meet Assist 跟随系统主题，还是保持浅色或深色",
+    "description": "选择 CASE 跟随系统主题，还是保持浅色或深色",
     "options": {
       "system": "跟随系统",
       "light": "浅色",
@@ -682,5 +761,24 @@
   "secureInput": {
     "learnMore": "如何解决",
     "recorderBlocked": "当前无法录制快捷键——macOS 的 Secure Input 正在阻止按键事件。请先解决 Secure Input 警告。"
+  },
+  "nav": {
+    "label": "Main",
+    "home": "Home",
+    "spaces": "Spaces",
+    "newSpace": "New space",
+    "spacesEmpty": "The assistant creates spaces as it files your meetings. Add one yourself with +.",
+    "settings": "Settings",
+    "back": "Back"
+  },
+  "home": {
+    "title": "Home",
+    "idleTitle": "Nothing recording",
+    "idleHintBefore": "Press",
+    "idleHintAfter": "anywhere to start. The assistant files it into a space once it knows the topic.",
+    "idleHintNoShortcut": "Start here or from the tray. The assistant files the meeting into a space once it knows the topic.",
+    "startedAt": "Started {{time}}",
+    "openNotes": "Open notes",
+    "empty": "Meetings you record show up here, grouped by day."
   }
 }

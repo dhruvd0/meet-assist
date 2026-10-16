@@ -5,7 +5,4 @@ contact_links:
     about: Read the design spec first, then open a PR that edits the spec. Feature ideas are not tracked as issues.
   - name: 📖 Vision and architecture
     url: https://github.com/dhruvd0/meet-assist/blob/main/docs/VISION.md
-    about: What Meet Assist is for and how it is built
-  - name: 🔁 Dictation bugs that also affect upstream Handy
-    url: https://github.com/cjpais/Handy/issues
-    about: Consider reporting dictation-pipeline bugs upstream too, so the fix reaches both projects
+    about: What CASE is for and how it is built

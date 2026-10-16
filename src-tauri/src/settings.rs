@@ -151,18 +151,19 @@ pub enum ChineseScript {
 #[serde(rename_all = "snake_case")]
 pub enum KeyboardImplementation {
     Tauri,
-    HandyKeys,
+    #[serde(alias = "handy_keys")]
+    NativeKeys,
 }
 
 impl Default for KeyboardImplementation {
-    /// Tauri on macOS and Linux: on macOS handy-keys needs Accessibility,
+    /// Tauri on macOS and Linux: on macOS native-keys needs Accessibility,
     /// which onboarding no longer asks for, while Tauri's Carbon hotkeys need
     /// no permission.
     fn default() -> Self {
         #[cfg(any(target_os = "linux", target_os = "macos"))]
         return KeyboardImplementation::Tauri;
         #[cfg(not(any(target_os = "linux", target_os = "macos")))]
-        return KeyboardImplementation::HandyKeys;
+        return KeyboardImplementation::NativeKeys;
     }
 }
 
@@ -217,7 +218,7 @@ impl SoundTheme {
 }
 
 /// UI appearance mode. `System` follows the OS `prefers-color-scheme`; `Light`
-/// and `Dark` force one of the two palettes Handy already ships.
+/// and `Dark` force one of the two palettes CASE already ships.
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Type)]
 #[serde(rename_all = "snake_case")]
 pub enum Theme {
@@ -283,7 +284,7 @@ impl std::ops::DerefMut for SecretMap {
     }
 }
 
-/* still handy for composing the initial JSON in the store ------------- */
+/* useful for composing the initial JSON in the store ------------- */
 /// The container-level `serde(default)` (backed by the `Default` impl below)
 /// guarantees every field — including ones added in the future — falls back to
 /// its `get_default_settings()` value when missing from a stored settings
@@ -521,11 +522,11 @@ fn default_show_tray_icon() -> bool {
 }
 
 /// OpenRouter key shipped with the app, used while the user has not entered
-/// their own. Baked in at build time from the `MEET_ASSIST_OPENROUTER_KEY`
+/// their own. Baked in at build time from the `CASE_OPENROUTER_KEY`
 /// environment variable (a CI secret), never stored in the repository:
 /// public keys are found by secret scanning and revoked within minutes.
 /// Empty in builds made without it.
-pub const BUNDLED_OPENROUTER_API_KEY: &str = match option_env!("MEET_ASSIST_OPENROUTER_KEY") {
+pub const BUNDLED_OPENROUTER_API_KEY: &str = match option_env!("CASE_OPENROUTER_KEY") {
     Some(key) => key,
     None => "",
 };
@@ -1039,7 +1040,7 @@ fn apply_settings_migrations(
         let known = |settings: &AppSettings, id: &str| {
             settings.llm_provider_by_id(id).is_some() || builtins.iter().any(|p| p.id == id)
         };
-        // Meet Assist has one provider. A dedicated meeting provider, if the
+        // CASE has one provider. A dedicated meeting provider, if the
         // user picked one, was the one meetings actually used. An unknown id
         // used to fall back to the active provider, so it does here too.
         if let Some(id) = settings_value
@@ -1087,16 +1088,16 @@ fn apply_settings_migrations(
 }
 
 /// Update checks are forced off (without touching the persisted setting) when
-/// `HANDY_DISABLE_UPDATER` is set — e.g. by the Nix package, since self-update
+/// `CASE_DISABLE_UPDATER` is set — e.g. by the Nix package, since self-update
 /// can't work against an immutable /nix/store install.
 pub fn update_checks_forced_disabled() -> bool {
     use std::sync::OnceLock;
     static IS_UPDATER_DISABLED: OnceLock<bool> = OnceLock::new();
-    *IS_UPDATER_DISABLED.get_or_init(|| utils::env_flag_enabled("HANDY_DISABLE_UPDATER"))
+    *IS_UPDATER_DISABLED.get_or_init(|| utils::env_flag_enabled("CASE_DISABLE_UPDATER"))
 }
 
 /// Effective updater state: the user's stored preference, overridden to `false`
-/// while `HANDY_DISABLE_UPDATER` is set. Callers deciding whether to actually
+/// while `CASE_DISABLE_UPDATER` is set. Callers deciding whether to actually
 /// check for updates must use this rather than reading `update_checks_enabled`
 /// directly, so the forced-off state never leaks into the persisted setting.
 pub fn update_checks_effectively_enabled(settings: &AppSettings) -> bool {
@@ -1129,10 +1130,96 @@ pub fn get_stored_binding(settings: &AppSettings, id: &str) -> Result<ShortcutBi
 mod tests {
     use super::*;
 
-    /// A Handy-era store must keep the user's provider, key, model, and
+    #[test]
+    fn case_import_preserves_wal_settings_models_and_originals() {
+        let dir = tempfile::tempdir().unwrap();
+        let source = dir.path().join("previous");
+        let target = dir.path().join("case");
+        std::fs::create_dir_all(source.join("models")).unwrap();
+        std::fs::write(source.join("settings_store.json"), b"{\"settings\":{}}").unwrap();
+        std::fs::write(source.join("models/model.gguf"), b"model").unwrap();
+        let conn = rusqlite::Connection::open(source.join("meet.db")).unwrap();
+        conn.execute_batch(
+            "PRAGMA journal_mode=WAL; PRAGMA wal_autocheckpoint=0;
+            CREATE TABLE sources(locator TEXT); CREATE TABLE meetings(title TEXT);
+            INSERT INTO meetings VALUES ('Keep committed WAL data');",
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO sources VALUES (?1)",
+            [source.join("sources/image.png").to_string_lossy().as_ref()],
+        )
+        .unwrap();
+        conn.execute("INSERT INTO sources VALUES ('/external/project')", [])
+            .unwrap();
+        crate::branding::migrate_directory(&source, &target, None).unwrap();
+        let copied = rusqlite::Connection::open(target.join("meet.db")).unwrap();
+        let title: String = copied
+            .query_row("SELECT title FROM meetings", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(title, "Keep committed WAL data");
+        let locators = copied
+            .prepare("SELECT locator FROM sources ORDER BY rowid")
+            .unwrap()
+            .query_map([], |r| r.get::<_, String>(0))
+            .unwrap()
+            .collect::<rusqlite::Result<Vec<_>>>()
+            .unwrap();
+        assert_eq!(
+            locators[0],
+            target.join("sources/image.png").to_string_lossy()
+        );
+        assert_eq!(locators[1], "/external/project");
+        assert_eq!(
+            std::fs::read(target.join("models/model.gguf")).unwrap(),
+            b"model"
+        );
+        assert!(source.join("meet.db").exists());
+        assert!(target.join("settings_store.json").exists());
+        std::fs::write(target.join("settings_store.json"), b"new CASE settings").unwrap();
+        crate::branding::migrate_directory(&source, &target, None).unwrap();
+        assert_eq!(
+            std::fs::read(target.join("settings_store.json")).unwrap(),
+            b"new CASE settings"
+        );
+        assert_eq!(
+            serde_json::from_str::<KeyboardImplementation>("\"handy_keys\"").unwrap(),
+            KeyboardImplementation::NativeKeys
+        );
+    }
+
+    #[test]
+    fn case_import_resumes_ready_stage_without_overwriting_existing_data() {
+        let dir = tempfile::tempdir().unwrap();
+        let source = dir.path().join("previous");
+        let target = dir.path().join("case");
+        let stage = target.with_extension("case-import");
+        std::fs::create_dir_all(&target).unwrap();
+        std::fs::write(target.join("settings_store.json"), b"already installed").unwrap();
+        crate::branding::migrate_directory(&source, &target, None).unwrap();
+        assert_eq!(
+            std::fs::read(target.join("settings_store.json")).unwrap(),
+            b"already installed"
+        );
+        std::fs::create_dir_all(&stage).unwrap();
+        std::fs::write(stage.join(".ready"), b"ready").unwrap();
+        std::fs::write(stage.join("model.gguf"), b"remaining file").unwrap();
+        crate::branding::migrate_directory(&source, &target, None).unwrap();
+        assert_eq!(
+            std::fs::read(target.join("model.gguf")).unwrap(),
+            b"remaining file"
+        );
+        assert_eq!(
+            std::fs::read(target.join("settings_store.json")).unwrap(),
+            b"already installed"
+        );
+        assert!(!stage.exists());
+    }
+
+    /// A CASE-era store must keep the user's provider, key, model, and
     /// shortcut combo, and must not keep dictation bindings registered.
     #[test]
-    fn handy_era_settings_keep_provider() {
+    fn legacy_settings_keep_provider() {
         let stored = serde_json::json!({
             "settings_schema_version": 2,
             "bindings": {

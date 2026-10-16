@@ -147,7 +147,7 @@ Commit `feat: capture system audio as speaker them alongside the microphone`.
 
 ### Task 6a: Strings and transcript rendering (Lane E)
 
-- i18n: `meetings.transcript.them: "Them"`, `meetings.capture.systemAudioUnavailable: "System audio is unavailable; transcribing your microphone only. {{message}}"`, `meetings.capture.systemAudioHint: "On macOS, allow Meet Assist under System Settings, Privacy & Security, Screen & System Audio Recording, then end and start the meeting again."`, `settings.meeting.systemAudio.label: "Capture system audio"`, `settings.meeting.systemAudio.description: "Hear the other side of the call. Takes effect when the next meeting starts."` in en and 25 locales.
+- i18n: `meetings.transcript.them: "Them"`, `meetings.capture.systemAudioUnavailable: "System audio is unavailable; transcribing your microphone only. {{message}}"`, `meetings.capture.systemAudioHint: "On macOS, allow CASE under System Settings, Privacy & Security, Screen & System Audio Recording, then end and start the meeting again."`, `settings.meeting.systemAudio.label: "Capture system audio"`, `settings.meeting.systemAudio.description: "Hear the other side of the call. Takes effect when the next meeting starts."` in en and 25 locales.
 - `TranscriptThread.tsx`: render `speaker === "them"` with label `meetings.transcript.them` and a second colour (`text-text/70` label), `me` as before.
 - `MeetingAssistantSettings.tsx`: add the `meeting_system_audio_enabled` toggle.
 

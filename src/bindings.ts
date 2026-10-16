@@ -392,9 +392,9 @@ async getAvailableAccelerators() : Promise<AvailableAccelerators> {
 /**
  * Start key recording mode
  */
-async startHandyKeysRecording(bindingId: string) : Promise<Result<null, string>> {
+async startNativeKeysRecording(bindingId: string) : Promise<Result<null, string>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("start_handy_keys_recording", { bindingId }) };
+    return { status: "ok", data: await TAURI_INVOKE("start_native_keys_recording", { bindingId }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -403,9 +403,9 @@ async startHandyKeysRecording(bindingId: string) : Promise<Result<null, string>>
 /**
  * Stop key recording mode
  */
-async stopHandyKeysRecording() : Promise<Result<null, string>> {
+async stopNativeKeysRecording() : Promise<Result<null, string>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("stop_handy_keys_recording") };
+    return { status: "ok", data: await TAURI_INVOKE("stop_native_keys_recording") };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -491,7 +491,7 @@ async openAppDataDir() : Promise<Result<null, string>> {
 },
 /**
  * Initialize keyboard shortcuts.
- * The frontend calls this once onboarding is done. If the optional handy-keys
+ * The frontend calls this once onboarding is done. If the optional native-keys
  * backend can't start (on macOS it needs Accessibility), this falls back to
  * the Tauri global shortcut, which needs no permission.
  * This is idempotent - calling it multiple times is safe.
@@ -1111,7 +1111,7 @@ export type ImplementationChangeResult = { success: boolean;
 reset_bindings: string[] }
 export type Intervention = { id: number; session_id: number; ts: number; kind: string; text: string; reason: string; dismissed: boolean }
 export type InterventionPayload = { meeting_id: number; intervention: Intervention }
-export type KeyboardImplementation = "tauri" | "handy_keys"
+export type KeyboardImplementation = "tauri" | "native_keys"
 /**
  * Request format an LLM endpoint speaks. Built-in providers have a
  * fixed format; only the custom provider lets the user change it.
@@ -1176,7 +1176,7 @@ export type MeetingTitledPayload = { meeting_id: number; title: string }
 export type ModelInfo = { id: string; name: string; description: string; filename: string; source: ModelSource; size_mb: number; is_downloaded: boolean; is_downloading: boolean; partial_size: number; is_directory: boolean; engine_type: EngineType; accuracy_score: number; speed_score: number; supports_translation: boolean; is_recommended: boolean; supported_languages: string[]; supports_language_selection: boolean; is_custom: boolean; supports_streaming: boolean; supports_language_detection: boolean }
 export type ModelLoadStatus = { is_loaded: boolean; current_model: string | null }
 /**
- * Where a model comes from and how Handy obtains it — the routing discriminant
+ * Where a model comes from and how CASE obtains it — the routing discriminant
  * for downloading and on-disk resolution.
  */
 export type ModelSource = 
@@ -1266,7 +1266,7 @@ export type SourceStatus = "pending" | "ready" | "failed"
 export type SourceStatusPayload = { source: Source }
 /**
  * UI appearance mode. `System` follows the OS `prefers-color-scheme`; `Light`
- * and `Dark` force one of the two palettes Handy already ships.
+ * and `Dark` force one of the two palettes CASE already ships.
  */
 export type Theme = "system" | "light" | "dark"
 export type TranscribeAcceleratorSetting = "auto" | "cpu" | "gpu"

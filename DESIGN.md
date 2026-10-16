@@ -1,5 +1,5 @@
 ---
-name: Meet Assist
+name: CASE
 description: A private meeting copilot whose meetings read as quiet documents on a zinc ground.
 colors:
   accent: "oklch(0.55 0.19 255)"
@@ -165,13 +165,13 @@ components:
     height: "48px"
 ---
 
-# Design System: Meet Assist
+# Design System: CASE
 
 ## Overview
 
 **Creative North Star: "The Quiet Notebook"**
 
-A meeting is a document, not a record. Meet Assist sets every meeting as a centered page with a serif title, read top to bottom: agenda, nudges, notes, and the transcript last. The shell around it is a near-silent zinc ground: a slightly tinted sidebar, a white (or near-black) canvas, hairlines drawn in text-alpha rather than gray, and almost nothing raised off the page. It is a reading surface between calls, not a dashboard.
+A meeting is a document, not a record. CASE sets every meeting as a centered page with a serif title, read top to bottom: agenda, nudges, notes, and the transcript last. The shell around it is a near-silent zinc ground: a slightly tinted sidebar, a white (or near-black) canvas, hairlines drawn in text-alpha rather than gray, and almost nothing raised off the page. It is a reading surface between calls, not a dashboard.
 
 Density is calm and editorial. One 720px column, generous 40px breaks between document sections, and 14px UI type with 15px reading type. Color is nearly absent: the one blue accent marks only what is alive or yours (a running meeting, focus, selection, your lines in the transcript, an undismissed nudge). Actions are carried by an inverted neutral button, so the accent never has to compete with a call to action.
 
@@ -340,5 +340,9 @@ A separate small window: canvas background, 12px padding, 16px radius, hairline 
 - **Don't** put shadows on in-page cards; only the dock, toasts, tooltips, and menus float.
 - **Don't** use the serif for body, buttons, or section headings.
 - **Don't** add uppercase tracked eyebrows or kickers above titles; headings are sentence case.
-- **Don't** write color literals in components; the old Handy pink (#FAA2CA) is not part of this system.
+- **Don't** write color literals in components; pink is not part of the approved CASE palette.
 - **Don't** arrange the main pane as grouped boxes in a narrow settings column; meetings and spaces are documents.
+
+## CASE identity
+
+CASE is uppercase and is not an acronym. The shared mark in `src/components/icons/Wordmark.tsx` is two curved strokes with an offset dot. `src/assets/brand/case-mark.svg` is the standalone vector master; `case-app.svg` supplies the blue app icon. Native tray variants live in `src-tauri/resources/brand/`. The mark inherits `currentColor` in the interface, using the existing `text-accent` token from `src/styles/theme.css`; packaging uses the approved blue icon artwork. Keep the existing Newsreader wordmark and titles, DM Sans interface, and JetBrains Mono utility type.

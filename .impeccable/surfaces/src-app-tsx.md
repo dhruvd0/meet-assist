@@ -5,7 +5,7 @@ primary_target: "src/App.tsx"
 related_targets: ["src/components/Sidebar.tsx"]
 ---
 
-# Surface: Meet Assist main window
+# Surface: CASE main window
 
 Mode: Operate. Scope: app shell (sidebar, home, space, meeting document, settings), onboarding, intervention card.
 

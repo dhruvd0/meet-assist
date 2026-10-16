@@ -1,24 +1,20 @@
 import React from "react";
 
-/** Meet Assist mark: a speech bubble holding a three-bar level. */
+/** CASE mark: two conversational strokes and a private signal. */
 export const Mark: React.FC<{ className?: string }> = ({ className = "" }) => (
-  <svg viewBox="0 0 20 20" className={className} aria-hidden="true" fill="none">
+  <svg viewBox="8 5 50 50" className={className} aria-hidden="true" fill="none">
     <path
-      d="M4 2.5h12A2.5 2.5 0 0 1 18.5 5v7A2.5 2.5 0 0 1 16 14.5H9.2L5.4 17.6a.6.6 0 0 1-1-.47V14.5H4A2.5 2.5 0 0 1 1.5 12V5A2.5 2.5 0 0 1 4 2.5Z"
-      fill="currentColor"
-      opacity="0.16"
-    />
-    <path
-      d="M7 7v3.5M10 5.5V12M13 7.5V10"
+      d="M18 42V26c0-9 6-14 14-14M34 42V30c0-6 4-10 10-10"
       stroke="currentColor"
-      strokeWidth="1.6"
+      strokeWidth="9"
       strokeLinecap="round"
     />
+    <circle cx="48" cy="47" r="5" fill="currentColor" />
   </svg>
 );
 
 /** The product name is not translated. */
-const NAME = "Meet Assist";
+const NAME = "CASE";
 
 /** Product name set beside the mark. */
 export const Wordmark: React.FC<{ className?: string; size?: "sm" | "lg" }> = ({

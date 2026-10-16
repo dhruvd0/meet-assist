@@ -1,4 +1,4 @@
-//! Shared shortcut event handling for the Tauri and handy-keys backends.
+//! Shared shortcut event handling for the Tauri and native-keys backends.
 
 use log::warn;
 use tauri::AppHandle;

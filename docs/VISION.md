@@ -1,8 +1,8 @@
-# Meet Assist Vision
+# CASE Vision
 
-Meet Assist is a private meeting copilot. It sits on your machine, listens to the call you are on, and speaks up only to you when it has something worth saying.
+CASE is a private meeting copilot. It sits on your machine, listens to the call you are on, and speaks up only to you when it has something worth saying.
 
-It is a fork of [Handy](https://github.com/cjpais/Handy), the open source offline dictation app. Handy supplies the audio capture, voice activity detection, and local speech-to-text engine. Meet Assist is meeting-only: the dictation features were removed.
+CASE combines local audio capture, voice activity detection, and speech recognition with a project-aware meeting assistant. It is a meeting-only application.
 
 ## The problem
 
@@ -10,10 +10,10 @@ Calls drift. The same point gets restated three times with no decision. Someone 
 
 Meeting bots that join the call as a participant are intrusive, record everyone, and ship audio to someone else's server. Note takers summarize after the fact when it is too late to help.
 
-## What Meet Assist does
+## What CASE does
 
 - **Listens** to both sides of a call: your microphone and the system audio of remote participants.
-- **Transcribes** locally with the same models Handy uses. Each line is tagged as you or them.
+- **Transcribes** locally using local speech models. Each line is tagged as you or them.
 - **Watches** the recent conversation on a short timer and asks a language model one question: is there a reason to speak up right now?
 - **Beeps and shows a card**, only to you, when the answer is yes. Four kinds of nudge: the conversation is looping, someone is stuck, a quick fact is needed, or an idea is worth raising.
 - **Remembers** meetings as threads. End a meeting today, continue it tomorrow, and the assistant carries a rolling summary forward. Ending a session writes a session summary, then merges it into the meeting's rolling summary.
@@ -24,7 +24,7 @@ Meeting bots that join the call as a participant are intrusive, record everyone,
 1. **Private by default.** Nothing leaves the machine unless you point the assistant at a cloud model. Local models through Ollama or LM Studio are first-class.
 2. **Speak only when useful.** Silence is the default answer. A nudge that interrupts flow is worse than none.
 3. **Only you hear it.** The assistant never speaks into the call. You decide whether to say it out loud.
-4. **Reuse Handy's engine.** Transcription, models, and audio capture come from Handy. Dictation output (paste, post-processing, history) was removed; the global shortcut starts and ends meetings.
+4. **Reuse the speech engine.** Transcription, models, and audio capture share one implementation. Dictation output (paste, post-processing, history) was removed; the global shortcut starts and ends meetings.
 5. **Notes-first look.** t3.codes tokens (zinc neutrals, one blue accent, DM Sans, Newsreader titles, JetBrains Mono) in a Granola-style shell: spaces in the sidebar, a home feed by day, each meeting as a document. See [DESIGN.md](../DESIGN.md).
 
 ## Non-goals for v1
@@ -40,9 +40,9 @@ Meeting bots that join the call as a participant are intrusive, record everyone,
 
 | Platform | Microphone capture | System audio capture                                                                                        |
 | -------- | ------------------ | ----------------------------------------------------------------------------------------------------------- |
-| macOS    | Working (Handy)    | Working. CoreAudio process tap on the default output (14.2+); asks for the "Audio capture" permission once. |
-| Windows  | Working (Handy)    | Built, WASAPI loopback. Not yet verified.                                                                   |
-| Linux    | Working (Handy)    | Built, PulseAudio monitor source. Not yet verified.                                                         |
+| macOS    | Working (CASE)     | Working. CoreAudio process tap on the default output (14.2+); asks for the "Audio capture" permission once. |
+| Windows  | Working (CASE)     | Built, WASAPI loopback. Not yet verified.                                                                   |
+| Linux    | Working (CASE)     | Built, PulseAudio monitor source. Not yet verified.                                                         |
 
 Where system audio is unavailable (older macOS, permission denied, or a default output that is also an input, such as a headset in call mode, which is refused to avoid capturing your own voice as "them"), a meeting runs microphone-only and a banner says so. System audio can also be switched off in settings.
 

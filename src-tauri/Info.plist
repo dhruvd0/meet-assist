@@ -3,8 +3,8 @@
 <plist version="1.0">
 <dict>
   <key>NSMicrophoneUsageDescription</key>
-  <string>Request microphone access to transcribe audio locally</string>
+  <string>CASE needs microphone access to transcribe your voice locally.</string>
   <key>NSAudioCaptureUsageDescription</key>
-  <string>Capture the audio of your calls so the assistant can transcribe the other participants locally.</string>
+  <string>CASE captures call audio to transcribe the other participants locally.</string>
 </dict>
 </plist>

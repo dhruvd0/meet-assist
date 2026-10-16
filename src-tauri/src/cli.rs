@@ -2,7 +2,7 @@ use clap::Parser;
 use std::path::PathBuf;
 
 #[derive(Parser, Debug, Clone, Default)]
-#[command(name = "meet-assist", about = "Meet Assist - private meeting copilot")]
+#[command(name = "case", about = "CASE - private meeting companion")]
 pub struct CliArgs {
     /// Start with the main window hidden
     #[arg(long)]

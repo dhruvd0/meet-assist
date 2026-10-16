@@ -3,7 +3,7 @@
   "configVersion": 0,
   "workspaces": {
     "": {
-      "name": "handy-app",
+      "name": "case",
       "dependencies": {
         "@fontsource-variable/dm-sans": "^5.3.0",
         "@fontsource-variable/jetbrains-mono": "^5.3.0",

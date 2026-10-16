@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CASE — logo explorations</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: var(--font-sans, Arial, sans-serif);
+        color: var(--foreground, #22241f);
+      }
+      section {
+        padding: 18px 0 24px;
+        border-top: 1px solid var(--border, #d8d5cc);
+      }
+      .heading {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 16px;
+        margin: 0 0 12px;
+      }
+      h2 {
+        font-size: 17px;
+        font-weight: 500;
+        margin: 0;
+      }
+      .label {
+        font-size: 12px;
+        color: var(--muted-foreground, #777);
+      }
+      img {
+        display: block;
+        width: 100%;
+        height: auto;
+        border-radius: var(--radius, 10px);
+      }
+      p {
+        font-size: 13px;
+        line-height: 1.5;
+        color: var(--muted-foreground, #777);
+        margin: 10px 0 0;
+      }
+      footer {
+        font-size: 12px;
+        color: var(--muted-foreground, #777);
+        padding: 0 0 16px;
+      }
+      @media (max-width: 450px) {
+        .heading {
+          align-items: flex-start;
+        }
+        .label {
+          max-width: 135px;
+          text-align: right;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <section>
+      <div class="heading">
+        <h2>01 · Typographic</h2>
+        <span class="label">Industrial / confident</span>
+      </div>
+      <img
+        src="01-typographic.png"
+        alt="CASE custom geometric wordmark with an amber joint in the C, shown on light and dark app icons"
+      />
+      <p>A custom wordmark that gives the C a second life as the app icon.</p>
+    </section>
+    <section>
+      <div class="heading">
+        <h2>02 · Articulated</h2>
+        <span class="label">Recommended for refinement</span>
+      </div>
+      <img
+        src="02-articulated.png"
+        alt="CASE segmented geometric C symbol with an amber connecting piece and a restrained sans serif wordmark"
+      />
+      <p>
+        An independent symbol built from connected segments. The clearest
+        expression of a practical companion.
+      </p>
+    </section>
+    <section>
+      <div class="heading">
+        <h2>03 · Editorial</h2>
+        <span class="label">Bookish / composed</span>
+      </div>
+      <img
+        src="03-editorial.png"
+        alt="CASE uppercase serif wordmark with an open C monogram and a short amber marginal stroke"
+      />
+      <p>
+        A calmer, more literary identity that relates to the existing
+        notebook-style interface.
+      </p>
+    </section>
+    <footer>
+      Exploratory image mockups generated with imagegen. Production vector
+      artwork and app assets are a separate refinement step.
+    </footer>
+  </body>
+</html>

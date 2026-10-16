@@ -44,7 +44,7 @@ pub fn create_intervention_window(app: &AppHandle) {
 #[cfg(not(target_os = "macos"))]
 pub(crate) fn create_floating(app: &AppHandle, label: &str, url: &str, width: f64, height: f64) {
     let mut builder = WebviewWindowBuilder::new(app, label, tauri::WebviewUrl::App(url.into()))
-        .title("Meet Assist")
+        .title("CASE")
         .resizable(false)
         .inner_size(width, height)
         .shadow(true)
@@ -75,7 +75,7 @@ pub(crate) fn create_floating(app: &AppHandle, label: &str, url: &str, width: f6
 pub(crate) fn create_floating(app: &AppHandle, label: &str, url: &str, width: f64, height: f64) {
     match PanelBuilder::<_, InterventionPanel>::new(app, label)
         .url(WebviewUrl::App(url.into()))
-        .title("Meet Assist")
+        .title("CASE")
         .level(PanelLevel::Floating)
         .size(tauri::Size::Logical(tauri::LogicalSize { width, height }))
         .has_shadow(true)

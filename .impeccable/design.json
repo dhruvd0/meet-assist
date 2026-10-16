@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "generatedAt": "2026-10-15T00:00:00Z",
-  "title": "Design System: Meet Assist",
+  "title": "Design System: CASE",
   "extensions": {
     "colorMeta": {
       "accent": {
@@ -564,7 +564,7 @@
   ],
   "narrative": {
     "northStar": "The Quiet Notebook",
-    "overview": "A meeting is a document, not a record. Meet Assist sets every meeting as a centered page with a serif title, read top to bottom: agenda, nudges, notes, and the transcript last. The shell around it is a near-silent zinc ground: a slightly tinted sidebar, a white (or near-black) canvas, hairlines drawn in text-alpha rather than gray, and almost nothing raised off the page. It is a reading surface between calls, not a dashboard.\n\nDensity is calm and editorial. One 720px column, generous 40px breaks between document sections, and 14px UI type with 15px reading type. Color is nearly absent: the one blue accent marks only what is alive or yours (a running meeting, focus, selection, your lines in the transcript, an undismissed nudge). Actions are carried by an inverted neutral button, so the accent never has to compete with a call to action.\n\nThe live meeting is the one thing allowed to float. The live dock, a pill at the foot of the canvas with a pulsing level meter, timer, pause, and end, sits above every page while a meeting runs; it is the system's signature and its only persistent elevated object.",
+    "overview": "A meeting is a document, not a record. CASE sets every meeting as a centered page with a serif title, read top to bottom: agenda, nudges, notes, and the transcript last. The shell around it is a near-silent zinc ground: a slightly tinted sidebar, a white (or near-black) canvas, hairlines drawn in text-alpha rather than gray, and almost nothing raised off the page. It is a reading surface between calls, not a dashboard.\n\nDensity is calm and editorial. One 720px column, generous 40px breaks between document sections, and 14px UI type with 15px reading type. Color is nearly absent: the one blue accent marks only what is alive or yours (a running meeting, focus, selection, your lines in the transcript, an undismissed nudge). Actions are carried by an inverted neutral button, so the accent never has to compete with a call to action.\n\nThe live meeting is the one thing allowed to float. The live dock, a pill at the foot of the canvas with a pulsing level meter, timer, pause, and end, sits above every page while a meeting runs; it is the system's signature and its only persistent elevated object.",
     "keyCharacteristics": [
       "Zinc neutrals in matched light and dark pairs; both themes are first-class and follow the OS unless forced.",
       "One blue accent, reserved for live state, focus, selection, and \"you\".",
@@ -628,7 +628,7 @@
       "Don't put shadows on in-page cards; only the dock, toasts, tooltips, and menus float.",
       "Don't use the serif for body, buttons, or section headings.",
       "Don't add uppercase tracked eyebrows or kickers above titles; headings are sentence case.",
-      "Don't write color literals in components; the old Handy pink (#FAA2CA) is not part of this system.",
+      "Don't write color literals in components; the old CASE pink (#FAA2CA) is not part of this system.",
       "Don't arrange the main pane as grouped boxes in a narrow settings column; meetings and spaces are documents."
     ]
   }

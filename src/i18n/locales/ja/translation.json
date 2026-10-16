@@ -79,7 +79,9 @@
       "errors": {
         "add": "Could not add source.",
         "remove": "Could not remove source.",
-        "reindex": "Could not re-index source."
+        "reindex": "Could not re-index source.",
+        "load": "Could not load sources.",
+        "pick": "Could not open the picker: {{error}}"
       },
       "digestLabel": "Digest",
       "digestByModel": "Summarized by {{model}}",
@@ -89,8 +91,10 @@
       "load": "Could not load projects.",
       "create": "Could not create project.",
       "delete": "Could not delete project.",
-      "save": "Could not save."
-    }
+      "save": "Could not save.",
+      "notFound": "This project no longer exists."
+    },
+    "meetingsEmpty": "No meetings in this space yet."
   },
   "meetings": {
     "title": "Meetings",
@@ -125,7 +129,14 @@
       "empty": "Nothing transcribed yet. Say something.",
       "session": "Session {{n}}",
       "me": "You",
-      "them": "Them"
+      "them": "Them",
+      "show_one": "Show {{count}} line",
+      "show_other": "Show {{count}} lines",
+      "hide": "Hide",
+      "playLine": "Play this line",
+      "pauseLine": "Pause",
+      "playAll": "Play recording",
+      "stopAll": "Stop"
     },
     "errors": {
       "load": "Could not load meetings.",
@@ -133,7 +144,8 @@
       "control": "Could not change the meeting state.",
       "save": "Could not save.",
       "delete": "Could not delete the meeting.",
-      "capture": "Microphone stopped delivering audio."
+      "capture": "Microphone stopped delivering audio.",
+      "notFound": "This meeting no longer exists."
     },
     "intervention": {
       "kind": {
@@ -146,7 +158,11 @@
       "open": "Open meeting",
       "timeline": "Assistant nudges",
       "empty": "No nudges yet.",
-      "dismissed": "Dismissed"
+      "dismissed": "Dismissed",
+      "errors": {
+        "dismiss": "Couldn't dismiss: {{error}}",
+        "open": "Couldn't open the meeting: {{error}}"
+      }
     },
     "observer": {
       "toolsUnavailable": "This provider does not support tools; the assistant answers from the transcript only.",
@@ -158,7 +174,12 @@
         "unsupported_provider": "{{detail}} cannot run the meeting assistant. Choose another provider in Assistant.",
         "missing_api_key": "No API key for {{detail}}. Add one in Assistant.",
         "no_model": "No model is selected for {{detail}}. Pick one in Assistant."
-      }
+      },
+      "listening": "AI is listening",
+      "pausedListening": "AI is paused with the meeting",
+      "lastCheck": "checked {{time}}",
+      "firstCheck": "First check runs once someone speaks.",
+      "nudged": "Nudged:"
     },
     "summary": {
       "title": "Summary",
@@ -170,11 +191,48 @@
       "none": "No summary yet.",
       "retry": "Retry",
       "generating": "Generating summary...",
-      "failed": "Summary could not be read."
+      "failed": "Summary could not be read.",
+      "failedToGenerate": "The summary could not be generated.",
+      "efficiency": {
+        "title": "How the time was used",
+        "none": "No time lost to circles, arguments or tangents.",
+        "minutes_one": "~{{count}} min",
+        "minutes_other": "~{{count}} min",
+        "kind": {
+          "circle": "Going in circles",
+          "argument": "Pointless argument",
+          "tangent": "Tangent",
+          "repetition": "Repetition",
+          "recurring": "Recurring"
+        },
+        "acrossSpace": "Space history: still unsettled from earlier conversations"
+      }
     },
     "capture": {
       "systemAudioUnavailable": "System audio is unavailable; transcribing your microphone only. {{message}}",
-      "systemAudioHint": "On macOS, allow Meet Assist under System Settings, Privacy & Security, Screen & System Audio Recording, then end and start the meeting again."
+      "systemAudioHint": "On macOS, allow CASE under System Settings, Privacy & Security, Screen & System Audio Recording, then end and start the meeting again."
+    },
+    "filing": {
+      "project": "Space",
+      "unfiled": "Unfiled",
+      "byAssistant": "Filed by assistant",
+      "pending": "Assistant will file this soon",
+      "pickProject": "Unfiled · pick a project",
+      "card": {
+        "title": "Filed by assistant",
+        "filedInto": "Filed into {{project}} as “{{title}}”",
+        "created": "Created {{project}} and filed “{{title}}”",
+        "change": "Change",
+        "undo": "Undo",
+        "undoFailed": "Couldn't undo: {{error}}"
+      }
+    },
+    "start": "Start meeting",
+    "dock": {
+      "label": "Current meeting",
+      "recording": "Recording",
+      "aiListening": "AI listening",
+      "open": "Open meeting"
     }
   },
   "onboarding": {
@@ -336,9 +394,12 @@
     "assistant": {
       "provider": {
         "title": "AI provider",
-        "description": "The model Meet Assist uses for nudges, summaries, and image digests.",
+        "description": "The model CASE uses for nudges, summaries, and image digests.",
         "test": {
-          "button": "Test connection"
+          "button": "Test connection",
+          "testing": "Testing…",
+          "ok": "Replied “{{reply}}” in {{seconds}} s.",
+          "failure": "Failed: {{error}}"
         },
         "select": {
           "title": "プロバイダー",
@@ -361,7 +422,8 @@
         "apiKey": {
           "title": "API キー",
           "description": "選択したプロバイダーの API キー。",
-          "placeholder": "sk-…"
+          "placeholder": "sk-…",
+          "bundledPlaceholder": "Using the built-in key. Paste your own to replace it."
         },
         "model": {
           "title": "モデル",
@@ -389,7 +451,7 @@
       },
       "rescan": {
         "label": "再スキャン",
-        "tooltip": "Meet Assist を使わずに models フォルダーまたは Hugging Face キャッシュに追加されたモデルを再スキャンします"
+        "tooltip": "CASE を使わずに models フォルダーまたは Hugging Face キャッシュに追加されたモデルを再スキャンします"
       },
       "noModelsMatch": "このフィルターに一致するモデルがありません。"
     },
@@ -451,11 +513,11 @@
       },
       "autostart": {
         "label": "起動時に実行",
-        "description": "コンピューターにログインしたときに Meet Assist を自動的に起動。"
+        "description": "コンピューターにログインしたときに CASE を自動的に起動。"
       },
       "showTrayIcon": {
         "label": "トレイアイコンを表示",
-        "description": "システムトレイに Meet Assist のアイコンを表示します。"
+        "description": "システムトレイに CASE のアイコンを表示します。"
       },
       "translateToEnglish": {
         "label": "英語に翻訳",
@@ -532,8 +594,8 @@
       },
       "updateChecks": {
         "label": "アップデートを確認",
-        "description": "Meet Assist の新しいバージョンを自動的にチェック",
-        "lockedDescription": "システム設定により無効化されています (HANDY_DISABLE_UPDATER)"
+        "description": "CASE の新しいバージョンを自動的にチェック",
+        "lockedDescription": "システム設定により無効化されています (CASE_DISABLE_UPDATER)"
       },
       "whatsNewPreview": {
         "title": "新機能をプレビュー",
@@ -559,7 +621,9 @@
       "keyboardImplementation": {
         "title": "キーボード実装",
         "description": "キーボードショートカットのバックエンドを選択してください。",
-        "bindingsReset": "キーボードショートカットに互換性がなかったため、デフォルトにリセットされました"
+        "bindingsReset": "キーボードショートカットに互換性がなかったため、デフォルトにリセットされました",
+        "systemLabel": "System shortcuts",
+        "nativeLabel": "Native shortcuts"
       },
       "paths": {
         "appData": "アプリデータ:",
@@ -571,32 +635,27 @@
       "title": "概要",
       "version": {
         "title": "バージョン",
-        "description": "Meet Assist の現在のバージョン"
+        "description": "CASE の現在のバージョン"
       },
       "whatsNewUpdates": {
         "label": "新機能を表示",
-        "description": "Meet Assist のアップデート後にリリースノートを表示"
+        "description": "CASE のアップデート後にリリースノートを表示"
       },
       "appDataDirectory": {
         "title": "アプリデータディレクトリ",
-        "description": "Meet Assist がデータを保存する場所"
+        "description": "CASE がデータを保存する場所"
       },
       "sourceCode": {
         "title": "ソースコード",
         "description": "ソースコードを見て貢献する",
         "button": "GitHub で見る"
       },
-      "supportDevelopment": {
-        "title": "開発を支援",
-        "description": "Handy の開発を支援してください",
-        "button": "寄付する"
-      },
       "acknowledgments": {
         "title": "謝辞",
         "ggml": {
           "title": "ggml",
           "description": "オンデバイス機械学習推論のための高性能テンソルライブラリ",
-          "details": "Meet Assist のローカルの音声からテキストへの文字起こしは transcribe.cpp と ggml を基盤としています。Georgi Gerganov 氏と貢献者の皆様の素晴らしい仕事に感謝します。"
+          "details": "CASE uses transcribe.cpp and ggml for local speech recognition. Built with open-source software; copyright and license notices are included with the source."
         }
       }
     },
@@ -625,6 +684,10 @@
       "systemAudio": {
         "label": "Capture system audio",
         "description": "Hear the other side of the call. Takes effect when the next meeting starts."
+      },
+      "maxLine": {
+        "label": "Longest transcript line",
+        "description": "Seconds of non-stop speech before it is cut into a new line. Lower values give the assistant new lines, and so checks, more often during long monologues, but may split a sentence. Takes effect when the next meeting starts."
       }
     }
   },
@@ -644,7 +707,7 @@
     "portableUpdateBrowseButton": "GitHub Releases を開く"
   },
   "whatsNew": {
-    "title": "Meet Assist v{{version}} の新機能"
+    "title": "CASE v{{version}} の新機能"
   },
   "common": {
     "loading": "読み込み中…",
@@ -661,18 +724,34 @@
     "meetingToggleFailedTitle": "Couldn't start the meeting",
     "micPermissionDenied": {
       "windows": "設定 → プライバシーとセキュリティ → マイク(デスクトップアプリのアクセスを含む)でマイクへのアクセスを有効にしてください。",
-      "macos": "Enable microphone access for Meet Assist in System Settings → Privacy & Security → Microphone."
+      "macos": "Enable microphone access for CASE in System Settings → Privacy & Security → Microphone."
     },
     "modelLoadFailed": "モデルの読み込みに失敗しました: {{model}}",
-    "modelLoadFailedUnknown": "不明なモデル"
+    "modelLoadFailedUnknown": "不明なモデル",
+    "settingSaveFailed": "Couldn't save the setting: {{error}}",
+    "modelListFailed": "Couldn't load the provider's models: {{error}}",
+    "settingsLoadFailed": "Couldn't load settings: {{error}}",
+    "devicesLoadFailed": "Couldn't list audio devices: {{error}}",
+    "soundTestFailed": "Couldn't play the sound: {{error}}",
+    "openFolderFailed": "Couldn't open the folder: {{error}}",
+    "updateCheckFailed": "Couldn't check for updates: {{error}}",
+    "updateInstallFailed": "Couldn't install the update: {{error}}",
+    "models": {
+      "load": "Couldn't load models: {{error}}",
+      "rescan": "Couldn't rescan models: {{error}}",
+      "select": "Couldn't switch model: {{error}}",
+      "cancel": "Couldn't cancel the download: {{error}}",
+      "delete": "Couldn't delete the model: {{error}}",
+      "download": "Couldn't download the model: {{error}}"
+    }
   },
   "appLanguage": {
     "title": "アプリの言語",
-    "description": "Meet Assist インターフェースの言語を変更"
+    "description": "CASE インターフェースの言語を変更"
   },
   "theme": {
     "title": "アプリのテーマ",
-    "description": "Meet Assist をシステムのテーマに合わせるか、ライトまたはダークで固定するかを選択します",
+    "description": "CASE をシステムのテーマに合わせるか、ライトまたはダークで固定するかを選択します",
     "options": {
       "system": "システム",
       "light": "ライト",
@@ -682,5 +761,24 @@
   "secureInput": {
     "learnMore": "解決方法",
     "recorderBlocked": "現在ショートカットを記録できません。macOS の Secure Input がキーイベントをブロックしています。先に Secure Input の警告を解消してください。"
+  },
+  "nav": {
+    "label": "Main",
+    "home": "Home",
+    "spaces": "Spaces",
+    "newSpace": "New space",
+    "spacesEmpty": "The assistant creates spaces as it files your meetings. Add one yourself with +.",
+    "settings": "Settings",
+    "back": "Back"
+  },
+  "home": {
+    "title": "Home",
+    "idleTitle": "Nothing recording",
+    "idleHintBefore": "Press",
+    "idleHintAfter": "anywhere to start. The assistant files it into a space once it knows the topic.",
+    "idleHintNoShortcut": "Start here or from the tray. The assistant files the meeting into a space once it knows the topic.",
+    "startedAt": "Started {{time}}",
+    "openNotes": "Open notes",
+    "empty": "Meetings you record show up here, grouped by day."
   }
 }

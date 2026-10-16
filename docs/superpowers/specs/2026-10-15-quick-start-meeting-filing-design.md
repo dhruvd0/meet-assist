@@ -7,7 +7,7 @@ Status: Draft, awaiting review
 
 Pressing the shortcut should start recording at once, with no project to pick. Once the meeting has enough transcript, the assistant files it into the right project (or a new one) and gives it a real title. From then on the observer has that project's brief and sources for the rest of the meeting. The user never has to file meetings by hand, but can always see what the assistant did and change or undo it.
 
-This is sub-project 2 of the transition described in [2026-10-14-handy-to-meet-assist-transition-design.md](2026-10-14-handy-to-meet-assist-transition-design.md#sub-project-context). It replaces the interim "start in the most recently used project" shortcut behaviour.
+This is sub-project 2 of the transition described in [2026-10-14-application-transition-design.md](2026-10-14-application-transition-design.md#sub-project-context). It replaces the interim "start in the most recently used project" shortcut behaviour.
 
 ## Decisions
 

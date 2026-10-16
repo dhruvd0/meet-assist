@@ -1,12 +1,12 @@
-# Contributing to Meet Assist
+# Contributing to CASE
 
-Meet Assist is a private meeting copilot forked from [Handy](https://github.com/cjpais/Handy). Thanks for helping.
+CASE is a private meeting companion. Thanks for helping.
 
 ## Where things stand
 
 Read [docs/VISION.md](docs/VISION.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). The meeting subsystem is built from the spec in `docs/superpowers/specs/` through plans in `docs/superpowers/plans/`. If you want to change the direction, propose a spec edit first.
 
-Dictation is inherited from Handy and kept working. Bug fixes there are welcome; consider sending them upstream too.
+Audio capture, models, and transcription share one engine. Fixes to these dependencies are welcome; include upstream references when appropriate.
 
 ## Setup
 
@@ -15,8 +15,8 @@ Dictation is inherited from Handy and kept working. Bug fixes there are welcome;
 - Platform build tools, see [BUILD.md](BUILD.md)
 
 ```bash
-git clone git@github.com:dhruvd0/meet-assist.git
-cd meet-assist
+git clone git@github.com:dhruvd0/case.git
+cd case
 bun install
 mkdir -p src-tauri/resources/models
 curl -L -o src-tauri/resources/models/silero-vad-v6.2-F32.gguf https://huggingface.co/handy-computer/silero-vad-v6.2-gguf/resolve/main/silero-vad-v6.2-F32.gguf

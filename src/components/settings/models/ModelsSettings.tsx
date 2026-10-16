@@ -280,7 +280,7 @@ export const ModelsSettings: React.FC = () => {
               {t("settings.models.yourModels")}
             </h2>
             <div className="flex items-center gap-2">
-              {/* Rescan local sources for models added outside Handy */}
+              {/* Rescan local sources for models added outside CASE */}
               <button
                 type="button"
                 onClick={() => rescanLocalModels()}

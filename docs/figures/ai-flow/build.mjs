@@ -1,4 +1,4 @@
-// Fig: the Meet Assist observer as a transcript deck.
+// Fig: the CASE observer as a transcript deck.
 //   node docs/figures/ai-flow/build.mjs [--light]
 // Needs the anatomy skill kit at ~/.claude/skills/anatomy.
 import { readFileSync, writeFileSync } from "node:fs";
@@ -951,7 +951,7 @@ draw();
 
 const page = k.plateHtml({
   fig: "Fig 1",
-  title: "How Meet Assist listens",
+  title: "How CASE listens",
   hint: "Hover to scrub the meeting · ← → step one tick",
   readout: S0.readout,
   keys: [
@@ -983,7 +983,7 @@ const name = theme === "light" ? "ai-flow-light.html" : "ai-flow.html";
 writeFileSync(
   join(HERE, name),
   k.pageHtml({
-    title: "How Meet Assist listens",
+    title: "How CASE listens",
     theme,
     body: page,
     script: kitScript() + live,

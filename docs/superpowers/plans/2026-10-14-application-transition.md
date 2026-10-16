@@ -1,21 +1,21 @@
-# Handy to Meet Assist Transition Implementation Plan
+# CASE to CASE Transition Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Remove Handy's dictation product (paste output, post-processing, dictation recorder, history, overlay, accessibility) and most tests, repurpose the shortcut to toggle meetings, and give the AI provider an always-visible Assistant page.
+**Goal:** Remove CASE's dictation product (paste output, post-processing, dictation recorder, history, overlay, accessibility) and most tests, repurpose the shortcut to toggle meetings, and give the AI provider an always-visible Assistant page.
 
 **Architecture:** Mostly deletion, guided by the compiler. Meetings already use their own capture (`meeting/capture.rs`, `meeting/system_capture.rs`) and only borrow two helpers from `managers/audio.rs` (`create_capture_vad`, `microphone_config`). The dictation recorder, coordinator, actions, paste, and history go entirely. One new module, `meeting/toggle.rs`, owns the shortcut, tray, CLI, and signal entry point for start/end. Settings keep their store with serde aliases and a schema-3 migration.
 
 **Tech Stack:** Rust (Tauri 2, tauri-specta, serde), React + TypeScript, Zustand, i18next, Bun.
 
-**Spec:** `docs/superpowers/specs/2026-10-14-handy-to-meet-assist-transition-design.md`
+**Spec:** `docs/superpowers/specs/2026-10-14-application-transition-design.md`
 
 ## Global Constraints
 
-- Branch: `feat/meet-assist-transition`. Commit after each task with conventional prefixes (`feat:`, `fix:`, `refactor:`, `chore:`, `docs:`), message about _why_, ending with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
+- Branch: `feat/case-transition`. Commit after each task with conventional prefixes (`feat:`, `fix:`, `refactor:`, `chore:`, `docs:`), message about _why_, ending with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 - Test policy: no new tests except `handy_era_settings_keep_provider`. Exactly 7 Rust tests remain at the end (listed in Task 1).
 - Every task ends green on: `cd src-tauri && cargo clippy --all-targets -- -D warnings && cargo test`, plus `bun run build && bun run lint` once frontend files are touched.
-- Do not rename crates or internal identifiers like `handy-recorder` or `handy_keys`.
+- Do not rename crates or internal identifiers like `handy-recorder` or `native_keys`.
 - No new UI primitives. Reuse `components/ui` (`SettingsGroup`, `SettingContainer`, `ToggleSwitch`, `Dropdown`, `Input`, `Button`).
 - All user-facing strings go through i18next. New keys go in `src/i18n/locales/en/translation.json` only.
 - Settings store compatibility: an old store must load without losing the provider, API keys, models, selected model, microphone, language, custom words, or meeting settings.
@@ -24,7 +24,7 @@
 
 ## Review Focus
 
-1. **Stored Handy bindings.** An old store has `transcribe`, `transcribe_with_post_process`, `cancel` in `bindings`. The load path merges defaults but never prunes, so stale ids would be registered as global shortcuts with no handler, and `escape` would stay grabbed. Expected: only `toggle_meeting` exists after load, carrying the user's old `transcribe` key combo. Pinned by `handy_era_settings_keep_provider` (Task 4).
+1. **Stored CASE bindings.** An old store has `transcribe`, `transcribe_with_post_process`, `cancel` in `bindings`. The load path merges defaults but never prunes, so stale ids would be registered as global shortcuts with no handler, and `escape` would stay grabbed. Expected: only `toggle_meeting` exists after load, carrying the user's old `transcribe` key combo. Pinned by `handy_era_settings_keep_provider` (Task 4).
 2. **Assistant on with no usable provider.** Expected: the toggle stays on and the page shows the backend readiness message (missing key, model, or provider). It doesn't re-derive the rule in TypeScript. Checked in Task 5's manual step.
 3. **Shortcut pressed while a meeting is paused.** `MeetingManager::state().meeting_id` is `Some` for live _and_ paused meetings. Expected: the shortcut ends it. Pinned by the `toggle` match in Task 2.
 4. **Shortcut with no projects and no meetings.** Expected: the main window opens on Projects. No meeting with a dangling project is created. Task 2.
@@ -119,7 +119,7 @@ Expected: success.
 ```bash
 git add -A && git commit -m "chore: cut tests to a data-safety core
 
-UI, end-to-end and most unit tests guarded Handy's dictation behaviour
+UI, end-to-end and most unit tests guarded CASE's dictation behaviour
 and slowed changes; typecheck, clippy and six store/summary tests stay.
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
@@ -348,7 +348,7 @@ Manual: `bun run tauri dev` (on macOS add `CMAKE_POLICY_VERSION_MINIMUM=3.5` if 
 ```bash
 git add -A && git commit -m "feat: toggle meetings from the shortcut, tray, CLI
 
-Meet Assist's main action is starting a meeting; give it the global
+CASE's main action is starting a meeting; give it the global
 shortcut and tray entry that dictation used to own.
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
@@ -415,7 +415,7 @@ In `commands/audio.rs`, delete `update_microphone_mode`, `get_microphone_mode`, 
 `shortcut/handler.rs` becomes:
 
 ```rust
-//! Shared shortcut event handling for the Tauri and handy-keys backends.
+//! Shared shortcut event handling for the Tauri and native-keys backends.
 
 use log::warn;
 use tauri::AppHandle;
@@ -484,7 +484,7 @@ pub fn setup_signal_handler(app_handle: AppHandle) {
 
 - [ ] **Step 5: Drop Enigo and the clipboard plugin if unused**
 
-`grep -rn "enigo\|clipboard_manager\|tauri_plugin_clipboard" src-tauri/src`. If the only hits are in `lib.rs` plugin registration, remove `.plugin(tauri_plugin_clipboard_manager::init())` and the `enigo`, `tauri-plugin-clipboard-manager` entries from `Cargo.toml`. Do the same for any other dependency `cargo machete` or a grep shows unused (`rdev` stays if `handy_keys` uses it). Remove the matching JS packages from `package.json` only if `grep -rn "@tauri-apps/plugin-clipboard-manager" src` is empty.
+`grep -rn "enigo\|clipboard_manager\|tauri_plugin_clipboard" src-tauri/src`. If the only hits are in `lib.rs` plugin registration, remove `.plugin(tauri_plugin_clipboard_manager::init())` and the `enigo`, `tauri-plugin-clipboard-manager` entries from `Cargo.toml`. Do the same for any other dependency `cargo machete` or a grep shows unused (`rdev` stays if `native_keys` uses it). Remove the matching JS packages from `package.json` only if `grep -rn "@tauri-apps/plugin-clipboard-manager" src` is empty.
 
 - [ ] **Step 6: Verify**
 
@@ -536,7 +536,7 @@ Add to `settings.rs`:
 mod tests {
     use super::*;
 
-    /// A Handy-era store must keep the user's provider, key, model, and
+    /// A CASE-era store must keep the user's provider, key, model, and
     /// shortcut combo, and must not keep dictation bindings registered.
     #[test]
     fn handy_era_settings_keep_provider() {
@@ -658,7 +658,7 @@ Set `const CURRENT_SETTINGS_SCHEMA_VERSION: u32 = 3;`. In `apply_settings_migrat
 
 ```rust
     if stored_schema_version < 3 {
-        // Meet Assist has one provider. A dedicated meeting provider, if the
+        // CASE has one provider. A dedicated meeting provider, if the
         // user picked one, was the one meetings actually used.
         if let Some(id) = settings_value
             .get("meeting_provider_id")
@@ -830,7 +830,7 @@ Add i18n keys under `settings` in `en/translation.json`:
 "assistant": {
   "provider": {
     "title": "AI provider",
-    "description": "The model Meet Assist uses for nudges, summaries, and image digests.",
+    "description": "The model CASE uses for nudges, summaries, and image digests.",
     "test": {
       "button": "Test connection",
       "ok": "Connected. {{count}} models available."
@@ -922,7 +922,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 Replace principle 4 with:
 
 ```markdown
-4. **Reuse Handy's engine.** Transcription, models, and audio capture come from Handy. Dictation output (paste, post-processing, history) was removed; the global shortcut starts and ends meetings.
+4. **Reuse CASE's engine.** Transcription, models, and audio capture come from CASE. Dictation output (paste, post-processing, history) was removed; the global shortcut starts and ends meetings.
 ```
 
 Delete any other "Dictation keeps working" sentence.
@@ -936,7 +936,7 @@ Delete the dictation pipeline section and diagram. Add a short "Entry points" pa
 - Replace "Backend Structure" with the remaining modules. Remove `history.rs`, `signal_handle.rs`'s `send_transcription_input()` reference, and the overlay.
 - Replace "Application Flow" with: start minimized, onboarding (model, assistant), shortcut toggles a meeting, transcript plus observer nudges, summary on end.
 - CLI table: replace `--toggle-transcription`, `--toggle-post-process`, `--cancel` with `--toggle-meeting`.
-- Under "GitHub workflow", change the upstream-sync bullet to "Engine, audio, and model fixes from Handy are welcome; dictation-output changes no longer apply."
+- Under "GitHub workflow", change the upstream-sync bullet to "Engine, audio, and model fixes from CASE are welcome; dictation-output changes no longer apply."
 - Add under "Code Style": "**Tests:** typecheck, clippy, lint, and the 7 data-safety tests (settings migration, store, summary). Do not add UI, end-to-end, or unit tests outside that core."
 
 - [ ] **Step 4: Full verification**
@@ -960,7 +960,7 @@ Manual checklist from the spec's Verification section:
 - [ ] **Step 5: Commit**
 
 ```bash
-git add -A && git commit -m "docs: describe Meet Assist as a meeting-only product
+git add -A && git commit -m "docs: describe CASE as a meeting-only product
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
