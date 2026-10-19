@@ -531,6 +531,8 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           CASE_OPENROUTER_KEY: ${{ secrets.CASE_OPENROUTER_KEY || secrets.MEET_ASSIST_OPENROUTER_KEY }}
+          CASE_JEV_KEY: ${{ secrets.CASE_JEV_KEY || secrets.JEV_API_KEY }}
+          CASE_GROQ_KEY: ${{ secrets.CASE_GROQ_KEY || secrets.GROQ_API_KEY }}
         run: |
           export_if_set() {
             for name in "$@"; do
@@ -541,8 +543,7 @@ jobs:
           }
           # Updater bundles are signed whenever the key exists.
           export_if_set TAURI_SIGNING_PRIVATE_KEY TAURI_SIGNING_PRIVATE_KEY_PASSWORD
-          # Compiled into the app as its default OpenRouter key.
-          export_if_set CASE_OPENROUTER_KEY
+          export_if_set CASE_OPENROUTER_KEY CASE_JEV_KEY CASE_GROQ_KEY
           if [[ "$SIGN_BINARIES" == "true" ]]; then
             export_if_set APPLE_ID APPLE_ID_PASSWORD APPLE_PASSWORD APPLE_TEAM_ID \
               APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD \

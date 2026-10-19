@@ -8,6 +8,7 @@ import {
   X,
 } from "lucide-react";
 import type { Intervention } from "@/bindings";
+import { NudgeText } from "./NudgeText";
 import { useMeetingStore } from "@/stores/meetingStore";
 
 const ICON: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -67,11 +68,10 @@ export const InterventionTimeline: React.FC<{
                   }).format(iv.ts)}
                 </span>
               </div>
-              <p
-                className={`mt-0.5 whitespace-pre-line ${compact ? "text-[13.5px] leading-[1.45rem]" : "text-[14.5px] leading-6"} ${iv.dismissed ? "text-muted" : "text-text"}`}
-              >
-                {iv.text}
-              </p>
+              <NudgeText
+                text={iv.text}
+                className={`mt-0.5 ${compact ? "text-[13.5px] leading-[1.45rem]" : "text-[14.5px] leading-6"} ${iv.dismissed ? "text-muted" : "text-text"}`}
+              />
             </div>
             {!iv.dismissed && (
               <button

@@ -20,6 +20,12 @@ export const ObserverStatus: React.FC<{ recording: boolean }> = ({
 }) => {
   const { t, i18n } = useTranslation();
   const thoughts = useMeetingStore((s) => s.observer.thoughts);
+  const hasTranscript = useMeetingStore(
+    (s) =>
+      s.live.session_id !== null &&
+      (s.detail?.lines.some((line) => line.session_id === s.live.session_id) ??
+        false),
+  );
   const now = useNow(recording);
   const newest = [...thoughts].reverse();
   const clock = new Intl.DateTimeFormat(i18n.language, {
@@ -54,7 +60,13 @@ export const ObserverStatus: React.FC<{ recording: boolean }> = ({
         )}
       </div>
       {newest.length === 0 ? (
-        <p className="mt-1.5 text-faint">{t("meetings.observer.firstCheck")}</p>
+        <p className="mt-1.5 text-faint">
+          {t(
+            hasTranscript
+              ? "meetings.observer.awaitingAssessment"
+              : "meetings.observer.firstCheck",
+          )}
+        </p>
       ) : (
         <ul className="mt-2 space-y-1.5">
           {newest.map((th, i) => (

@@ -6,7 +6,7 @@ import type { ModelOption } from "./types";
 import type { DropdownOption } from "../../../ui/Dropdown";
 
 type LlmProviderState = {
-  /** The empty OpenRouter key field falls back to the build's bundled key. */
+  /** An empty key field falls back to the provider's bundled key. */
   usesBundledKey: boolean;
   providerOptions: DropdownOption[];
   selectedProviderId: string;
@@ -191,12 +191,23 @@ export const useLlmProviderState = (): LlmProviderState => {
 
   // No automatic fetching - user must click refresh button
 
-  // Builds made with a key fall back to it when the OpenRouter field is empty.
   const [bundledKey, setBundledKey] = useState(false);
   useEffect(() => {
-    commands.hasBundledLlmKey().then(setBundledKey, () => setBundledKey(false));
-  }, []);
-  const usesBundledKey = bundledKey && selectedProviderId === "openrouter";
+    let active = true;
+    setBundledKey(false);
+    commands.hasBundledLlmKey(selectedProviderId).then(
+      (available) => {
+        if (active) setBundledKey(available);
+      },
+      () => {
+        if (active) setBundledKey(false);
+      },
+    );
+    return () => {
+      active = false;
+    };
+  }, [selectedProviderId]);
+  const usesBundledKey = bundledKey && !apiKey.trim();
 
   return {
     usesBundledKey,

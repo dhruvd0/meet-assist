@@ -4,6 +4,7 @@ import { commands, type ObserverReadiness } from "@/bindings";
 import { useSettings } from "../../../hooks/useSettings";
 import { ProviderSettings } from "./provider";
 import { AssistantBehaviour } from "./AssistantBehaviour";
+import { LiveTesterLauncher } from "../../meetings/LiveTesterLauncher";
 
 /** Provider first, behaviour second: one page, one pass. */
 export const AssistantSettings: React.FC = () => {
@@ -35,6 +36,7 @@ export const AssistantSettings: React.FC = () => {
       )}
       <ProviderSettings />
       <AssistantBehaviour />
+      <LiveTesterLauncher ready={ready} />
     </div>
   );
 };

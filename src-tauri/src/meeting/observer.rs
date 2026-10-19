@@ -2,8 +2,10 @@
 //! question with a small base prompt and tool access; emit at most one
 //! intervention per cooldown window.
 
+use super::tester::TesterTraceKind;
 use crate::audio_feedback;
 use crate::llm_client::{self, ToolLoopError};
+use crate::meeting::jev::{GateMode, JevDetector};
 use crate::meeting::session::MeetingManager;
 use crate::meeting::store::{
     Intervention, Meeting, MeetingRecap, ObserverCheck, ProjectStore, TranscriptLine,
@@ -37,6 +39,8 @@ pub const EARLIER_MIN_LINES: i64 = 20;
 pub const RECAP_MAX_CHARS: usize = 1500;
 /// Bound both catch-up work and the durable model-written ledger.
 pub const CATCHUP_LINES: usize = 100;
+const MEMORY_FLOOR_LINES: usize = 40;
+const MEMORY_FLOOR_MS: i64 = 90_000;
 pub const LEDGER_ITEMS: usize = 12;
 pub const LEDGER_ITEM_CHARS: usize = 240;
 
@@ -134,9 +138,12 @@ impl History {
 pub const CARD_TEXT_MAX_CHARS: usize = 100;
 /// Max characters of a "loop" card: a "Circle:" line naming the topic,
 /// then a checklist, `LOOP_MAX_LINES` lines in all.
-pub const LOOP_TEXT_MAX_CHARS: usize = 200;
+pub const LOOP_TEXT_MAX_CHARS: usize = 280;
 pub const LOOP_MAX_LINES: usize = 4;
 /// Consecutive judge failures after which the observer slows down.
+/// Seconds between ticks while Jev gates checks. The model still runs at
+/// most once per configured interval.
+pub const JEV_TICK_SECS: u64 = 2;
 pub const BACKOFF_AFTER_FAILURES: u32 = 5;
 /// Interval multiplier while backing off.
 pub const BACKOFF_FACTOR: u64 = 4;
@@ -188,12 +195,14 @@ pub fn parse_verdict(text: &str) -> Result<Verdict, String> {
         .or_else(|| t.strip_prefix("```"))
         .unwrap_or(t);
     let t = t.strip_suffix("```").unwrap_or(t).trim();
-    // Models sometimes wrap the object in prose; keep the outermost braces.
-    let t = match (t.find('{'), t.rfind('}')) {
-        (Some(a), Some(b)) if a < b => &t[a..=b],
-        _ => t,
-    };
-    serde_json::from_str::<Verdict>(t).map_err(|e| format!("verdict parse: {e}"))
+    // Models sometimes wrap the object in prose or repeat it; take the first
+    // object and ignore what follows.
+    let t = t.find('{').map_or(t, |a| &t[a..]);
+    serde_json::Deserializer::from_str(t)
+        .into_iter::<Verdict>()
+        .next()
+        .unwrap_or_else(|| serde_json::from_str::<Verdict>(t))
+        .map_err(|e| format!("verdict parse: {e}"))
 }
 
 /// Truncate to at most `max` characters (never splitting a character).
@@ -241,8 +250,23 @@ impl Readiness {
 }
 
 fn is_local(provider: &LlmProvider) -> bool {
-    let u = provider.base_url.to_ascii_lowercase();
-    u.contains("localhost") || u.contains("127.0.0.1")
+    let Ok(url) = reqwest::Url::parse(&provider.base_url) else {
+        return false;
+    };
+    let Some(host) = url.host_str() else {
+        return false;
+    };
+    let host = host.trim_start_matches('[').trim_end_matches(']');
+    if host == "localhost" || host.ends_with(".localhost") {
+        return true;
+    }
+    match host.parse::<std::net::IpAddr>() {
+        Ok(std::net::IpAddr::V4(ip)) => ip.is_loopback(),
+        Ok(std::net::IpAddr::V6(ip)) => {
+            ip.is_loopback() || ip.to_ipv4_mapped().is_some_and(|ip| ip.is_loopback())
+        }
+        Err(_) => false,
+    }
 }
 
 pub fn readiness(settings: &AppSettings) -> Readiness {
@@ -315,6 +339,9 @@ impl Judge for LlmJudge {
         allow_tools: bool,
     ) -> Result<Verdict, JudgeError> {
         let settings = crate::settings::get_settings(&self.app);
+        if readiness(&settings) != Readiness::Ready {
+            return Err(JudgeError::Other("assistant not ready".into()));
+        }
         let provider = settings
             .llm_provider()
             .cloned()
@@ -438,6 +465,11 @@ pub struct ObserverState {
     pub last_error: Option<String>,
     /// The last `THOUGHTS_KEPT` verdicts, oldest first.
     pub thoughts: Vec<ObserverThought>,
+    /// Last line Jev scored without flagging; Jev is not asked again until
+    /// someone speaks.
+    pub jev_through: i64,
+    /// When the model last ran, to cap model calls at the check interval.
+    pub last_judge_ms: i64,
 }
 
 /// One judged window: the model's reason, and whether it nudged.
@@ -528,23 +560,42 @@ pub fn card_text(kind: &str, text: &str) -> String {
     } else {
         (1, CARD_TEXT_MAX_CHARS)
     };
-    let lines: Vec<&str> = text
+    let mut out = String::new();
+    // Keep whole lines only: a checklist cut mid-line reads as broken.
+    for line in text
         .lines()
         .map(str::trim)
         .filter(|l| !l.is_empty())
         .take(max_lines)
-        .collect();
-    truncate_chars(&lines.join("\n"), max_chars).0.to_string()
+    {
+        let sep = usize::from(!out.is_empty());
+        if out.chars().count() + sep + line.chars().count() > max_chars {
+            break;
+        }
+        if sep == 1 {
+            out.push('\n');
+        }
+        out.push_str(line);
+    }
+    if out.is_empty() {
+        let first = text.trim().lines().next().unwrap_or_default();
+        return truncate_chars(first, max_chars).0.to_string();
+    }
+    out
 }
 
 pub fn tick(
     store: &ProjectStore,
     judge: &dyn Judge,
+    detector: &JevDetector,
     mm: &MeetingManager,
     settings: &AppSettings,
     state: &mut ObserverState,
     now_ms: i64,
 ) -> Result<Option<Intervention>> {
+    if readiness(settings) != Readiness::Ready || !mm.is_live() {
+        return Ok(None);
+    }
     let st = mm.state();
     let (Some(meeting_id), Some(session_id)) = (st.meeting_id, st.session_id) else {
         return Ok(None);
@@ -562,6 +613,10 @@ pub fn tick(
         return Ok(None);
     };
     let judged_through = last_line.id;
+    let memory_due = batch.len() >= MEMORY_FLOOR_LINES
+        || batch
+            .first()
+            .is_some_and(|line| now_ms.saturating_sub(line.ts) >= MEMORY_FLOOR_MS);
     // Rebuild memory in order after downtime, without nudging about stale talk.
     let catching_up = judged_through < latest || last_line.ts < now_ms - WINDOW_MS;
 
@@ -585,7 +640,7 @@ pub fn tick(
     lines.extend(batch);
     lines.sort_by_key(|l| l.id);
     lines.dedup_by_key(|l| l.id);
-    let input = build_prompt(
+    let mut input = build_prompt(
         &brief,
         &history,
         &meeting.context,
@@ -594,18 +649,47 @@ pub fn tick(
         settings.meeting_sensitivity,
         !state.tools_unavailable,
     );
+    let judge_gap_ms = i64::from(settings.meeting_observer_interval_secs.clamp(10, 120)) * 1000;
+    if now_ms.saturating_sub(state.last_judge_ms) < judge_gap_ms {
+        return Ok(None);
+    }
+    let jev_active = !catching_up && super::jev::eligible(settings);
+    if jev_active && latest <= state.jev_through {
+        return Ok(None);
+    }
+    let mode = if catching_up {
+        mm.trace_tester(
+            session_id,
+            TesterTraceKind::DetectorBypassed {
+                reason: "Catching up on older transcript evidence without nudging".into(),
+            },
+        );
+        GateMode::Evaluate { hint: None }
+    } else {
+        detector.decide(&input.user, memory_due, mm, session_id)
+    };
+    if matches!(mode, GateMode::Deferred) {
+        state.jev_through = latest;
+        return Ok(None);
+    }
+    state.last_judge_ms = now_ms;
+    if !detector.assistant_ready() || !mm.is_live() || mm.state().session_id != Some(session_id) {
+        return Ok(None);
+    }
+    mode.instruct(&mut input.system);
     let ctx = ToolContext {
         store: Arc::new(store.clone_handle()),
         project_id: meeting.project_id,
         meeting_id,
     };
 
+    mm.trace_tester(session_id, TesterTraceKind::Judging);
     let verdict = match judge.judge(&input, &ctx, !state.tools_unavailable) {
         Ok(v) => v,
         Err(JudgeError::ToolsRejected) => {
             warn!("observer: provider rejected tools; falling back without tools");
             state.tools_unavailable = true;
-            let input = build_prompt(
+            let mut input = build_prompt(
                 &brief,
                 &history,
                 &meeting.context,
@@ -614,11 +698,20 @@ pub fn tick(
                 settings.meeting_sensitivity,
                 false,
             );
+            mode.instruct(&mut input.system);
+            mm.trace_tester(
+                session_id,
+                TesterTraceKind::Error {
+                    message: "Provider rejected tools; retrying without tools".into(),
+                },
+            );
+            mm.trace_tester(session_id, TesterTraceKind::Judging);
             match judge.judge(&input, &ctx, false) {
                 Ok(v) => v,
                 Err(e) => {
                     state.consecutive_failures += 1;
                     state.last_error = Some(short_error(&format!("{e:?}")));
+                    mm.trace_tester(session_id, TesterTraceKind::Error { message: "Main model request failed after retrying without tools. See assistant status.".into() });
                     warn!("observer: judge failed after fallback: {e:?}");
                     return Ok(None);
                 }
@@ -627,6 +720,12 @@ pub fn tick(
         Err(e) => {
             state.consecutive_failures += 1;
             state.last_error = Some(short_error(&format!("{e:?}")));
+            mm.trace_tester(
+                session_id,
+                TesterTraceKind::Error {
+                    message: "Main model request failed. See assistant status.".into(),
+                },
+            );
             warn!("observer: judge failed: {e:?}");
             return Ok(None);
         }
@@ -634,8 +733,11 @@ pub fn tick(
     let current = mm.state();
     let suppression = if catching_up {
         Some(("catching_up", 0))
-    } else if current.session_id != Some(session_id) || !mm.is_live() {
+    } else if current.session_id != Some(session_id) || !mm.is_live() || !detector.assistant_ready()
+    {
         Some(("inactive_session", 0))
+    } else if matches!(mode, GateMode::Memory) {
+        Some(("jev_quiet", 0))
     } else {
         suppression_reason(&verdict, now_ms, &recent)
     };
@@ -656,6 +758,14 @@ pub fn tick(
         context_json: serde_json::to_string(&verdict.live_context.bounded())?,
     };
     let iv = store.save_observer_check(&check)?;
+    mm.trace_tester(
+        session_id,
+        TesterTraceKind::Judged {
+            outcome: outcome.into(),
+            reason: check.reason.clone(),
+            remaining_ms,
+        },
+    );
     state.consecutive_failures = 0;
     state.last_error = None;
     info!("observer: meeting={meeting_id} session={session_id} through_line={judged_through} outcome={outcome} remaining_ms={remaining_ms} kind={:?} candidate={:?} reason={}", check.kind, check.text, check.reason);
@@ -700,17 +810,44 @@ pub fn spawn_observer(
     mm: Arc<MeetingManager>,
     judge: Arc<dyn Judge>,
 ) {
+    let (wake_tx, wake_rx) = std::sync::mpsc::sync_channel(1);
+    mm.install_observer_wake(wake_tx);
     let _ = std::thread::Builder::new()
         .name("meet-observer".into())
         .spawn(move || {
+            let detector = JevDetector::new(app.clone());
             let mut state = ObserverState::default();
             let mut last_meeting: Option<i64> = None;
             let mut last_status: Option<ObserverStatusPayload> = None;
             loop {
                 let settings = crate::settings::get_settings(&app);
-                let interval = settings.meeting_observer_interval_secs.clamp(10, 120) as u64;
+                let interval = if super::jev::eligible(&settings) {
+                    JEV_TICK_SECS
+                } else {
+                    settings.meeting_observer_interval_secs.clamp(10, 120) as u64
+                };
                 let delay = tick_delay_secs(interval, state.consecutive_failures);
-                std::thread::sleep(std::time::Duration::from_secs(delay));
+                let backoff = state.consecutive_failures >= BACKOFF_AFTER_FAILURES;
+                mm.set_observer_backoff(backoff);
+                let deadline = std::time::Instant::now() + std::time::Duration::from_secs(delay);
+                loop {
+                    let wait = deadline.saturating_duration_since(std::time::Instant::now());
+                    match wake_rx.recv_timeout(wait) {
+                        Ok((mid, sid)) => {
+                            let current = mm.state();
+                            if !backoff
+                                && current.meeting_id == Some(mid)
+                                && current.session_id == Some(sid)
+                                && current.input_mode
+                                    == Some(super::store::MeetingInputMode::TextTester)
+                                && mm.is_live()
+                            {
+                                break;
+                            }
+                        }
+                        Err(_) => break,
+                    }
+                }
                 // Re-read: settings may have changed while sleeping.
                 let settings = crate::settings::get_settings(&app);
                 let st = mm.state();
@@ -747,7 +884,15 @@ pub fn spawn_observer(
                     mm.maybe_file_live(mid);
                 }
                 let now = chrono::Utc::now().timestamp_millis();
-                match tick(&store, judge.as_ref(), &mm, &settings, &mut state, now) {
+                match tick(
+                    &store,
+                    judge.as_ref(),
+                    &detector,
+                    &mm,
+                    &settings,
+                    &mut state,
+                    now,
+                ) {
                     Ok(Some(iv)) => {
                         if settings.meeting_beep_enabled {
                             audio_feedback::play_alert_sound(&app);
@@ -765,6 +910,16 @@ pub fn spawn_observer(
                     Err(e) => {
                         state.consecutive_failures += 1;
                         state.last_error = Some(short_error(&format!("{e:#}")));
+                        if let Some(sid) = st.session_id {
+                            mm.trace_tester(
+                                sid,
+                                TesterTraceKind::Error {
+                                    message:
+                                        "Assistant check could not complete. See assistant status."
+                                            .into(),
+                                },
+                            );
+                        }
                         warn!("observer: outcome=check_failed error={e:#}");
                     }
                 }

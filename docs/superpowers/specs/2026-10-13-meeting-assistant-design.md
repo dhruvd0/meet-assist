@@ -222,3 +222,11 @@ Session summary prompt: decisions, open questions, action items, three-line reca
 6. Summaries, image digests, continue flow polish, onboarding step.
 
 Status (2026-10-14): all six delivered and merged to `main`. Plans live in `docs/superpowers/plans/`. Deviations: summaries run without tools; the onboarding step checks the provider only, system-audio permission is requested at the first meeting. Windows and Linux system audio are built but unverified on hardware.
+
+## Jev opportunity gate amendment, 2026-10-17
+
+The opt-in cloud assistant uses TypeSafe Jev to classify loop, stuck, info, and idea opportunities before the existing main model writes a nudge. The main model may reject a hint. Custom and local providers bypass Jev, even when their endpoint is on a LAN. Users can disable Jev or override its bundled credential. The assistant consent text names TypeSafe as a second recipient of bounded transcript evidence and context.
+
+Quiet detection leaves the durable observer cursor and ledger unchanged. At 40 pending lines or 90 seconds of oldest pending evidence, the main model refreshes the ledger and saves the real verdict while suppressing nudges with `jev_quiet`. Detector failures and oversized evidence fall through to the main model. Summaries, filing, and vision remain independent main-model calls. No hosted CASE backend, second ledger, or database migration is introduced.
+
+Build-time defaults use ring AES-256-GCM. Both ciphertext and decryption material ship in the app, so distributed credentials remain extractable. Own keys take precedence, and clearing an override restores the default.

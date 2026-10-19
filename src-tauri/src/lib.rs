@@ -2,6 +2,7 @@ mod audio_feedback;
 pub mod audio_toolkit;
 mod autostart;
 mod branding;
+mod bundled_keys;
 mod catalog;
 mod chinese_script;
 pub mod cli;
@@ -652,6 +653,9 @@ pub fn run(cli_args: CliArgs) {
             shortcut::fetch_llm_models,
             shortcut::ping_llm_model,
             shortcut::has_bundled_llm_key,
+            shortcut::has_bundled_jev_key,
+            shortcut::change_meeting_jev_setting,
+            shortcut::change_jev_api_key_setting,
             shortcut::update_custom_words,
             shortcut::suspend_all_bindings,
             shortcut::resume_all_bindings,
@@ -725,6 +729,10 @@ pub fn run(cli_args: CliArgs) {
             commands::meeting::list_meetings,
             commands::meeting::get_meeting_detail,
             commands::meeting::start_meeting,
+            commands::meeting::start_text_tester,
+            commands::meeting::append_tester_turn,
+            commands::meeting::request_tester_check,
+            commands::meeting::get_tester_trace,
             commands::meeting::pause_meeting,
             commands::meeting::resume_meeting,
             commands::meeting::end_meeting,
@@ -751,6 +759,7 @@ pub fn run(cli_args: CliArgs) {
             meeting::summary::SessionSummaryStatusPayload,
             meeting::observer::InterventionPayload,
             meeting::observer::ObserverStatusPayload,
+            meeting::tester::TesterTrace,
             meeting::filing::MeetingFiledPayload,
             meeting::filing::MeetingTitledPayload,
             commands::meeting::OpenMeetingPayload,

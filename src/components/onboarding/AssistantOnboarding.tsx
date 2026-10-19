@@ -27,7 +27,7 @@ export const AssistantOnboarding: React.FC<AssistantOnboardingProps> = ({
         <h2 className="text-xl font-semibold">
           {t("onboarding.assistant.title")}
         </h2>
-        <p className="text-muted">{t("onboarding.assistant.description")}</p>
+        <p className="text-muted">{t("meetings.jev.onboardingConsent")}</p>
       </div>
 
       <div className="max-w-xl w-full flex flex-col gap-3">

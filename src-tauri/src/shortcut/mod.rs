@@ -881,11 +881,42 @@ pub fn set_llm_provider(app: AppHandle, provider_id: String) -> Result<(), Strin
     Ok(())
 }
 
-/// Whether this build ships a default OpenRouter key.
+/// Whether this build ships a default key for the given provider.
 #[tauri::command]
 #[specta::specta]
-pub fn has_bundled_llm_key() -> bool {
-    !settings::BUNDLED_OPENROUTER_API_KEY.is_empty()
+pub fn has_bundled_llm_key(provider_id: String) -> bool {
+    crate::bundled_keys::for_provider(&provider_id).is_some()
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn has_bundled_jev_key() -> bool {
+    crate::bundled_keys::jev().is_some()
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn change_meeting_jev_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.meeting_jev_enabled = enabled;
+    settings::write_settings(&app, settings);
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn change_jev_api_key_setting(
+    app: AppHandle,
+    key_id: String,
+    api_key: String,
+) -> Result<(), String> {
+    if key_id != "jev" {
+        return Err("Unsupported opportunity detector key".into());
+    }
+    let mut settings = settings::get_settings(&app);
+    settings.llm_api_keys.insert(key_id, api_key);
+    settings::write_settings(&app, settings);
+    Ok(())
 }
 
 /// Reply to `ping_llm_model`: what the model said and how long it took.

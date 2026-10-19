@@ -102,6 +102,7 @@ static MIGRATIONS: &[M] = &[
         );
         CREATE INDEX observer_checks_session_idx ON observer_checks(session_id, ts);",
     ),
+    M::up("ALTER TABLE meetings ADD COLUMN input_mode TEXT NOT NULL DEFAULT 'audio' CHECK (input_mode IN ('audio', 'text_tester'));"),
 ];
 
 /// Durable result of a judged window, including candidates the backend suppressed.
@@ -687,8 +688,25 @@ impl MeetingStatus {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum MeetingInputMode {
+    Audio,
+    TextTester,
+}
+
+impl MeetingInputMode {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Audio => "audio",
+            Self::TextTester => "text_tester",
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, Type)]
 pub struct Meeting {
+    pub input_mode: MeetingInputMode,
     pub id: i64,
     pub project_id: Option<i64>,
     pub title: String,
@@ -744,12 +762,17 @@ pub const FILED_BY_AI: &str = "ai";
 pub const FILED_BY_USER: &str = "user";
 
 const MEETING_COLS: &str =
-    "id, project_id, title, created_at, updated_at, status, context, rolling_summary, filed_by";
+    "id, project_id, title, created_at, updated_at, status, context, rolling_summary, filed_by, input_mode";
 
 impl ProjectStore {
     fn map_meeting(row: &rusqlite::Row<'_>) -> rusqlite::Result<Meeting> {
         let status: String = row.get("status")?;
         Ok(Meeting {
+            input_mode: match row.get::<_, String>("input_mode")?.as_str() {
+                "audio" => MeetingInputMode::Audio,
+                "text_tester" => MeetingInputMode::TextTester,
+                _ => return Err(rusqlite::Error::InvalidQuery),
+            },
             id: row.get("id")?,
             project_id: row.get("project_id")?,
             title: row.get("title")?,
@@ -793,19 +816,30 @@ impl ProjectStore {
         Ok(())
     }
 
+    #[cfg(test)]
     pub fn create_meeting(&self, project_id: Option<i64>, title: &str) -> Result<Meeting> {
+        self.create_meeting_with_input(project_id, title, MeetingInputMode::Audio)
+    }
+
+    pub fn create_meeting_with_input(
+        &self,
+        project_id: Option<i64>,
+        title: &str,
+        input_mode: MeetingInputMode,
+    ) -> Result<Meeting> {
         let conn = self.conn()?;
         let ts = now();
         conn.execute(
-            "INSERT INTO meetings (project_id, title, created_at, updated_at, status, context)
-             VALUES (?1, ?2, ?3, ?3, 'live', '')",
-            params![project_id, title, ts],
+            "INSERT INTO meetings (project_id, title, created_at, updated_at, status, context, input_mode)
+             VALUES (?1, ?2, ?3, ?3, 'live', '', ?4)",
+            params![project_id, title, ts, input_mode.as_str()],
         )?;
         let id = conn.last_insert_rowid();
         if let Some(pid) = project_id {
             Self::touch_project(&conn, pid)?;
         }
         Ok(Meeting {
+            input_mode,
             id,
             project_id,
             title: title.to_string(),
@@ -1544,11 +1578,21 @@ mod tests {
             )
             .unwrap();
         }
-        let s = ProjectStore::open(path).unwrap();
+        let s = ProjectStore::open(path.clone()).unwrap();
         let meetings = s.list_meetings(None).unwrap();
         assert_eq!(meetings.len(), 1);
         assert_eq!(meetings[0].project_id, Some(1));
         assert_eq!(meetings[0].filed_by, None);
+        assert_eq!(meetings[0].input_mode, MeetingInputMode::Audio);
+        let test = s
+            .create_meeting_with_input(None, "Tester", MeetingInputMode::TextTester)
+            .unwrap();
+        drop(s);
+        let reopened = ProjectStore::open(path).unwrap();
+        assert_eq!(
+            reopened.get_meeting(test.id).unwrap().unwrap().input_mode,
+            MeetingInputMode::TextTester
+        );
     }
 
     #[test]

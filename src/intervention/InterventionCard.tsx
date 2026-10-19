@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
+import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import {
   Loader2,
   FolderInput,
@@ -11,6 +12,7 @@ import {
   Info,
   X,
 } from "lucide-react";
+import { NudgeText } from "@/components/meetings/NudgeText";
 
 type Intervention = {
   id: number;
@@ -47,6 +49,8 @@ const ICON: Record<string, React.ComponentType<{ className?: string }>> = {
 };
 
 const AUTO_HIDE_MS = 30_000;
+const WIDTH = 380;
+const MAX_HEIGHT = 320;
 
 export const InterventionCard: React.FC = () => {
   const { t } = useTranslation();
@@ -56,6 +60,24 @@ export const InterventionCard: React.FC = () => {
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
   const timer = useRef<number | null>(null);
+  const root = useRef<HTMLDivElement>(null);
+
+  // The window fits the card: a one-line nudge stays compact, a checklist
+  // gets the room it needs.
+  useEffect(() => {
+    const el = root.current;
+    if (!el) return;
+    const fit = () => {
+      const height = Math.min(Math.ceil(el.scrollHeight), MAX_HEIGHT);
+      getCurrentWindow()
+        .setSize(new LogicalSize(WIDTH, height))
+        .catch(console.error);
+    };
+    fit();
+    const observer = new ResizeObserver(fit);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [card]);
 
   const hide = async () => {
     if (timer.current) window.clearTimeout(timer.current);
@@ -172,7 +194,8 @@ export const InterventionCard: React.FC = () => {
 
   return (
     <div
-      className="h-screen w-screen p-3 bg-background text-text rounded-xl border border-line shadow-lg flex flex-col gap-2"
+      ref={root}
+      className="w-screen max-h-screen overflow-hidden px-3.5 pt-3 pb-2.5 bg-background text-text rounded-xl border border-line shadow-lg flex flex-col gap-1.5"
       onMouseEnter={() => (hovered.current = true)}
       onMouseLeave={() => (hovered.current = false)}
     >
@@ -189,15 +212,13 @@ export const InterventionCard: React.FC = () => {
           <X className="w-4 h-4" aria-hidden="true" />
         </button>
       </div>
-      <p className="text-sm leading-snug flex-1 overflow-hidden whitespace-pre-line">
-        {body}
-      </p>
+      <NudgeText text={body} className="text-[14px] leading-[1.4]" />
       {failure && (
         <p role="alert" className="text-xs text-error leading-snug">
           {failure}
         </p>
       )}
-      <div className="flex justify-end items-center gap-3">
+      <div className="flex justify-end items-center gap-3 pt-0.5">
         {busy && (
           <Loader2
             className="w-3.5 h-3.5 animate-spin text-faint"

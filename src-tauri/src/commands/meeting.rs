@@ -235,3 +235,38 @@ pub async fn summarize_session(mm: Mm<'_>, session_id: i64) -> Result<(), String
         .await
         .map_err(|e| e.to_string())?
 }
+
+#[tauri::command]
+#[specta::specta]
+pub async fn start_text_tester(mm: Mm<'_>) -> Result<Meeting, String> {
+    mm.start_text_tester().map_err(err)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn append_tester_turn(
+    mm: Mm<'_>,
+    meeting_id: i64,
+    session_id: i64,
+    speaker: crate::meeting::tester::TesterSpeaker,
+    text: String,
+) -> Result<crate::meeting::store::TranscriptLine, String> {
+    mm.append_tester_turn(meeting_id, session_id, speaker, text)
+        .map_err(err)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn request_tester_check(mm: Mm<'_>, meeting_id: i64, session_id: i64) -> Result<(), String> {
+    mm.request_tester_check(meeting_id, session_id).map_err(err)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn get_tester_trace(
+    mm: Mm<'_>,
+    meeting_id: i64,
+    session_id: i64,
+) -> Vec<crate::meeting::tester::TesterTrace> {
+    mm.tester_trace(meeting_id, session_id)
+}

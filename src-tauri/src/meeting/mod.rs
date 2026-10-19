@@ -6,6 +6,7 @@ pub mod chunk;
 pub mod echo;
 pub mod filing;
 pub mod indexer;
+pub mod jev;
 pub mod manager;
 pub mod observer;
 pub mod resample;
@@ -16,3 +17,5 @@ pub mod summary;
 pub mod system_capture;
 pub mod toggle;
 pub mod tools;
+
+pub mod tester;

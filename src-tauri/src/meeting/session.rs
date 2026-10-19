@@ -4,7 +4,9 @@
 use crate::managers::transcription::TranscriptionManager;
 use crate::meeting::capture::{Echo, MeetingCapture, Utterance};
 use crate::meeting::echo::EchoReference;
-use crate::meeting::store::{Meeting, MeetingStatus, ProjectStore, TranscriptLine};
+use crate::meeting::store::{
+    Meeting, MeetingInputMode, MeetingStatus, ProjectStore, TranscriptLine,
+};
 use crate::meeting::summary::{
     run_summary_job, SessionSummaryPayload, SessionSummaryStatusPayload, Summarizer,
 };
@@ -165,6 +167,7 @@ impl CaptureSource for CombinedCapture {
 
 #[derive(Clone, Debug, Serialize, Deserialize, Type, tauri_specta::Event)]
 pub struct MeetingStatePayload {
+    pub input_mode: Option<MeetingInputMode>,
     pub meeting_id: Option<i64>,
     pub session_id: Option<i64>,
     pub status: Option<MeetingStatus>,
@@ -189,13 +192,40 @@ pub struct MeetingCaptureWarningPayload {
 /// Shared so the failure ticker can poll the handle while `Active` owns it.
 type SharedCapture = Arc<Mutex<Option<Box<dyn CaptureHandle>>>>;
 
+struct AudioResources {
+    capture: SharedCapture,
+    worker: JoinHandle<()>,
+}
+
+enum ActiveInput {
+    Audio(Option<AudioResources>),
+    TextTester,
+}
+
+impl ActiveInput {
+    fn mode(&self) -> MeetingInputMode {
+        match self {
+            Self::Audio(_) => MeetingInputMode::Audio,
+            Self::TextTester => MeetingInputMode::TextTester,
+        }
+    }
+    fn take_audio(&mut self) -> (Option<SharedCapture>, Option<JoinHandle<()>>) {
+        match self {
+            Self::Audio(resources) => resources
+                .take()
+                .map(|r| (Some(r.capture), Some(r.worker)))
+                .unwrap_or((None, None)),
+            Self::TextTester => (None, None),
+        }
+    }
+}
+
 struct Active {
     meeting_id: i64,
     session_id: i64,
     project_id: Option<i64>,
     status: MeetingStatus,
-    capture: Option<SharedCapture>,
-    worker: Option<JoinHandle<()>>,
+    input: ActiveInput,
 }
 
 pub struct MeetingManager {
@@ -209,6 +239,10 @@ pub struct MeetingManager {
     transition: Mutex<()>,
     /// True while capture runs; keeps the transcription model warm.
     live: AtomicBool,
+    tester_traces: Mutex<std::collections::VecDeque<crate::meeting::tester::TesterTrace>>,
+    observer_wake: Mutex<Option<mpsc::SyncSender<(i64, i64)>>>,
+    observer_backoff: AtomicBool,
+    last_manual_check: Mutex<Option<Instant>>,
     app: Option<AppHandle>,
     summarizer: Option<Arc<dyn Summarizer>>,
     /// Serialises summary jobs: the rolling summary is a chain.
@@ -339,6 +373,10 @@ impl MeetingManager {
             active: Mutex::new(None),
             transition: Mutex::new(()),
             live: AtomicBool::new(false),
+            tester_traces: Mutex::new(std::collections::VecDeque::new()),
+            observer_wake: Mutex::new(None),
+            observer_backoff: AtomicBool::new(false),
+            last_manual_check: Mutex::new(None),
             app: Some(app.clone()),
             summarizer: Some(Arc::new(crate::meeting::summary::LlmSummarizer {
                 app: app.clone(),
@@ -461,6 +499,126 @@ impl MeetingManager {
         self.live.load(Ordering::SeqCst)
     }
 
+    pub fn captures_audio(&self) -> bool {
+        self.is_live()
+            && self
+                .lock_active()
+                .as_ref()
+                .is_some_and(|a| a.input.mode() == MeetingInputMode::Audio)
+    }
+
+    pub fn install_observer_wake(&self, tx: mpsc::SyncSender<(i64, i64)>) {
+        *lock(&self.observer_wake) = Some(tx);
+    }
+    pub fn set_observer_backoff(&self, backoff: bool) {
+        self.observer_backoff.store(backoff, Ordering::SeqCst);
+    }
+
+    fn validate_tester(&self, meeting_id: i64, session_id: i64) -> Result<()> {
+        if !self.lock_active().as_ref().is_some_and(|a| {
+            a.meeting_id == meeting_id
+                && a.session_id == session_id
+                && a.status == MeetingStatus::Live
+                && a.input.mode() == MeetingInputMode::TextTester
+        }) {
+            return Err(anyhow!("This text tester session is no longer live"));
+        }
+        Ok(())
+    }
+
+    pub fn request_tester_check(&self, meeting_id: i64, session_id: i64) -> Result<()> {
+        let _t = lock(&self.transition);
+        self.validate_tester(meeting_id, session_id)?;
+        if self.observer_backoff.load(Ordering::SeqCst) {
+            return Err(anyhow!(
+                "The assistant is backing off after provider errors. Wait for its next check."
+            ));
+        }
+        let mut last = lock(&self.last_manual_check);
+        if last.is_some_and(|at| at.elapsed() < Duration::from_secs(10)) {
+            return Err(anyhow!("Wait ten seconds between checks"));
+        }
+        let guard = lock(&self.observer_wake);
+        let tx = guard
+            .as_ref()
+            .ok_or_else(|| anyhow!("Observer unavailable"))?;
+        match tx.try_send((meeting_id, session_id)) {
+            Ok(()) | Err(mpsc::TrySendError::Full(_)) => {
+                *last = Some(Instant::now());
+                Ok(())
+            }
+            Err(mpsc::TrySendError::Disconnected(_)) => Err(anyhow!("Observer unavailable")),
+        }
+    }
+
+    pub fn trace_tester(&self, session_id: i64, kind: crate::meeting::tester::TesterTraceKind) {
+        let Ok(Some(session)) = self.store.get_session(session_id) else {
+            return;
+        };
+        let Ok(Some(meeting)) = self.store.get_meeting(session.meeting_id) else {
+            return;
+        };
+        if meeting.input_mode != MeetingInputMode::TextTester {
+            return;
+        }
+        let trace = crate::meeting::tester::TesterTrace {
+            meeting_id: meeting.id,
+            session_id,
+            ts: chrono::Utc::now().timestamp_millis(),
+            kind,
+        };
+        let mut traces = lock(&self.tester_traces);
+        if traces.len() >= 200 {
+            traces.pop_front();
+        }
+        traces.push_back(trace.clone());
+        drop(traces);
+        if let Some(app) = &self.app {
+            let _ = trace.emit(app);
+        }
+    }
+
+    pub fn tester_trace(
+        &self,
+        meeting_id: i64,
+        session_id: i64,
+    ) -> Vec<crate::meeting::tester::TesterTrace> {
+        lock(&self.tester_traces)
+            .iter()
+            .filter(|t| t.meeting_id == meeting_id && t.session_id == session_id)
+            .cloned()
+            .collect()
+    }
+
+    pub fn append_tester_turn(
+        &self,
+        meeting_id: i64,
+        session_id: i64,
+        speaker: crate::meeting::tester::TesterSpeaker,
+        text: String,
+    ) -> Result<TranscriptLine> {
+        let _t = lock(&self.transition);
+        self.validate_tester(meeting_id, session_id)?;
+        let text = text.trim();
+        if text.is_empty() || text.len() > 8000 {
+            return Err(anyhow!("Enter a turn between 1 and 8000 bytes"));
+        }
+        let line = self.store.append_line(
+            session_id,
+            speaker.as_str(),
+            text,
+            chrono::Utc::now().timestamp_millis(),
+        )?;
+        if let Some(app) = &self.app {
+            let _ = (TranscriptLinePayload {
+                meeting_id,
+                line: line.clone(),
+            })
+            .emit(app);
+        }
+        Ok(line)
+    }
+
     /// Meeting id of the running (live or paused) meeting, if any.
     #[allow(dead_code)] // public accessor with no caller yet
     pub fn active_meeting_id(&self) -> Option<i64> {
@@ -533,11 +691,13 @@ impl MeetingManager {
                 meeting_id: Some(a.meeting_id),
                 session_id: Some(a.session_id),
                 status: Some(a.status),
+                input_mode: Some(a.input.mode()),
             },
             None => MeetingStatePayload {
                 meeting_id: None,
                 session_id: None,
                 status: None,
+                input_mode: None,
             },
         }
     }
@@ -698,9 +858,40 @@ impl MeetingManager {
     }
 
     pub fn start(&self, project_id: Option<i64>, meeting_id: Option<i64>) -> Result<Meeting> {
+        self.start_with_input(project_id, meeting_id, MeetingInputMode::Audio)
+    }
+
+    pub fn start_text_tester(&self) -> Result<Meeting> {
+        self.start_with_input(None, None, MeetingInputMode::TextTester)
+    }
+
+    fn start_with_input(
+        &self,
+        project_id: Option<i64>,
+        meeting_id: Option<i64>,
+        new_mode: MeetingInputMode,
+    ) -> Result<Meeting> {
         let _t = lock(&self.transition);
         if self.lock_active().is_some() {
             return Err(anyhow!("A meeting is already running"));
+        }
+        let input_mode = match meeting_id {
+            Some(id) => {
+                self.store
+                    .get_meeting(id)?
+                    .ok_or_else(|| anyhow!("Meeting not found"))?
+                    .input_mode
+            }
+            None => new_mode,
+        };
+        if input_mode == MeetingInputMode::TextTester {
+            if let Some(app) = &self.app {
+                let ready =
+                    crate::meeting::observer::readiness(&crate::settings::get_settings(app));
+                if ready != crate::meeting::observer::Readiness::Ready {
+                    return Err(anyhow!("The assistant must be enabled and configured before starting a text test ({})", ready.code()));
+                }
+            }
         }
         let mut previous_status = None;
         let meeting = match meeting_id {
@@ -716,14 +907,26 @@ impl MeetingManager {
                     ..m
                 }
             }
-            None => self.store.create_meeting(
+            None => self.store.create_meeting_with_input(
                 project_id,
-                &Self::auto_title_at(chrono::Utc::now().timestamp_millis()),
+                &if new_mode == MeetingInputMode::TextTester {
+                    "Live tester".into()
+                } else {
+                    Self::auto_title_at(chrono::Utc::now().timestamp_millis())
+                },
+                new_mode,
             )?,
         };
         let session = self.store.create_session(meeting.id)?;
-        let (capture, worker) = match self.start_capture_and_worker(meeting.id, session.id) {
-            Ok(c) => c,
+        let input = match if meeting.input_mode == MeetingInputMode::TextTester {
+            Ok(ActiveInput::TextTester)
+        } else {
+            self.start_capture_and_worker(meeting.id, session.id)
+                .map(|(capture, worker)| {
+                    ActiveInput::Audio(Some(AudioResources { capture, worker }))
+                })
+        } {
+            Ok(input) => input,
             Err(e) => {
                 // Undo the partial start; always surface the capture error.
                 match previous_status {
@@ -750,8 +953,7 @@ impl MeetingManager {
             session_id: session.id,
             project_id: meeting.project_id,
             status: MeetingStatus::Live,
-            capture: Some(capture),
-            worker: Some(worker),
+            input,
         });
         self.live.store(true, Ordering::SeqCst);
         self.emit_state();
@@ -767,7 +969,10 @@ impl MeetingManager {
             if a.status != MeetingStatus::Live {
                 return Err(anyhow!("meeting is not live"));
             }
-            (a.meeting_id, a.capture.take(), a.worker.take())
+            {
+                let (capture, worker) = a.input.take_audio();
+                (a.meeting_id, capture, worker)
+            }
         };
         // Lines already spoken land before the meeting reads as paused.
         stop_and_drain(capture, worker);
@@ -785,18 +990,23 @@ impl MeetingManager {
 
     pub fn resume(&self) -> Result<()> {
         let _t = lock(&self.transition);
-        let (meeting_id, session_id) = {
+        let (meeting_id, session_id, mode) = {
             let guard = self.lock_active();
             let a = guard.as_ref().ok_or_else(|| anyhow!("no active meeting"))?;
             if a.status != MeetingStatus::Paused {
                 return Err(anyhow!("meeting is not paused"));
             }
-            (a.meeting_id, a.session_id)
+            (a.meeting_id, a.session_id, a.input.mode())
         };
-        let (capture, worker) = self.start_capture_and_worker(meeting_id, session_id)?;
+        let input = match mode {
+            MeetingInputMode::TextTester => ActiveInput::TextTester,
+            MeetingInputMode::Audio => {
+                let (capture, worker) = self.start_capture_and_worker(meeting_id, session_id)?;
+                ActiveInput::Audio(Some(AudioResources { capture, worker }))
+            }
+        };
         if let Some(a) = self.lock_active().as_mut() {
-            a.capture = Some(capture);
-            a.worker = Some(worker);
+            a.input = input;
             a.status = MeetingStatus::Live;
         }
         self.live.store(true, Ordering::SeqCst);
@@ -812,12 +1022,8 @@ impl MeetingManager {
         let (meeting_id, session_id, capture, worker) = {
             let mut guard = self.lock_active();
             let a = guard.as_mut().ok_or_else(|| anyhow!("no active meeting"))?;
-            (
-                a.meeting_id,
-                a.session_id,
-                a.capture.take(),
-                a.worker.take(),
-            )
+            let (capture, worker) = a.input.take_audio();
+            (a.meeting_id, a.session_id, capture, worker)
         };
         let leftover = stop_and_drain(capture, worker);
         self.live.store(false, Ordering::SeqCst);

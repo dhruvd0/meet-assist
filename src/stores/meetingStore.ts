@@ -93,6 +93,7 @@ const idleObserver: ObserverView = {
   detail: null,
 };
 const idle: MeetingStatePayload = {
+  input_mode: null,
   meeting_id: null,
   session_id: null,
   status: null,

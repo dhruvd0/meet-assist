@@ -57,6 +57,7 @@ interface SettingsStore {
     apiFormat: LlmApiFormat,
   ) => Promise<void>;
   updateLlmApiKey: (providerId: string, apiKey: string) => Promise<void>;
+  updateJevApiKey: (apiKey: string) => Promise<void>;
   updateLlmModel: (providerId: string, model: string) => Promise<void>;
   fetchLlmModels: (providerId: string) => Promise<string[]>;
   setLlmModelOptions: (providerId: string, models: string[]) => void;
@@ -129,6 +130,8 @@ const settingUpdaters: {
     commands.changeMeetingAssistantSetting(value as boolean),
   meeting_system_audio_enabled: (value) =>
     commands.changeMeetingSystemAudioSetting(value as boolean),
+  meeting_jev_enabled: (value) =>
+    commands.changeMeetingJevSetting(value ?? true),
   meeting_vision_enabled: (value) =>
     commands.changeMeetingVisionSetting(value as boolean),
   meeting_sensitivity: (value) =>
@@ -533,6 +536,20 @@ export const useSettingsStore = create<SettingsStore>()(
         await refreshSettings();
       } finally {
         setUpdating(updateKey, false);
+      }
+    },
+
+    updateJevApiKey: async (apiKey) => {
+      const { setUpdating, refreshSettings } = get();
+      setUpdating("jev_api_key", true);
+      try {
+        await ok(commands.changeJevApiKeySetting("jev", apiKey));
+        await refreshSettings();
+      } catch (error) {
+        toastError("errors.settingSaveFailed", error);
+        await refreshSettings();
+      } finally {
+        setUpdating("jev_api_key", false);
       }
     },
 

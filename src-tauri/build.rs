@@ -1,6 +1,5 @@
 fn main() {
-    // Bundled OpenRouter key (settings.rs reads it with option_env!).
-    println!("cargo:rerun-if-env-changed=CASE_OPENROUTER_KEY");
+    seal_bundled_keys();
     generate_tray_translations();
 
     // Linux ships transcribe-cpp as a shared libtranscribe + loadable ggml
@@ -389,4 +388,83 @@ fn escape_string(s: &str) -> String {
         .replace('\n', "\\n")
         .replace('\r', "\\r")
         .replace('\t', "\\t")
+}
+
+fn seal_bundled_keys() {
+    use ring::{
+        aead,
+        rand::{SecureRandom, SystemRandom},
+    };
+    use std::{collections::HashMap, env, path::PathBuf};
+
+    let dotenv = PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").expect("manifest directory"))
+        .join("../.env");
+    if dotenv.exists() {
+        println!("cargo:rerun-if-changed={}", dotenv.display());
+    }
+    for name in [
+        "CASE_OPENROUTER_KEY",
+        "CASE_GROQ_KEY",
+        "GROQ_API_KEY",
+        "CASE_JEV_KEY",
+        "JEV_API_KEY",
+    ] {
+        println!("cargo:rerun-if-env-changed={name}");
+    }
+    let file_vars: HashMap<String, String> = if dotenv.exists() {
+        dotenvy::from_path_iter(&dotenv)
+            .unwrap_or_else(|_| panic!("Cannot read root .env"))
+            .map(|entry| entry.unwrap_or_else(|_| panic!("Invalid root .env syntax")))
+            .filter(|(name, _)| {
+                matches!(
+                    name.as_str(),
+                    "CASE_OPENROUTER_KEY"
+                        | "CASE_GROQ_KEY"
+                        | "GROQ_API_KEY"
+                        | "CASE_JEV_KEY"
+                        | "JEV_API_KEY"
+                )
+            })
+            .collect()
+    } else {
+        HashMap::new()
+    };
+    let env_or_file = |names: &[&str]| {
+        names
+            .iter()
+            .find_map(|name| env::var(name).ok())
+            .or_else(|| names.iter().find_map(|name| file_vars.get(*name).cloned()))
+            .filter(|value| !value.trim().is_empty())
+    };
+    let rng = SystemRandom::new();
+    let mut key_bytes = [0u8; 32];
+    rng.fill(&mut key_bytes)
+        .expect("credential sealing randomness");
+    let key = aead::LessSafeKey::new(
+        aead::UnboundKey::new(&aead::AES_256_GCM, &key_bytes).expect("credential sealing key"),
+    );
+    let mut generated = format!("const SEALING_KEY: [u8; 32] = {key_bytes:?};\n");
+    for (service, names) in [
+        ("OPENROUTER", &["CASE_OPENROUTER_KEY"][..]),
+        ("GROQ", &["CASE_GROQ_KEY", "GROQ_API_KEY"][..]),
+        ("JEV", &["CASE_JEV_KEY", "JEV_API_KEY"][..]),
+    ] {
+        if let Some(value) = env_or_file(names) {
+            let mut nonce = [0u8; 12];
+            rng.fill(&mut nonce).expect("credential sealing nonce");
+            let mut ciphertext = value.into_bytes();
+            let aad = format!("case-bundled-v1:{service}");
+            key.seal_in_place_append_tag(
+                aead::Nonce::assume_unique_for_key(nonce),
+                aead::Aad::from(aad.as_bytes()),
+                &mut ciphertext,
+            )
+            .expect("seal bundled credential");
+            generated.push_str(&format!("const {service}: Option<Sealed> = Some(Sealed {{ nonce: {nonce:?}, ciphertext: &{ciphertext:?} }});\n"));
+        } else {
+            generated.push_str(&format!("const {service}: Option<Sealed> = None;\n"));
+        }
+    }
+    let out = PathBuf::from(env::var_os("OUT_DIR").expect("build output directory"));
+    std::fs::write(out.join("bundled_keys.rs"), generated).expect("write sealed defaults");
 }

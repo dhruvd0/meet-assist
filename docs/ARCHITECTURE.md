@@ -71,7 +71,7 @@ One LLM provider serves the observer, summaries, and vision digests: `llm_provid
 
 ### Settings added for the meeting subsystem
 
-`meeting_assistant_enabled`, `meeting_system_audio_enabled` (default on), and `meeting_vision_enabled` (default on), alongside the observer sensitivity, interval, and beep keys. The provider and model come from the shared `llm_*` settings.
+`meeting_assistant_enabled`, `meeting_jev_enabled` (default on, gated by the assistant opt-in and actual built-in cloud endpoint), `meeting_system_audio_enabled` (default on), and `meeting_vision_enabled` (default on), alongside the observer sensitivity, interval, and beep keys. The provider and model come from the shared `llm_*` settings.
 
 ## Data model
 
@@ -90,6 +90,10 @@ Project, Source, SourceChunk, Meeting, Session, TranscriptLine, and Intervention
 A project holds sources and meetings. A meeting is a thread of sessions. "Continue" opens a new session under an existing meeting. The observer receives the rolling summary of past sessions plus the live window, never the full raw history.
 
 ## Observer contract
+
+In opt-in cloud mode, Jev classifies opportunities through TypeSafe before the existing main-model judge writes a nudge. Only built-in cloud endpoints permit this secondary request. Custom providers, including LAN models, bypass it. The gate uses a five-second timeout, rejects redirects, caps the request at 24 KiB, and caps the streamed response at 16 KiB. All four `noul` answers must be finite probabilities in `[0, 1]`. Invalid, unavailable, or failed detection falls through to the main model this tick.
+
+A quiet gate defers without writing a check, cursor, or ledger. At 40 pending lines or 90 seconds since the oldest pending line, a quiet gate instead runs the main model to refresh memory and suppresses its nudge with `jev_quiet`. Ordered catch-up and oversized detector evidence bypass Jev. Sensitivity thresholds are 0.85 for low, 0.70 for medium, and 0.55 for high. Low considers only loop and stuck. A flagged kind is a hint the main model can reject. The existing store transaction remains the only path that advances durable memory. Filing, vision, and end reports still use the main provider independently.
 
 Base prompt, in order: project brief, rolling summary of the most recent other meeting in the project, meeting context, recent interventions, last ~3 minutes of transcript. Anything else the model fetches through tools:
 

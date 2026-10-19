@@ -18,7 +18,8 @@ use tauri_nspanel::{
 
 const LABEL: &str = "intervention";
 const WIDTH: f64 = 380.0;
-const HEIGHT: f64 = 175.0;
+/// Initial height; the card resizes itself to its content once shown.
+const HEIGHT: f64 = 120.0;
 const MARGIN: f64 = 16.0;
 
 /// Bumped on every show so a hide scheduled for an earlier card cannot hide a newer one.

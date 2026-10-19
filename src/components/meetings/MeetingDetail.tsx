@@ -14,6 +14,7 @@ import Badge from "../ui/Badge";
 import { Button } from "../ui/Button";
 import { DocSection } from "../shared";
 import { ContextEditor } from "./ContextEditor";
+import { LiveTesterPanel } from "./LiveTesterPanel";
 import { InterventionTimeline } from "./InterventionTimeline";
 import { EfficiencyReports, sessionReports } from "./EfficiencyReport";
 import { SessionSummary } from "./SessionSummary";
@@ -64,6 +65,9 @@ export const MeetingDetail: React.FC = () => {
     );
   const m = detail.meeting;
   const status = isLive ? live.status : m.status;
+  const testerSessionId = isLive
+    ? live.session_id
+    : detail.sessions[detail.sessions.length - 1]?.id;
   const otherRunning = live.meeting_id !== null && !isLive;
 
   const commit = () => {
@@ -140,6 +144,9 @@ export const MeetingDetail: React.FC = () => {
             {when}
           </span>
           <MeetingProjectPicker meeting={m} />
+          {m.input_mode === "text_tester" && (
+            <Badge variant="secondary">{t("meetings.tester.badge")}</Badge>
+          )}
           {(status === "live" || status === "paused") && (
             <Badge variant={status === "live" ? "primary" : "secondary"}>
               {status === "live" && (
@@ -216,6 +223,14 @@ export const MeetingDetail: React.FC = () => {
             </Alert>
           )}
         </div>
+
+        {m.input_mode === "text_tester" && testerSessionId != null && (
+          <LiveTesterPanel
+            key={`${m.id}-${testerSessionId}`}
+            meetingId={m.id}
+            sessionId={testerSessionId}
+          />
+        )}
 
         {/* With one session the session notes already say it all. */}
         {m.rolling_summary && detail.sessions.length > 1 && (

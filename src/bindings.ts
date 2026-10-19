@@ -226,10 +226,29 @@ async pingLlmModel() : Promise<Result<LlmPing, string>> {
 }
 },
 /**
- * Whether this build ships a default OpenRouter key.
+ * Whether this build ships a default key for the given provider.
  */
-async hasBundledLlmKey() : Promise<boolean> {
-    return await TAURI_INVOKE("has_bundled_llm_key");
+async hasBundledLlmKey(providerId: string) : Promise<boolean> {
+    return await TAURI_INVOKE("has_bundled_llm_key", { providerId });
+},
+async hasBundledJevKey() : Promise<boolean> {
+    return await TAURI_INVOKE("has_bundled_jev_key");
+},
+async changeMeetingJevSetting(enabled: boolean) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("change_meeting_jev_setting", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async changeJevApiKeySetting(keyId: string, apiKey: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("change_jev_api_key_setting", { keyId, apiKey }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 },
 async updateCustomWords(words: string[]) : Promise<Result<null, string>> {
     try {
@@ -819,6 +838,33 @@ async startMeeting(projectId: number | null, meetingId: number | null) : Promise
     else return { status: "error", error: e  as any };
 }
 },
+async startTextTester() : Promise<Result<Meeting, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("start_text_tester") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async appendTesterTurn(meetingId: number, sessionId: number, speaker: TesterSpeaker, text: string) : Promise<Result<TranscriptLine, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("append_tester_turn", { meetingId, sessionId, speaker, text }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async requestTesterCheck(meetingId: number, sessionId: number) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("request_tester_check", { meetingId, sessionId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async getTesterTrace(meetingId: number, sessionId: number) : Promise<TesterTrace[]> {
+    return await TAURI_INVOKE("get_tester_trace", { meetingId, sessionId });
+},
 async pauseMeeting() : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("pause_meeting") };
@@ -967,6 +1013,7 @@ openMeetingPayload: OpenMeetingPayload,
 sessionSummaryPayload: SessionSummaryPayload,
 sessionSummaryStatusPayload: SessionSummaryStatusPayload,
 sourceStatusPayload: SourceStatusPayload,
+testerTrace: TesterTrace,
 transcriptLinePayload: TranscriptLinePayload
 }>({
 interventionPayload: "intervention-payload",
@@ -979,6 +1026,7 @@ openMeetingPayload: "open-meeting-payload",
 sessionSummaryPayload: "session-summary-payload",
 sessionSummaryStatusPayload: "session-summary-status-payload",
 sourceStatusPayload: "source-status-payload",
+testerTrace: "tester-trace",
 transcriptLinePayload: "transcript-line-payload"
 })
 
@@ -1031,7 +1079,11 @@ meeting_assistant_enabled?: boolean;
 /**
  * Capture system audio (the other participants) during meetings.
  */
-meeting_system_audio_enabled?: boolean; meeting_vision_enabled?: boolean; meeting_sensitivity?: MeetingSensitivity; meeting_observer_interval_secs?: number; 
+meeting_system_audio_enabled?: boolean; meeting_vision_enabled?: boolean; 
+/**
+ * Cloud-only opportunity detection. Still requires the assistant opt-in.
+ */
+meeting_jev_enabled?: boolean; meeting_sensitivity?: MeetingSensitivity; meeting_observer_interval_secs?: number; 
 /**
  * Seconds of non-stop speech before the segmenter cuts a new line.
  */
@@ -1064,6 +1116,7 @@ export type ChineseScript =
  */
 "as_transcribed" | "simplified" | "traditional"
 export type CustomSounds = { start: boolean; stop: boolean }
+export type DetectionScores = { loop_score: number; stuck: number; info: number; idea: number }
 export type EfficiencyIssue = { 
 /**
  * One of `EFFICIENCY_KINDS`.
@@ -1131,7 +1184,7 @@ export type LlmApiFormat =
 export type LlmPing = { model: string; reply: string; ms: number }
 export type LlmProvider = { id: string; label: string; base_url: string; allow_base_url_edit?: boolean; models_endpoint?: string | null; supports_structured_output?: boolean; api_format?: LlmApiFormat }
 export type LogLevel = "trace" | "debug" | "info" | "warn" | "error"
-export type Meeting = { id: number; project_id: number | null; title: string; created_at: number; updated_at: number; status: MeetingStatus; context: string; rolling_summary: string | null; 
+export type Meeting = { input_mode: MeetingInputMode; id: number; project_id: number | null; title: string; created_at: number; updated_at: number; status: MeetingStatus; context: string; rolling_summary: string | null; 
 /**
  * Who chose the project: `None` (nobody yet), `"ai"`, or `"user"`.
  */
@@ -1163,11 +1216,12 @@ created_project: boolean;
  * project only while its brief still equals this.
  */
 created_brief: string | null }
+export type MeetingInputMode = "audio" | "text_tester"
 /**
  * How readily the meeting observer raises interventions.
  */
 export type MeetingSensitivity = "low" | "medium" | "high"
-export type MeetingStatePayload = { meeting_id: number | null; session_id: number | null; status: MeetingStatus | null }
+export type MeetingStatePayload = { input_mode: MeetingInputMode | null; meeting_id: number | null; session_id: number | null; status: MeetingStatus | null }
 export type MeetingStatus = "live" | "paused" | "ended"
 /**
  * Emitted when the assistant names a meeting without filing it.
@@ -1264,6 +1318,9 @@ export type Source = { id: number; project_id: number; kind: SourceKind; title: 
 export type SourceKind = "text" | "file" | "folder" | "link" | "image"
 export type SourceStatus = "pending" | "ready" | "failed"
 export type SourceStatusPayload = { source: Source }
+export type TesterSpeaker = "me" | "them"
+export type TesterTrace = { meeting_id: number; session_id: number; ts: number; kind: TesterTraceKind }
+export type TesterTraceKind = { type: "detecting" } | { type: "detection"; outcome: string; kind: string | null; scores: DetectionScores } | { type: "detector_fallback"; reason: string } | { type: "detector_bypassed"; reason: string } | { type: "judging" } | { type: "judged"; outcome: string; reason: string; remaining_ms: number } | { type: "error"; message: string }
 /**
  * UI appearance mode. `System` follows the OS `prefers-color-scheme`; `Light`
  * and `Dark` force one of the two palettes CASE already ships.

@@ -62,6 +62,9 @@ fn is_auto_title(title: &str, created_at: i64) -> bool {
 /// both. A meeting started inside a project still needs a name; one the
 /// user moved by hand is theirs, title included.
 pub fn eligible(m: &Meeting) -> bool {
+    if m.input_mode == crate::meeting::store::MeetingInputMode::TextTester {
+        return false;
+    }
     needs_filing(m)
         || (m.filed_by.as_deref() != Some(FILED_BY_USER) && is_auto_title(&m.title, m.created_at))
 }

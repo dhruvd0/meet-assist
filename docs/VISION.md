@@ -21,7 +21,7 @@ Meeting bots that join the call as a participant are intrusive, record everyone,
 
 ## Principles
 
-1. **Private by default.** Nothing leaves the machine unless you point the assistant at a cloud model. Local models through Ollama or LM Studio are first-class.
+1. **Private by default.** Nothing leaves the machine unless you point the assistant at a cloud model. Local models through Ollama or LM Studio are first-class. In opt-in cloud mode, enabled Jev opportunity detection also sends bounded transcript snippets and context to TypeSafe. Custom and local providers bypass Jev.
 2. **Speak only when useful.** Silence is the default answer. A nudge that interrupts flow is worse than none.
 3. **Only you hear it.** The assistant never speaks into the call. You decide whether to say it out loud.
 4. **Reuse the speech engine.** Transcription, models, and audio capture share one implementation. Dictation output (paste, post-processing, history) was removed; the global shortcut starts and ends meetings.

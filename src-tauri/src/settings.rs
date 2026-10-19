@@ -369,6 +369,9 @@ pub struct AppSettings {
     pub meeting_system_audio_enabled: bool,
     #[serde(default = "default_meeting_vision_enabled")]
     pub meeting_vision_enabled: bool,
+    /// Cloud-only opportunity detection. Still requires the assistant opt-in.
+    #[serde(default = "default_meeting_jev_enabled")]
+    pub meeting_jev_enabled: bool,
     #[serde(default)]
     pub meeting_sensitivity: MeetingSensitivity,
     #[serde(default = "default_meeting_observer_interval_secs")]
@@ -495,6 +498,10 @@ fn default_meeting_system_audio_enabled() -> bool {
     true
 }
 
+fn default_meeting_jev_enabled() -> bool {
+    true
+}
+
 fn default_meeting_vision_enabled() -> bool {
     true
 }
@@ -521,20 +528,12 @@ fn default_show_tray_icon() -> bool {
     true
 }
 
-/// OpenRouter key shipped with the app, used while the user has not entered
-/// their own. Baked in at build time from the `CASE_OPENROUTER_KEY`
-/// environment variable (a CI secret), never stored in the repository:
-/// public keys are found by secret scanning and revoked within minutes.
-/// Empty in builds made without it.
-pub const BUNDLED_OPENROUTER_API_KEY: &str = match option_env!("CASE_OPENROUTER_KEY") {
-    Some(key) => key,
-    None => "",
-};
-/// OpenRouter model used while the user has not picked one.
-pub const BUNDLED_OPENROUTER_MODEL: &str = "anthropic/claude-haiku-5.5";
+/// Default model used when no OpenRouter model is selected.
+pub const BUNDLED_OPENROUTER_MODEL: &str = "openrouter/free";
+pub const BUNDLED_GROQ_MODEL: &str = "openai/gpt-oss-120b";
 
 fn default_llm_provider_id() -> String {
-    "openrouter".to_string()
+    "groq".to_string()
 }
 
 fn default_llm_providers() -> Vec<LlmProvider> {
@@ -632,10 +631,10 @@ fn default_llm_models() -> HashMap<String, String> {
     default_llm_providers()
         .into_iter()
         .map(|provider| {
-            let model = if provider.id == "openrouter" {
-                BUNDLED_OPENROUTER_MODEL.to_string()
-            } else {
-                String::new()
+            let model = match provider.id.as_str() {
+                "groq" => BUNDLED_GROQ_MODEL.to_string(),
+                "openrouter" => BUNDLED_OPENROUTER_MODEL.to_string(),
+                _ => String::new(),
             };
             (provider.id, model)
         })
@@ -776,6 +775,7 @@ pub fn get_default_settings() -> AppSettings {
         meeting_assistant_enabled: false,
         meeting_system_audio_enabled: default_meeting_system_audio_enabled(),
         meeting_vision_enabled: default_meeting_vision_enabled(),
+        meeting_jev_enabled: default_meeting_jev_enabled(),
         meeting_sensitivity: MeetingSensitivity::default(),
         meeting_observer_interval_secs: default_meeting_observer_interval_secs(),
         meeting_max_line_secs: default_meeting_max_line_secs(),
@@ -808,18 +808,21 @@ impl AppSettings {
         self.llm_provider_by_id(&self.llm_provider_id)
     }
 
-    /// The selected model; on OpenRouter with none picked, the bundled one.
+    /// The selected model, falling back to the built-in provider default.
     pub fn llm_model(&self) -> Option<String> {
         let provider = self.llm_provider()?;
         let model = self.llm_models.get(&provider.id).cloned();
-        if provider.id == "openrouter" && model.as_deref().is_none_or(|m| m.trim().is_empty()) {
-            return Some(BUNDLED_OPENROUTER_MODEL.to_string());
+        if model.as_deref().is_none_or(|m| m.trim().is_empty()) {
+            match provider.id.as_str() {
+                "groq" => return Some(BUNDLED_GROQ_MODEL.to_string()),
+                "openrouter" => return Some(BUNDLED_OPENROUTER_MODEL.to_string()),
+                _ => {}
+            }
         }
         model
     }
 
-    /// The selected provider's key; on OpenRouter with none entered, the
-    /// bundled one.
+    /// The selected provider's key, falling back to the bundled key.
     pub fn llm_api_key(&self) -> String {
         let Some(provider) = self.llm_provider() else {
             return String::new();
@@ -827,17 +830,55 @@ impl AppSettings {
         self.llm_provider_api_key(&provider.id)
     }
 
-    /// A provider's stored key, or the bundled key for an empty OpenRouter one.
+    /// A provider's stored key, or its bundled key when empty.
     pub fn llm_provider_api_key(&self, provider_id: &str) -> String {
         let key = self
             .llm_api_keys
             .get(provider_id)
             .cloned()
             .unwrap_or_default();
-        if provider_id == "openrouter" && key.trim().is_empty() {
-            return BUNDLED_OPENROUTER_API_KEY.to_string();
+        if key.trim().is_empty() {
+            return crate::bundled_keys::for_provider(provider_id)
+                .unwrap_or_default()
+                .to_string();
         }
         key
+    }
+
+    /// An explicit own key always wins, including a key rejected by the service.
+    pub fn jev_api_key(&self) -> Option<String> {
+        self.llm_api_keys
+            .get("jev")
+            .filter(|key| !key.trim().is_empty())
+            .cloned()
+            .or_else(|| crate::bundled_keys::jev().map(str::to_string))
+    }
+
+    /// Only the actual built-in cloud endpoints permit secondary cloud detection.
+    pub fn jev_cloud_provider(&self) -> bool {
+        let Some(provider) = self.llm_provider() else {
+            return false;
+        };
+        let Some(builtin) = default_llm_providers()
+            .into_iter()
+            .find(|builtin| builtin.id == provider.id && builtin.id != "custom")
+        else {
+            return false;
+        };
+        let Ok(url) = reqwest::Url::parse(&provider.base_url) else {
+            return false;
+        };
+        let Ok(expected) = reqwest::Url::parse(&builtin.base_url) else {
+            return false;
+        };
+        url.scheme() == "https"
+            && url.host() == expected.host()
+            && url.port_or_known_default() == expected.port_or_known_default()
+            && url.path().trim_end_matches('/') == expected.path().trim_end_matches('/')
+            && url.username().is_empty()
+            && url.password().is_none()
+            && url.query().is_none()
+            && url.fragment().is_none()
     }
 
     pub fn llm_provider_by_id(&self, provider_id: &str) -> Option<&LlmProvider> {
@@ -1255,6 +1296,66 @@ mod tests {
         );
         assert_eq!(settings.selected_model, "parakeet");
         assert!(settings.meeting_assistant_enabled);
+        assert!(settings.meeting_jev_enabled);
+        assert!(settings
+            .llm_api_keys
+            .get("jev")
+            .is_none_or(|key| key.is_empty()));
+        assert!(settings.jev_api_key().as_deref() == crate::bundled_keys::jev());
+        settings
+            .llm_api_keys
+            .insert("jev".into(), "own-jev-fixture".into());
+        assert!(settings.jev_api_key().as_deref() == Some("own-jev-fixture"));
+        settings
+            .llm_api_keys
+            .insert("openrouter".into(), "own-router-fixture".into());
+        assert!(settings.llm_provider_api_key("openrouter") == "own-router-fixture");
+        let debug = format!("{settings:?}");
+        assert!(!debug.contains("own-jev-fixture"));
+        assert!(!debug.contains("own-router-fixture"));
+        assert!(!debug.contains("sk-ant"));
+        settings.llm_api_keys.insert("jev".into(), " ".into());
+        settings
+            .llm_api_keys
+            .insert("openrouter".into(), String::new());
+        assert!(settings.jev_api_key().as_deref() == crate::bundled_keys::jev());
+        assert!(
+            settings.llm_provider_api_key("openrouter")
+                == crate::bundled_keys::openrouter().unwrap_or_default()
+        );
+        settings.meeting_jev_enabled = false;
+        let roundtrip: AppSettings =
+            serde_json::from_value(serde_json::to_value(&settings).unwrap()).unwrap();
+        assert!(!roundtrip.meeting_jev_enabled);
+        let mut cloud = get_default_settings();
+        assert_eq!(cloud.llm_provider_id, "groq");
+        assert_eq!(cloud.llm_model().as_deref(), Some(BUNDLED_GROQ_MODEL));
+        cloud.llm_models.insert("groq".into(), String::new());
+        assert_eq!(cloud.llm_model().as_deref(), Some(BUNDLED_GROQ_MODEL));
+        assert!(cloud.llm_api_key() == crate::bundled_keys::groq().unwrap_or_default());
+        cloud
+            .llm_api_keys
+            .insert("groq".into(), "own-groq-fixture".into());
+        assert!(cloud.llm_api_key() == "own-groq-fixture");
+        assert!(!format!("{cloud:?}").contains("own-groq-fixture"));
+        cloud.llm_api_keys.insert("groq".into(), " ".into());
+        assert!(cloud.llm_api_key() == crate::bundled_keys::groq().unwrap_or_default());
+        assert!(cloud.jev_cloud_provider());
+        cloud.llm_provider_id = "openrouter".into();
+        for url in [
+            "http://localhost:11434/v1",
+            "http://192.168.1.10/v1",
+            "https://openrouter.ai.example/api/v1",
+            "https://openrouter.ai/api/v1?proxy=1",
+            "https://user@openrouter.ai/api/v1",
+            "https://openrouter.ai:444/api/v1",
+        ] {
+            cloud.llm_provider_mut("openrouter").unwrap().base_url = url.into();
+            assert!(!cloud.jev_cloud_provider());
+        }
+        cloud.llm_provider_id = "custom".into();
+        cloud.llm_provider_mut("custom").unwrap().base_url = "https://openrouter.ai/api/v1".into();
+        assert!(!cloud.jev_cloud_provider());
 
         let ids: Vec<_> = settings.bindings.keys().cloned().collect();
         assert_eq!(ids, vec!["toggle_meeting".to_string()]);

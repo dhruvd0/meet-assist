@@ -709,12 +709,13 @@ dependencies = [
 
 [[package]]
 name = "case"
-version = "0.9.10"
+version = "0.9.11"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
  "chrono",
  "clap",
+ "dotenvy",
  "earshot",
  "env_filter",
  "ferrous-opencc",
@@ -737,6 +738,7 @@ dependencies = [
  "once_cell",
  "regex",
  "reqwest 0.12.28",
+ "ring",
  "rodio",
  "rubato",
  "rusqlite",
@@ -1518,6 +1520,12 @@ dependencies = [
  "selectors 0.36.1",
  "tendril 0.5.1",
 ]
+
+[[package]]
+name = "dotenvy"
+version = "0.15.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1aaf95b3e5c8f23aa320147307562d361db0ae0d51242340f558153b4eb2439b"
 
 [[package]]
 name = "dpi"

@@ -260,6 +260,42 @@ impl LlmSummarizer {
     }
 }
 
+/// Models that ignore the schema return objects (e.g. `{owner, task}`) where
+/// text is expected. Flatten them to text rather than losing the summary.
+fn flatten_text_fields(v: &mut Value) {
+    fn text(v: &Value) -> String {
+        match v {
+            Value::String(s) => s.clone(),
+            Value::Array(items) => items
+                .iter()
+                .map(text)
+                .filter(|s| !s.is_empty())
+                .collect::<Vec<_>>()
+                .join(", "),
+            Value::Object(map) => map
+                .values()
+                .map(text)
+                .filter(|s| !s.is_empty())
+                .collect::<Vec<_>>()
+                .join(" — "),
+            Value::Null => String::new(),
+            other => other.to_string(),
+        }
+    }
+    for key in ["decisions", "open_questions", "action_items"] {
+        if let Some(Value::Array(items)) = v.get_mut(key) {
+            for item in items.iter_mut() {
+                if !item.is_string() {
+                    *item = Value::String(text(item));
+                }
+            }
+        }
+    }
+    if let Some(recap) = v.get_mut("recap").filter(|r| !r.is_string()) {
+        *recap = Value::String(text(recap));
+    }
+}
+
 impl Summarizer for LlmSummarizer {
     fn summarize_session(
         &self,
@@ -273,6 +309,7 @@ impl Summarizer for LlmSummarizer {
         // Providers without structured output only see the report's shape in
         // the prompt. A malformed report is dropped, never the summary.
         let report = v.get_mut("efficiency").map(Value::take);
+        flatten_text_fields(&mut v);
         let mut summary: SessionSummary = serde_json::from_value(v)?;
         summary.efficiency = report
             .and_then(|r| serde_json::from_value::<EfficiencyReport>(r).ok())
@@ -408,6 +445,30 @@ mod tests {
         fn merge_rolling(&self, _p: Option<&str>, _n: &SessionSummary) -> Result<String> {
             Err(anyhow!("merge down"))
         }
+    }
+
+    #[test]
+    fn flatten_text_fields_handles_nested_objects() {
+        let mut v = json!({
+            "decisions": [
+                "plain string",
+                { "choice": "Postgres", "reason": "easier to operate" }
+            ],
+            "open_questions": [
+                { "question": "Who will run migrations?" }
+            ],
+            "action_items": [
+                { "owner": "Alice", "task": "benchmark query latency" }
+            ],
+            "recap": { "overview": "Discussed database options." }
+        });
+        flatten_text_fields(&mut v);
+        let summary: SessionSummary = serde_json::from_value(v).unwrap();
+        assert_eq!(summary.decisions[0], "plain string");
+        assert_eq!(summary.decisions[1], "Postgres — easier to operate");
+        assert_eq!(summary.open_questions[0], "Who will run migrations?");
+        assert_eq!(summary.action_items[0], "Alice — benchmark query latency");
+        assert_eq!(summary.recap, "Discussed database options.");
     }
 
     #[test]

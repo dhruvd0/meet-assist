@@ -179,7 +179,8 @@
       "pausedListening": "AI is paused with the meeting",
       "lastCheck": "checked {{time}}",
       "firstCheck": "First check runs once someone speaks.",
-      "nudged": "Nudged:"
+      "nudged": "Nudged:",
+      "awaitingAssessment": "Transcript received. Waiting for the assistant’s first assessment."
     },
     "summary": {
       "title": "Summary",
@@ -233,6 +234,53 @@
       "recording": "Recording",
       "aiListening": "AI listening",
       "open": "Open meeting"
+    },
+    "jev": {
+      "label": "Opportunity detection (Jev)",
+      "description": "TypeSafe checks transcript snippets and meeting context for loops, blockers, missing facts, and ideas. Your chosen provider writes any nudge.",
+      "cloudOnly": "Available with a built-in cloud provider. Custom and local providers never send text to TypeSafe.",
+      "keyLabel": "Your Jev key (optional)",
+      "keyDescription": "Leave blank to use the built-in key. Clearing your own key restores the default. Without either key, the assistant checks directly.",
+      "bundledKey": "Using built-in key",
+      "ownKey": "Add a Jev key to enable detection",
+      "consent": "When on, the chosen provider receives your transcript, project brief, and meeting context for nudges and summaries. With Jev enabled in cloud mode, TypeSafe also receives bounded snippets and context every few seconds while people talk to detect opportunities.",
+      "onboardingConsent": "The meeting assistant and summaries use your chosen LLM provider. In cloud mode, Jev opportunity detection also sends transcript snippets and context to TypeSafe. Both have built-in keys when included in this build, and you can add your own in Assistant."
+    },
+    "tester": {
+      "title": "Live tester",
+      "badge": "Text test",
+      "description": "Try a conversation through the real meeting assistant.",
+      "noAudio": "Text only. Your microphone and system audio are off. End the meeting to generate the real report.",
+      "consent": "This sends your text to the configured AI providers, including Jev when enabled. Provider limits and costs apply. Your microphone and system audio stay off.",
+      "conversation": "Sample conversation",
+      "remaining": "Remaining conversation",
+      "scriptHint": "One turn per line, starting with me: or them:. Up to 2,000 characters per turn and 40,000 total.",
+      "invalid": "Check line {{line}}. Each turn needs me: or them: and nonempty text within the size limits.",
+      "alreadyRunning": "End the current meeting before starting a text test.",
+      "start": "Start text test",
+      "starting": "Starting text test…",
+      "sendNext": "Send next turn",
+      "sending": "Sending…",
+      "play": "Play conversation",
+      "pausePlayback": "Pause playback",
+      "checkNow": "Check now",
+      "checking": "Requesting check…",
+      "timing": "Playback sends a turn every 2.5 seconds. Checks use the real detector and normal nudge cooldown. A nudge is not guaranteed.",
+      "seed": "me: We need to decide whether the customer dashboard launches Friday or next Tuesday.\nthem: The core dashboard is ready and marketing has the Friday announcement drafted.\nme: Friday gives us a clean story. I think we should launch Friday.\nthem: But the CSV export still shows duplicate invoices. Finance will use that export on day one.\nme: Then maybe Tuesday is safer. Can we agree on Tuesday?\nthem: Marketing really wants Friday, so could we still aim for Friday?\nme: We have gone back to Friday again without deciding what makes it safe.\nthem: I am blocked. I cannot fix the invoice duplicates because I do not have access to the billing sandbox, and nobody has confirmed who can grant it.\nme: Do we need the export at launch, or could we launch the dashboard Friday with export disabled?\nthem: We can hide export behind a flag. Sam owns billing sandbox access and Priya owns the duplicate fix.\nme: I will ask Sam for access today. Priya will validate the fix by Thursday noon. Export stays disabled until finance signs off.\nthem: Agreed. Launch the dashboard Friday with export disabled. If the dashboard itself fails QA Thursday, move the launch to Tuesday.",
+      "trace": {
+        "title": "Assistant activity",
+        "waiting": "Waiting for an actual detector or model check. Send a turn, then check now.",
+        "detecting": "Jev is checking the conversation.",
+        "judging": "The main model is checking the conversation.",
+        "quiet": "Jev found no reason to call the main model.",
+        "flagged": "Jev flagged a possible nudge.",
+        "memory_refresh": "Jev requested a main-model memory refresh.",
+        "detector_fallback": "Jev was unavailable. Using the main model. {{reason}}",
+        "detector_bypassed": "The detector was skipped. {{reason}}",
+        "judged": "Main model result · {{outcome}}",
+        "cooldown": "Nudge cooldown · {{seconds}} seconds remaining",
+        "scores": "Loop {{loop}} · Stuck {{stuck}} · Fact {{info}} · Idea {{idea}}"
+      }
     }
   },
   "onboarding": {

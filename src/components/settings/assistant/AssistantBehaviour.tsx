@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { MeetingSensitivity } from "@/bindings";
+import { commands, type MeetingSensitivity } from "@/bindings";
+import { useSettingsStore } from "@/stores/settingsStore";
+import { ApiKeyField } from "./provider/ApiKeyField";
 import { useSettings } from "../../../hooks/useSettings";
 import { Dropdown } from "../../ui/Dropdown";
 import { Input } from "../../ui/Input";
@@ -59,6 +61,42 @@ const SecondsInput: React.FC<{
 export const AssistantBehaviour: React.FC = () => {
   const { t } = useTranslation();
   const { getSetting, updateSetting, isUpdating } = useSettings();
+  const defaultSettings = useSettingsStore((store) => store.defaultSettings);
+  const updateJevApiKey = useSettingsStore((store) => store.updateJevApiKey);
+  const [bundledJev, setBundledJev] = useState(false);
+  useEffect(() => {
+    void commands
+      .hasBundledJevKey()
+      .then(setBundledJev)
+      .catch(() => setBundledJev(false));
+  }, []);
+  const providerId = getSetting("llm_provider_id");
+  const provider = getSetting("llm_providers")?.find(
+    (item) => item.id === providerId,
+  );
+  const builtin = defaultSettings?.llm_providers?.find(
+    (item) => item.id === providerId && item.id !== "custom",
+  );
+  const cloudProvider = (() => {
+    if (!provider || !builtin) return false;
+    try {
+      const url = new URL(provider.base_url);
+      const expected = new URL(builtin.base_url);
+      return (
+        url.protocol === "https:" &&
+        url.origin === expected.origin &&
+        url.pathname.replace(/\/$/, "") ===
+          expected.pathname.replace(/\/$/, "") &&
+        !url.username &&
+        !url.password &&
+        !url.search &&
+        !url.hash
+      );
+    } catch {
+      return false;
+    }
+  })();
+  const jevKey = getSetting("llm_api_keys")?.jev ?? "";
 
   const interval =
     getSetting("meeting_observer_interval_secs") ?? DEFAULT_INTERVAL_SECS;
@@ -79,10 +117,39 @@ export const AssistantBehaviour: React.FC = () => {
         onChange={(v) => updateSetting("meeting_assistant_enabled", v)}
         isUpdating={isUpdating("meeting_assistant_enabled")}
         label={t("settings.meeting.enabled.label")}
-        description={t("settings.meeting.enabled.description", { interval })}
+        description={t("meetings.jev.consent", { interval })}
         descriptionMode="inline"
         grouped={true}
       />
+      <ToggleSwitch
+        checked={getSetting("meeting_jev_enabled") ?? true}
+        onChange={(value) => updateSetting("meeting_jev_enabled", value)}
+        isUpdating={isUpdating("meeting_jev_enabled")}
+        disabled={!enabled || !cloudProvider}
+        label={t("meetings.jev.label")}
+        description={t(
+          cloudProvider ? "meetings.jev.description" : "meetings.jev.cloudOnly",
+        )}
+        descriptionMode="inline"
+        grouped={true}
+      />
+      <SettingContainer
+        title={t("meetings.jev.keyLabel")}
+        description={t("meetings.jev.keyDescription")}
+        descriptionMode="inline"
+        grouped={true}
+      >
+        <ApiKeyField
+          value={jevKey}
+          onBlur={(value) => {
+            if (value !== jevKey) void updateJevApiKey(value);
+          }}
+          disabled={!enabled || !cloudProvider || isUpdating("jev_api_key")}
+          placeholder={t(
+            bundledJev ? "meetings.jev.bundledKey" : "meetings.jev.ownKey",
+          )}
+        />
+      </SettingContainer>
       <SettingContainer
         title={t("settings.meeting.sensitivity.label")}
         description={t("settings.meeting.sensitivity.description")}

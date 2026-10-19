@@ -110,7 +110,7 @@ pub struct TranscriptionManager {
 /// Whether a meeting is capturing; the model must stay warm while it is.
 fn meeting_is_live(app: &AppHandle) -> bool {
     app.try_state::<Arc<crate::meeting::session::MeetingManager>>()
-        .map(|m| m.is_live())
+        .map(|m| m.captures_audio())
         .unwrap_or(false)
 }
 
