@@ -705,6 +705,10 @@
           "description": "Vysoce výkonné inferenční zpracování modelu automatického rozpoznávání řeči Whisper od OpenAI",
           "details": "CASE uses transcribe.cpp and ggml for local speech recognition. Built with open-source software; copyright and license notices are included with the source."
         }
+      },
+      "automaticUpdates": {
+        "label": "Automatic updates",
+        "description": "Check at startup and every six hours, and download updates automatically. Restart to install when no meeting is running."
       }
     },
     "meeting": {
@@ -752,7 +756,11 @@
     "portableUpdateMessage": "Přenosné instalace nelze aktualizovat automaticky. Níže stáhněte instalátor pro svůj systém, spusťte jej a nainstalujte do stejné složky — vaše složka Data/ (nastavení, modely, nahrávky) zůstane na místě.",
     "portableUpdateButton": "Stáhnout instalátor",
     "portableUpdateBrowseMessage": "Přenosné instalace nelze aktualizovat automaticky. Stáhněte nejnovější verzi pro svůj systém z GitHub Releases a nainstalujte ji do stejné složky — vaše složka Data/ (nastavení, modely, nahrávky) zůstane na místě.",
-    "portableUpdateBrowseButton": "Otevřít GitHub Releases"
+    "portableUpdateBrowseButton": "Otevřít GitHub Releases",
+    "downloadingUnknown": "Downloading update…",
+    "retryDownload": "Retry update download",
+    "restartToUpdate": "Restart to update",
+    "updateAfterMeeting": "End meeting to update"
   },
   "whatsNew": {
     "title": "Novinky v CASE v{{version}}"
@@ -791,7 +799,8 @@
       "cancel": "Couldn't cancel the download: {{error}}",
       "delete": "Couldn't delete the model: {{error}}",
       "download": "Couldn't download the model: {{error}}"
-    }
+    },
+    "updateDownloadFailed": "Couldn't download the update: {{error}}"
   },
   "appLanguage": {
     "title": "Jazyk aplikace",
@@ -828,5 +837,17 @@
     "startedAt": "Started {{time}}",
     "openNotes": "Open notes",
     "empty": "Meetings you record show up here, grouped by day."
+  },
+  "installer": {
+    "macos": {
+      "title": "Install CASE",
+      "install": "Drag CASE into Applications, then open it from there.",
+      "warning": "If macOS says “CASE” Not Opened",
+      "explanation": "This build is not notarized by Apple. If you trust this download:",
+      "done": "Click Done in the warning.",
+      "settings": "Open System Settings → Privacy & Security.",
+      "openAnyway": "Scroll to Security, find the CASE warning, and click Open Anyway.",
+      "confirm": "Authenticate when asked, then click Open."
+    }
   }
 }

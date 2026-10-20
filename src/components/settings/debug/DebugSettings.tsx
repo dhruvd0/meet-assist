@@ -5,7 +5,6 @@ import { LogLevelSelector } from "./LogLevelSelector";
 import { LiveLogViewer } from "./LiveLogViewer";
 import { SettingsGroup } from "../../ui/SettingsGroup";
 import { SoundPicker } from "../SoundPicker";
-import { UpdateChecksToggle } from "../UpdateChecksToggle";
 import { WhatsNewPreview } from "./WhatsNewPreview";
 import {
   OnboardingPreview,
@@ -33,7 +32,6 @@ export const DebugSettings: React.FC<DebugSettingsProps> = ({
             grouped={true}
           />
         )}
-        <UpdateChecksToggle descriptionMode="tooltip" grouped={true} />
         <SoundPicker
           label={t("settings.debug.soundTheme.label")}
           description={t("settings.debug.soundTheme.description")}

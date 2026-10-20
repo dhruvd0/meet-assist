@@ -23,11 +23,11 @@ export const UpdateChecksToggle: React.FC<UpdateChecksToggleProps> = ({
       onChange={(enabled) => updateSetting("update_checks_enabled", enabled)}
       isUpdating={isUpdating("update_checks_enabled")}
       disabled={updateChecksLocked !== false}
-      label={t("settings.debug.updateChecks.label")}
+      label={t("settings.about.automaticUpdates.label")}
       description={
         updateChecksLocked
           ? t("settings.debug.updateChecks.lockedDescription")
-          : t("settings.debug.updateChecks.description")
+          : t("settings.about.automaticUpdates.description")
       }
       descriptionMode={descriptionMode}
       grouped={grouped}

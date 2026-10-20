@@ -7,6 +7,7 @@ import { SettingContainer } from "../../ui/SettingContainer";
 import { Button } from "../../ui/Button";
 import { AppDataDirectory } from "../AppDataDirectory";
 import { ShowWhatsNewOnUpdate } from "../ShowWhatsNewOnUpdate";
+import { UpdateChecksToggle } from "../UpdateChecksToggle";
 import { LogDirectory } from "../debug";
 
 export const AboutSettings: React.FC = () => {
@@ -39,6 +40,7 @@ export const AboutSettings: React.FC = () => {
           <span className="text-sm font-mono">v{version}</span>
         </SettingContainer>
 
+        <UpdateChecksToggle descriptionMode="inline" grouped={true} />
         <ShowWhatsNewOnUpdate descriptionMode="tooltip" grouped={true} />
 
         <SettingContainer

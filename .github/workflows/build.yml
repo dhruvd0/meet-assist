@@ -557,6 +557,8 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Apply the DMG's Finder layout and first-launch instructions on CI.
+          TAURI_BUNDLER_DMG_IGNORE_CI: ${{ startsWith(inputs.platform, 'macos') && 'true' || '' }}
           # The Vulkan loader and Wayland client library must come from the host
           # graphics stack. Bundling Ubuntu's copies ahead of the system libraries can
           # prevent a newer distro's Vulkan ICD or Mesa stack from loading.

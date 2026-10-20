@@ -705,6 +705,10 @@
           "description": "OpenAI의 Whisper 자동 음성 인식 모델의 고성능 추론",
           "details": "CASE uses transcribe.cpp and ggml for local speech recognition. Built with open-source software; copyright and license notices are included with the source."
         }
+      },
+      "automaticUpdates": {
+        "label": "Automatic updates",
+        "description": "Check at startup and every six hours, and download updates automatically. Restart to install when no meeting is running."
       }
     },
     "meeting": {
@@ -752,7 +756,11 @@
     "portableUpdateMessage": "포터블 설치는 자동으로 업데이트할 수 없습니다. 아래에서 사용 중인 시스템에 맞는 설치 프로그램을 다운로드해 실행하고 같은 폴더에 설치하세요. Data/ 폴더(설정, 모델, 녹음)는 그대로 유지됩니다.",
     "portableUpdateButton": "설치 프로그램 다운로드",
     "portableUpdateBrowseMessage": "포터블 설치는 자동으로 업데이트할 수 없습니다. GitHub Releases에서 사용 중인 시스템에 맞는 최신 버전을 다운로드해 같은 폴더에 설치하세요. Data/ 폴더(설정, 모델, 녹음)는 그대로 유지됩니다.",
-    "portableUpdateBrowseButton": "GitHub Releases 열기"
+    "portableUpdateBrowseButton": "GitHub Releases 열기",
+    "downloadingUnknown": "Downloading update…",
+    "retryDownload": "Retry update download",
+    "restartToUpdate": "Restart to update",
+    "updateAfterMeeting": "End meeting to update"
   },
   "whatsNew": {
     "title": "CASE v{{version}}의 새 소식"
@@ -791,7 +799,8 @@
       "cancel": "Couldn't cancel the download: {{error}}",
       "delete": "Couldn't delete the model: {{error}}",
       "download": "Couldn't download the model: {{error}}"
-    }
+    },
+    "updateDownloadFailed": "Couldn't download the update: {{error}}"
   },
   "appLanguage": {
     "title": "애플리케이션 언어",
@@ -828,5 +837,17 @@
     "startedAt": "Started {{time}}",
     "openNotes": "Open notes",
     "empty": "Meetings you record show up here, grouped by day."
+  },
+  "installer": {
+    "macos": {
+      "title": "Install CASE",
+      "install": "Drag CASE into Applications, then open it from there.",
+      "warning": "If macOS says “CASE” Not Opened",
+      "explanation": "This build is not notarized by Apple. If you trust this download:",
+      "done": "Click Done in the warning.",
+      "settings": "Open System Settings → Privacy & Security.",
+      "openAnyway": "Scroll to Security, find the CASE warning, and click Open Anyway.",
+      "confirm": "Authenticate when asked, then click Open."
+    }
   }
 }

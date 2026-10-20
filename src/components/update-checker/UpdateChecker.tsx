@@ -1,276 +1,281 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { toastError } from "@/lib/result";
-import { check } from "@tauri-apps/plugin-updater";
+import { check, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { listen } from "@tauri-apps/api/event";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { arch, platform } from "@tauri-apps/plugin-os";
-import { ProgressBar } from "../shared";
-import { useSettings } from "../../hooks/useSettings";
-import { commands } from "../../bindings";
+import { toast } from "sonner";
+import i18n from "@/i18n";
+import { toastError } from "@/lib/result";
+import { useSettings } from "@/hooks/useSettings";
+import { useMeetingStore } from "@/stores/meetingStore";
+import { commands } from "@/bindings";
+import { Button } from "../ui/Button";
+import { Dialog } from "../ui/Dialog";
 import {
   resolvePortableInstallerUrl,
   PORTABLE_RELEASES_URL,
 } from "./portableInstaller";
 
-interface UpdateCheckerProps {
-  className?: string;
-}
+const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
 
-const UpdateChecker: React.FC<UpdateCheckerProps> = ({ className = "" }) => {
+type UpdateState =
+  | { phase: "idle" }
+  | { phase: "checking" }
+  | { phase: "available"; update: Update }
+  | { phase: "portable"; url: string }
+  | { phase: "downloading"; update: Update; progress: number | null }
+  | { phase: "ready"; update: Update }
+  | { phase: "installing"; update: Update }
+  | { phase: "restart" };
+
+const UpdateChecker: React.FC<{ className?: string }> = ({
+  className = "",
+}) => {
   const { t } = useTranslation();
-  // Update checking state
-  const [isChecking, setIsChecking] = useState(false);
-  const [updateAvailable, setUpdateAvailable] = useState(false);
-  const [isInstalling, setIsInstalling] = useState(false);
-  const [downloadProgress, setDownloadProgress] = useState(0);
-  const [showUpToDate, setShowUpToDate] = useState(false);
-  const [showPortableUpdateDialog, setShowPortableUpdateDialog] =
-    useState(false);
-  const [portableInstallerUrl, setPortableInstallerUrl] = useState<string>(
-    PORTABLE_RELEASES_URL,
+  const { settings, isLoading, updateChecksLocked } = useSettings();
+  const enabled =
+    !isLoading &&
+    settings?.update_checks_enabled === true &&
+    updateChecksLocked === false;
+  const meetingRunning = useMeetingStore((s) => s.live.meeting_id !== null);
+  const [state, setState] = useState<UpdateState>({ phase: "idle" });
+  const [showPortableDialog, setShowPortableDialog] = useState(false);
+  const current = useRef<UpdateState>(state);
+  const generation = useRef(0);
+  const transition = useCallback((next: UpdateState) => {
+    current.current = next;
+    setState(next);
+  }, []);
+
+  const checkForUpdates = useCallback(
+    async (manual = false) => {
+      if (!enabled || current.current.phase !== "idle") return;
+      const run = generation.current;
+      const active = () => generation.current === run;
+      let update: Update | null = null;
+      transition({ phase: "checking" });
+      try {
+        update = await check({ timeout: 30_000 });
+        if (!active()) return;
+        if (!update) {
+          transition({ phase: "idle" });
+          if (manual) toast.success(i18n.t("footer.upToDate"));
+          return;
+        }
+        const portable = await commands.isPortable();
+        if (!active()) return;
+        if (portable) {
+          transition({
+            phase: "portable",
+            url: resolvePortableInstallerUrl(
+              update.rawJson,
+              platform(),
+              arch(),
+            ),
+          });
+          await update.close();
+          update = null;
+          if (manual) setShowPortableDialog(true);
+          return;
+        }
+        let downloaded = 0;
+        let total = 0;
+        const packageUpdate = update;
+        transition({ phase: "downloading", update, progress: null });
+        await update.download(
+          (event) => {
+            if (!active()) return;
+            if (event.event === "Started") {
+              downloaded = 0;
+              total = event.data.contentLength ?? 0;
+            } else if (event.event === "Progress") {
+              downloaded += event.data.chunkLength;
+            }
+            transition({
+              phase: "downloading",
+              update: packageUpdate,
+              progress:
+                total > 0
+                  ? Math.min(100, Math.round((downloaded / total) * 100))
+                  : null,
+            });
+          },
+          { timeout: 300_000 },
+        );
+        if (active()) transition({ phase: "ready", update });
+      } catch (error) {
+        if (active()) {
+          transition(
+            update ? { phase: "available", update } : { phase: "idle" },
+          );
+          toastError(
+            update ? "errors.updateDownloadFailed" : "errors.updateCheckFailed",
+            error,
+          );
+        }
+      } finally {
+        // A disabled updater or unmounted sidebar must not retain a late download.
+        if (!active() && update) await update.close().catch(() => {});
+      }
+    },
+    [enabled, transition],
   );
 
-  const { settings, isLoading, updateChecksLocked } = useSettings();
-  // Wait for the lock state too (null = not loaded yet), otherwise the first
-  // render could fire an update check before CASE_DISABLE_UPDATER is known.
-  const settingsLoaded =
-    !isLoading && settings !== null && updateChecksLocked !== null;
-  // Forced-off by system configuration (CASE_DISABLE_UPDATER) overrides the
-  // stored preference without persisting it, mirroring the backend's effective
-  // updater state.
-  const updateChecksEnabled =
-    (settings?.update_checks_enabled ?? false) && updateChecksLocked === false;
-
-  const upToDateTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
-  const isManualCheckRef = useRef(false);
-  const downloadedBytesRef = useRef(0);
-  const contentLengthRef = useRef(0);
-
   useEffect(() => {
-    // Wait for settings to load before doing anything
-    if (!settingsLoaded) return;
-
-    if (!updateChecksEnabled) {
-      if (upToDateTimeoutRef.current) {
-        clearTimeout(upToDateTimeoutRef.current);
-      }
-      setIsChecking(false);
-      setUpdateAvailable(false);
-      setShowUpToDate(false);
-      return;
-    }
-
-    checkForUpdates();
-
-    // Listen for update check events
-    const updateUnlisten = listen("check-for-updates", () => {
-      handleManualUpdateCheck();
+    if (!enabled) return;
+    void checkForUpdates();
+    const timer = window.setInterval(
+      () => void checkForUpdates(),
+      CHECK_INTERVAL_MS,
+    );
+    const unlisten = listen("check-for-updates", () => {
+      if (current.current.phase === "portable") setShowPortableDialog(true);
+      else void checkForUpdates(true);
     });
-
     return () => {
-      if (upToDateTimeoutRef.current) {
-        clearTimeout(upToDateTimeoutRef.current);
+      generation.current += 1;
+      window.clearInterval(timer);
+      void unlisten.then((stop) => stop());
+      const previous = current.current;
+      transition({ phase: "idle" });
+      // In-flight operations release their resource when they finish.
+      if (previous.phase === "ready" || previous.phase === "available") {
+        void previous.update.close().catch(() => {});
       }
-      updateUnlisten.then((fn) => fn());
     };
-  }, [settingsLoaded, updateChecksEnabled]);
-
-  // Update checking functions
-  const checkForUpdates = async () => {
-    if (!updateChecksEnabled || isChecking) return;
-
-    try {
-      setIsChecking(true);
-      const update = await check();
-
-      if (update) {
-        setUpdateAvailable(true);
-        setShowUpToDate(false);
-        // Portable installs can't self-update in place — the manual dialog links
-        // straight at the matching installer from this manifest instead.
-        setPortableInstallerUrl(
-          resolvePortableInstallerUrl(update.rawJson, platform(), arch()),
-        );
-      } else {
-        setUpdateAvailable(false);
-
-        if (isManualCheckRef.current) {
-          setShowUpToDate(true);
-          if (upToDateTimeoutRef.current) {
-            clearTimeout(upToDateTimeoutRef.current);
-          }
-          upToDateTimeoutRef.current = setTimeout(() => {
-            setShowUpToDate(false);
-          }, 3000);
-        }
-      }
-    } catch (error) {
-      toastError("errors.updateCheckFailed", error);
-    } finally {
-      setIsChecking(false);
-      isManualCheckRef.current = false;
-    }
-  };
-
-  const handleManualUpdateCheck = () => {
-    if (!updateChecksEnabled) return;
-    isManualCheckRef.current = true;
-    checkForUpdates();
-  };
+  }, [enabled, checkForUpdates, transition]);
 
   const installUpdate = async () => {
-    if (!updateChecksEnabled) return;
-
-    const portable = await commands.isPortable();
-    if (portable) {
-      setShowPortableUpdateDialog(true);
+    const pending = current.current;
+    if (!enabled || (pending.phase !== "ready" && pending.phase !== "restart"))
       return;
-    }
-
+    // Read the backend immediately before installing; the sidebar's event state
+    // can lag a meeting started from the global shortcut or tray.
     try {
-      setIsInstalling(true);
-      setDownloadProgress(0);
-      downloadedBytesRef.current = 0;
-      contentLengthRef.current = 0;
-      const update = await check();
-
-      if (!update) {
-        console.log("No update available during install attempt");
+      if ((await commands.meetingState()).meeting_id !== null) {
+        toast.info(t("footer.updateAfterMeeting"));
         return;
       }
-
-      await update.downloadAndInstall((event) => {
-        switch (event.event) {
-          case "Started":
-            downloadedBytesRef.current = 0;
-            contentLengthRef.current = event.data.contentLength ?? 0;
-            break;
-          case "Progress":
-            downloadedBytesRef.current += event.data.chunkLength;
-            const progress =
-              contentLengthRef.current > 0
-                ? Math.round(
-                    (downloadedBytesRef.current / contentLengthRef.current) *
-                      100,
-                  )
-                : 0;
-            setDownloadProgress(Math.min(progress, 100));
-            break;
-        }
-      });
+      if (!enabled || current.current !== pending) return;
+      if (pending.phase === "ready") {
+        transition({ phase: "installing", update: pending.update });
+        await pending.update.install();
+        await pending.update.close();
+        transition({ phase: "restart" });
+      }
       await relaunch();
     } catch (error) {
+      if (current.current.phase === "installing") {
+        await current.current.update.close().catch(() => {});
+        transition({ phase: "idle" });
+      }
       toastError("errors.updateInstallFailed", error);
-    } finally {
-      setIsInstalling(false);
-      setDownloadProgress(0);
-      downloadedBytesRef.current = 0;
-      contentLengthRef.current = 0;
     }
   };
 
-  // Update status functions
-  const getUpdateStatusText = () => {
-    if (!updateChecksEnabled) {
-      return t("footer.updateCheckingDisabled");
+  let label: string;
+  let action: (() => void) | undefined;
+  if (!enabled) label = t("footer.updateCheckingDisabled");
+  else {
+    switch (state.phase) {
+      case "idle":
+        label = t("footer.checkForUpdates");
+        action = () => void checkForUpdates(true);
+        break;
+      case "checking":
+        label = t("footer.checkingUpdates");
+        break;
+      case "downloading":
+        label =
+          state.progress === null
+            ? t("footer.downloadingUnknown")
+            : t("footer.downloading", { progress: state.progress });
+        break;
+      case "available":
+        label = t("footer.retryDownload");
+        action = () => {
+          void state.update.close().catch(() => {});
+          transition({ phase: "idle" });
+          void checkForUpdates(true);
+        };
+        break;
+      case "portable":
+        label = t("footer.updateAvailableShort");
+        action = () => setShowPortableDialog(true);
+        break;
+      case "ready":
+      case "restart":
+        label = t(
+          meetingRunning
+            ? "footer.updateAfterMeeting"
+            : "footer.restartToUpdate",
+        );
+        if (!meetingRunning) action = () => void installUpdate();
+        break;
+      case "installing":
+        label = t("footer.installing");
+        break;
     }
-    if (isInstalling) {
-      return downloadProgress > 0 && downloadProgress < 100
-        ? t("footer.downloading", {
-            progress: downloadProgress.toString().padStart(3),
-          })
-        : downloadProgress === 100
-          ? t("footer.installing")
-          : t("footer.preparing");
-    }
-    if (isChecking) return t("footer.checkingUpdates");
-    if (showUpToDate) return t("footer.upToDate");
-    if (updateAvailable) return t("footer.updateAvailableShort");
-    return t("footer.checkForUpdates");
-  };
-
-  const getUpdateStatusAction = () => {
-    if (!updateChecksEnabled) return undefined;
-    if (updateAvailable && !isInstalling) return installUpdate;
-    if (!isChecking && !isInstalling && !updateAvailable)
-      return handleManualUpdateCheck;
-    return undefined;
-  };
-
-  const isUpdateDisabled = !updateChecksEnabled || isChecking || isInstalling;
-  const isUpdateClickable =
-    !isUpdateDisabled && (updateAvailable || (!isChecking && !showUpToDate));
-
-  // When no installer could be resolved for this target the button falls back to
-  // the releases index, so the dialog has to say "browse" rather than "download".
-  const hasDirectInstaller = portableInstallerUrl !== PORTABLE_RELEASES_URL;
+  }
+  const portableUrl =
+    state.phase === "portable" ? state.url : PORTABLE_RELEASES_URL;
+  const directInstaller = portableUrl !== PORTABLE_RELEASES_URL;
 
   return (
     <>
-      {showPortableUpdateDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-background border border-line rounded-lg p-6 max-w-md w-full mx-4 space-y-4">
-            <h2 className="text-base font-semibold">
-              {t("footer.portableUpdateTitle")}
-            </h2>
-            <p className="text-sm text-muted">
-              {hasDirectInstaller
-                ? t("footer.portableUpdateMessage")
-                : t("footer.portableUpdateBrowseMessage")}
-            </p>
-            <div className="flex gap-2 justify-end">
-              <button
-                className="px-3 py-1.5 text-sm rounded border border-line hover:bg-surface-hover transition-colors"
-                onClick={() => setShowPortableUpdateDialog(false)}
-              >
-                {t("common.close")}
-              </button>
-              <button
-                className="px-3 py-1.5 text-sm rounded-lg bg-text text-background hover:bg-text/85 transition-colors"
-                onClick={() => {
-                  openUrl(portableInstallerUrl);
-                  setShowPortableUpdateDialog(false);
-                }}
-              >
-                {hasDirectInstaller
-                  ? t("footer.portableUpdateButton")
-                  : t("footer.portableUpdateBrowseButton")}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      <div className={`flex items-center gap-3 ${className}`}>
-        {isUpdateClickable ? (
+      <Dialog
+        open={showPortableDialog && enabled && state.phase === "portable"}
+        onOpenChange={setShowPortableDialog}
+        title={t("footer.portableUpdateTitle")}
+        closeLabel={t("common.close")}
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => setShowPortableDialog(false)}
+            >
+              {t("common.close")}
+            </Button>
+            <Button
+              onClick={() => {
+                void openUrl(portableUrl)
+                  .then(() => setShowPortableDialog(false))
+                  .catch((error: unknown) =>
+                    toastError("errors.updateDownloadFailed", error),
+                  );
+              }}
+            >
+              {t(
+                directInstaller
+                  ? "footer.portableUpdateButton"
+                  : "footer.portableUpdateBrowseButton",
+              )}
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-muted">
+          {t(
+            directInstaller
+              ? "footer.portableUpdateMessage"
+              : "footer.portableUpdateBrowseMessage",
+          )}
+        </p>
+      </Dialog>
+      <div className={`min-w-0 text-xs ${className}`}>
+        {action ? (
           <button
-            onClick={getUpdateStatusAction()}
-            disabled={isUpdateDisabled}
-            className={`transition-colors disabled:opacity-50 tabular-nums ${
-              updateAvailable
-                ? "text-accent hover:text-accent/80 font-medium"
-                : "text-muted hover:text-muted"
-            }`}
+            onClick={action}
+            className={`text-start transition-colors ${state.phase === "idle" ? "text-muted hover:text-text" : "text-accent hover:text-accent/80 font-medium"}`}
           >
-            {getUpdateStatusText()}
+            {label}
           </button>
         ) : (
-          <span className="text-muted tabular-nums">
-            {getUpdateStatusText()}
+          <span role="status" className="text-muted tabular-nums">
+            {label}
           </span>
-        )}
-
-        {isInstalling && downloadProgress > 0 && downloadProgress < 100 && (
-          <ProgressBar
-            progress={[
-              {
-                id: "update",
-                percentage: downloadProgress,
-              },
-            ]}
-            size="large"
-          />
         )}
       </div>
     </>
