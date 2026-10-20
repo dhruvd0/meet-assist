@@ -226,14 +226,20 @@ pub fn ack(conn: &mut Connection, e: &Entity, sent: &[Outgoing]) -> Result<()> {
     Ok(())
 }
 
+pub struct ApplyOutcome {
+    pub applied: usize,
+    /// Index of the first row skipped because its parent is not here yet.
+    pub first_blocked: Option<usize>,
+}
+
 /// Apply remote rows in one transaction with the outbox triggers muted.
-/// Returns how many rows changed local data.
-pub fn apply_remote(conn: &mut Connection, e: &Entity, rows: &[Value]) -> Result<usize> {
+pub fn apply_remote(conn: &mut Connection, e: &Entity, rows: &[Value]) -> Result<ApplyOutcome> {
     let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
     tx.execute("UPDATE sync_guard SET applying = 1", [])?;
     let upsert = upsert_sql(e);
     let mut applied = 0;
-    for row in rows {
+    let mut first_blocked = None;
+    for (i, row) in rows.iter().enumerate() {
         let Some(uid) = row.get("id").and_then(Value::as_str) else {
             continue;
         };
@@ -271,7 +277,10 @@ pub fn apply_remote(conn: &mut Connection, e: &Entity, rows: &[Value]) -> Result
             match parent_id {
                 Some(id) => values.push(SqlValue::Integer(id)),
                 None if p.nullable && parent_uid.is_none() => values.push(SqlValue::Null),
-                None => continue,
+                None => {
+                    first_blocked.get_or_insert(i);
+                    continue;
+                }
             }
         }
         for c in e.cols {
@@ -286,7 +295,10 @@ pub fn apply_remote(conn: &mut Connection, e: &Entity, rows: &[Value]) -> Result
     }
     tx.execute("UPDATE sync_guard SET applying = 0", [])?;
     tx.commit()?;
-    Ok(applied)
+    Ok(ApplyOutcome {
+        applied,
+        first_blocked,
+    })
 }
 
 fn upsert_sql(e: &Entity) -> String {
@@ -441,11 +453,15 @@ mod tests {
         let project = serde_json::json!({"id": "00000000-0000-4000-8000-000000000001", "updated_at": 5, "deleted": false, "title": "Remote", "brief": "b", "created_at": 1});
         let meeting = serde_json::json!({"id": "00000000-0000-4000-8000-000000000002", "updated_at": 5, "deleted": false, "project_id": "00000000-0000-4000-8000-000000000001", "title": "RM", "created_at": 1, "status": "ended", "context": "", "rolling_summary": null, "filed_by": null, "input_mode": "audio"});
         assert_eq!(
-            apply_remote(&mut conn, entity("projects"), &[project]).unwrap(),
+            apply_remote(&mut conn, entity("projects"), &[project])
+                .unwrap()
+                .applied,
             1
         );
         assert_eq!(
-            apply_remote(&mut conn, entity("meetings"), &[meeting]).unwrap(),
+            apply_remote(&mut conn, entity("meetings"), &[meeting])
+                .unwrap()
+                .applied,
             1
         );
         assert_eq!(

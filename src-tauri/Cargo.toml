@@ -93,6 +93,7 @@ html2text = "0.15"
 handy-cpal = "=0.18.2"
 rubato = "=5.0.0"
 base64 = "0.22"
+keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service", "crypto-rust"] }
 
 [target.'cfg(unix)'.dependencies]
 signal-hook = "0.3"
