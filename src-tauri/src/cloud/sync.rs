@@ -307,20 +307,34 @@ mod tests {
                 "pull did not echo"
             );
 
-            b.update_meeting_title(bm[0].id, "Planning (edited on B)").unwrap();
+            b.update_meeting_title(bm[0].id, "Planning (edited on B)")
+                .unwrap();
             run_cycle(&b, &remote).await.expect("cycle B push edit");
             run_cycle(&a, &remote).await.expect("cycle A pull edit");
             let am = a.list_meetings(None).unwrap();
-            println!("A after B edit: {:?}", am.iter().map(|m| &m.title).collect::<Vec<_>>());
+            println!(
+                "A after B edit: {:?}",
+                am.iter().map(|m| &m.title).collect::<Vec<_>>()
+            );
             assert_eq!(am.len(), 1);
             assert_eq!(am[0].title, "Planning (edited on B)");
-            assert_eq!(local::pending_count(&a.conn().unwrap()).unwrap(), 0, "pulled edit did not echo");
+            assert_eq!(
+                local::pending_count(&a.conn().unwrap()).unwrap(),
+                0,
+                "pulled edit did not echo"
+            );
 
             b.delete_project(bp[0].id).unwrap();
             run_cycle(&b, &remote).await.expect("cycle B push delete");
             run_cycle(&a, &remote).await.expect("cycle A pull delete");
-            assert!(a.list_projects().unwrap().is_empty(), "project delete reached A");
-            assert!(a.list_meetings(None).unwrap().is_empty(), "cascaded meeting delete reached A");
+            assert!(
+                a.list_projects().unwrap().is_empty(),
+                "project delete reached A"
+            );
+            assert!(
+                a.list_meetings(None).unwrap().is_empty(),
+                "cascaded meeting delete reached A"
+            );
             println!("A after B delete: projects and meetings empty");
         });
     }

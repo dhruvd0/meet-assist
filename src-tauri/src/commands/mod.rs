@@ -1,4 +1,5 @@
 pub mod audio;
+pub mod cloud;
 pub mod meeting;
 pub mod models;
 pub mod project;

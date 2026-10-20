@@ -3,6 +3,7 @@
 
 pub mod auth;
 pub mod local;
+pub mod service;
 pub mod sync;
 
 pub const SUPABASE_URL: &str = "https://fjohdmmgmvcjdoswkvsq.supabase.co";

@@ -157,6 +157,9 @@ fn initialize_core_logic(app_handle: &AppHandle) {
     );
     let meeting_store = project_manager.store_arc();
     app_handle.manage(project_manager);
+    let cloud = cloud::service::CloudService::new(app_handle.clone(), meeting_store.clone());
+    cloud.spawn();
+    app_handle.manage(cloud);
     match meeting_store.mark_live_sessions_paused() {
         Ok(n) if n > 0 => log::info!("recovered {} meeting(s) left live by a previous run", n),
         Ok(_) => {}
@@ -667,6 +670,11 @@ pub fn run(cli_args: CliArgs) {
             commands::transcription::set_model_unload_timeout,
             commands::transcription::get_model_load_status,
             commands::transcription::unload_model_manually,
+            commands::cloud::cloud_status,
+            commands::cloud::cloud_sign_in,
+            commands::cloud::cloud_sign_up,
+            commands::cloud::cloud_sign_out,
+            commands::cloud::cloud_sync_now,
             commands::project::list_projects,
             commands::project::get_project,
             commands::project::create_project,
@@ -705,6 +713,7 @@ pub fn run(cli_args: CliArgs) {
             commands::meeting::summarize_session,
         ])
         .events(collect_events![
+            cloud::service::CloudStatus,
             meeting::manager::SourceStatusPayload,
             meeting::session::MeetingStatePayload,
             meeting::session::TranscriptLinePayload,
