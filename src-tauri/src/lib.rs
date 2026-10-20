@@ -6,6 +6,7 @@ mod bundled_keys;
 mod catalog;
 mod chinese_script;
 pub mod cli;
+mod cloud;
 mod commands;
 pub mod engine_supervisor;
 mod intervention;
