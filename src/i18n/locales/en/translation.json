@@ -17,7 +17,8 @@
     "models": "Models",
     "advanced": "Advanced",
     "debug": "Debug",
-    "about": "About"
+    "about": "About",
+    "account": "Account"
   },
   "nav": {
     "label": "Main",
@@ -848,6 +849,32 @@
       "settings": "Open System Settings → Privacy & Security.",
       "openAnyway": "Scroll to Security, find the CASE warning, and click Open Anyway.",
       "confirm": "Authenticate when asked, then click Open."
+    }
+  },
+  "account": {
+    "title": "Account",
+    "intro": "Optional. Sign in to back up your projects, meetings, and preferences and keep them in sync across your computers. CASE works fully without an account, and nothing leaves this computer until you sign in. API keys never sync.",
+    "email": "Email",
+    "password": "Password",
+    "passwordHint": "At least 8 characters.",
+    "signIn": "Sign in",
+    "signingIn": "Signing in…",
+    "create": "Create account",
+    "creating": "Creating…",
+    "signedInAs": "Signed in as {{email}}",
+    "lastSynced": "Last synced {{time}}",
+    "neverSynced": "Not synced yet",
+    "pending_one": "{{count}} change waiting",
+    "pending_other": "{{count}} changes waiting",
+    "syncNow": "Sync now",
+    "signOut": "Sign out",
+    "state": {
+      "signed_out": "Signed out",
+      "idle": "Up to date",
+      "syncing": "Syncing…",
+      "offline": "Offline. Changes are saved here and will sync when you are back online",
+      "error": "Sync failed",
+      "account_mismatch": "This computer already syncs with a different account. Sign in with that account to sync, or sign out"
     }
   }
 }
