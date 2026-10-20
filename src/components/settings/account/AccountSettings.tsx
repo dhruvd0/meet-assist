@@ -11,8 +11,8 @@ const STATE_TONE: Record<CloudState, string> = {
   idle: "text-muted",
   syncing: "text-muted",
   offline: "text-faint",
-  error: "text-red-500",
-  account_mismatch: "text-red-500",
+  error: "text-error",
+  account_mismatch: "text-error",
 };
 
 /** Optional account: signing in turns on background sync of meetings and settings. */
@@ -88,7 +88,7 @@ export const AccountSettings: React.FC = () => {
               {t("account.passwordHint")}
             </p>
             {error && (
-              <p role="alert" className="text-[13px] text-red-500">
+              <p role="alert" className="text-[13px] text-error">
                 {error}
               </p>
             )}
