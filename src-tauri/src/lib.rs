@@ -99,12 +99,6 @@ pub(crate) fn show_main_window(app: &AppHandle) {
         if let Err(e) = main_window.set_focus() {
             log::error!("Failed to focus webview window: {}", e);
         }
-        #[cfg(target_os = "macos")]
-        {
-            if let Err(e) = app.set_activation_policy(tauri::ActivationPolicy::Regular) {
-                log::error!("Failed to set activation policy to Regular: {}", e);
-            }
-        }
         return;
     }
 
@@ -113,42 +107,6 @@ pub(crate) fn show_main_window(app: &AppHandle) {
         "Main window not found. Webview labels: {:?}",
         webview_labels
     );
-}
-
-/// Choose the macOS activation policy the process *launches* with.
-///
-/// Must run between `build()` and `run()`: that is the only point where
-/// `App::set_activation_policy` sets tao's initial policy, which
-/// `applicationDidFinishLaunching` then applies directly. Calling the
-/// `AppHandle` variant from `setup` (which Tauri runs on `RunEvent::Ready`,
-/// i.e. after launch) is instead a runtime Regular → Accessory demotion of an
-/// already-activated foreground app — the transition Apple documents as
-/// unreliable, and what left a Dock icon behind for start-hidden and
-/// login-item launches on macOS 26+ (#1787). Launching as Accessory avoids the
-/// transition entirely; showing the window later promotes to Regular, which is
-/// the supported direction.
-///
-/// Mirrors the show-window decision in `setup`: the app launches without a
-/// Dock icon only when it will start hidden (setting or `--start-hidden`) AND a
-/// tray icon is available (setting and not `--no-tray`). With no tray the Dock
-/// icon stays as the only way back into the app (#903). Headless one-shot
-/// runs are left alone.
-#[cfg(target_os = "macos")]
-fn apply_startup_activation_policy(app: &mut tauri::App, headless_mode: bool) {
-    if headless_mode {
-        return;
-    }
-
-    let cli_args = app.state::<CliArgs>().inner().clone();
-    let settings = settings::get_settings(app.handle());
-
-    let should_hide = settings.start_hidden || cli_args.start_hidden;
-    let tray_available = settings.show_tray_icon && !cli_args.no_tray;
-
-    if should_hide && tray_available {
-        log::info!("Starting hidden with tray available: launching as Accessory (no Dock icon)");
-        app.set_activation_policy(tauri::ActivationPolicy::Accessory);
-    }
 }
 
 #[allow(unused_variables)]
@@ -224,11 +182,6 @@ fn initialize_core_logic(app_handle: &AppHandle) {
     // SIGUSR2 toggles a meeting; see signal_handle.rs.
     #[cfg(unix)]
     signal_handle::setup_signal_handler(app_handle.clone());
-
-    // The macOS activation policy for a start-hidden launch is applied before
-    // the event loop runs (see `apply_startup_activation_policy`), not here:
-    // by the time `setup` runs the app has already launched as a Regular
-    // (Dock) app, and demoting it at runtime is unreliable (#1787).
 
     // Get the current theme to set the appropriate initial icon
     let initial_theme = tray::get_current_theme(app_handle);
@@ -870,8 +823,7 @@ pub fn run(cli_args: CliArgs) {
         }));
     }
 
-    #[allow(unused_mut)]
-    let mut app = builder
+    let app = builder
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -1044,7 +996,6 @@ pub fn run(cli_args: CliArgs) {
 
             // If start_hidden but tray is disabled, we must show the window
             // anyway. Without a tray icon, the dock is the only way back in.
-            // Keep in sync with `apply_startup_activation_policy` (macOS).
             let tray_available = settings.show_tray_icon && !cli_args.no_tray;
             if should_force_show || !should_hide || !tray_available {
                 show_main_window(&app_handle);
@@ -1057,22 +1008,9 @@ pub fn run(cli_args: CliArgs) {
                 api.prevent_close();
                 let _res = window.hide();
 
-                #[cfg(target_os = "macos")]
-                {
-                    let settings = get_settings(window.app_handle());
-                    let tray_visible =
-                        settings.show_tray_icon && !window.app_handle().state::<CliArgs>().no_tray;
-                    if tray_visible {
-                        // Tray is available: hide the dock icon, app lives in the tray
-                        let res = window
-                            .app_handle()
-                            .set_activation_policy(tauri::ActivationPolicy::Accessory);
-                        if let Err(e) = res {
-                            log::error!("Failed to set activation policy: {}", e);
-                        }
-                    }
-                    // No tray: keep the dock icon visible so the user can reopen
-                }
+                // Keep the Dock entry while the window is hidden so the
+                // Dock icon always reopens the app, whether or not the
+                // menu-bar icon is enabled.
             }
             tauri::WindowEvent::Focused(focused) if window.label() == "main" => {
                 live_pill::main_focus_changed(window.app_handle(), *focused);
@@ -1088,12 +1026,6 @@ pub fn run(cli_args: CliArgs) {
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
 
-    // Must sit between build() and run(): see the doc comment.
-    #[cfg(target_os = "macos")]
-    apply_startup_activation_policy(&mut app, headless_mode);
-
-    // `app` is only used by the macOS arm.
-    #[cfg_attr(not(target_os = "macos"), allow(unused_variables))]
     app.run(|app, event| match &event {
         #[cfg(target_os = "macos")]
         tauri::RunEvent::Reopen { .. } => {
