@@ -26,6 +26,10 @@ Meeting
 
 The global shortcut (the only binding, `toggle_meeting`), the tray Start/End Meeting item, the `--toggle-meeting` CLI flag, and SIGUSR2 all call `meeting::toggle::toggle_meeting`. It ends a running (live or paused) meeting; otherwise it starts a new, unfiled one. Once the meeting has 20 transcript lines, the observer loop runs `meeting::filing`: a tool loop (`list_projects`, `read_project`, `assign_meeting`, `create_project`, `rename_meeting`) that files the meeting into a project and renames it. It retries up to 3 times as the transcript grows and makes one last attempt when the meeting ends. Writes are conditional on `meetings.filed_by IS NULL`, so a user move (`move_meeting`, `filed_by = 'user'`) always wins. A filing shows on the floating card with Change and Undo.
 
+## Accounts and cloud sync
+
+Optional and offline-first; see [the design](superpowers/specs/2026-10-21-cloud-sync-design.md). SQLite triggers record every write to the synced tables (projects, sources, meetings, sessions, transcript lines, interventions) in `sync_outbox`, so store methods never call sync. `cloud::service::CloudService` runs a cycle every 30 seconds while signed in: `cloud::sync` pushes the outbox to Supabase and pulls other devices' rows by server cursor, applying them under `sync_guard` so they do not echo back. The entity registry in `cloud::local` drives both directions. Portable preferences sync through `user_settings`, last writer wins. The session sits in the OS keychain, and the local database binds to the first account that syncs it. Signed out, nothing touches the network. The backend schema lives in `supabase/migrations/`.
+
 ## macOS app visibility
 
 CASE keeps a Dock icon while running, including when its main window is closed or it starts hidden. The menu-bar icon is independent. The app keeps macOS's regular activation policy for its whole lifetime, so the Dock entry never disappears and reappears. Closing the window hides it, and clicking the Dock icon reopens it.

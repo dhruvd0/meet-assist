@@ -35,6 +35,7 @@ import { useSettingsStore } from "./stores/settingsStore";
 import { commands } from "@/bindings";
 import { useMeetingStore } from "./stores/meetingStore";
 import { useProjectStore } from "./stores/projectStore";
+import { useCloudStore } from "./stores/cloudStore";
 import { getLanguageDirection, initializeRTL } from "@/lib/utils/rtl";
 
 type OnboardingStep = "model" | "assistant" | "done";
@@ -128,11 +129,15 @@ function App() {
     meetings.loadMeetings(null);
     meetings.refreshLive();
     projects.loadProjects();
+    const cloud = useCloudStore.getState();
+    void cloud.load();
     const unMeetings = meetings.subscribe();
     const unProjects = projects.subscribe();
+    const unCloud = cloud.subscribe();
     return () => {
       unMeetings.then((fn) => fn());
       unProjects.then((fn) => fn());
+      unCloud.then((fn) => fn());
     };
   }, [ready]);
 

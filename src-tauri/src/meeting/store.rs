@@ -103,7 +103,114 @@ static MIGRATIONS: &[M] = &[
         CREATE INDEX observer_checks_session_idx ON observer_checks(session_id, ts);",
     ),
     M::up("ALTER TABLE meetings ADD COLUMN input_mode TEXT NOT NULL DEFAULT 'audio' CHECK (input_mode IN ('audio', 'text_tester'));"),
+    // Cloud sync change capture. Triggers record every local write in
+    // sync_outbox unless sync_guard.applying is set by a pull. See
+    // docs/superpowers/specs/2026-10-21-cloud-sync-design.md.
+    M::up(
+        "CREATE TABLE sync_outbox (
+            entity TEXT NOT NULL,
+            uid TEXT NOT NULL,
+            deleted INTEGER NOT NULL DEFAULT 0,
+            changed_at INTEGER NOT NULL,
+            version INTEGER NOT NULL DEFAULT 1,
+            PRIMARY KEY (entity, uid)
+        ) WITHOUT ROWID;
+        CREATE TABLE sync_guard (applying INTEGER NOT NULL);
+        INSERT INTO sync_guard (applying) VALUES (0);
+        CREATE TABLE sync_cursor (entity TEXT PRIMARY KEY, synced_at TEXT NOT NULL);
+        CREATE TABLE sync_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+        ALTER TABLE projects ADD COLUMN uid TEXT;
+        UPDATE projects SET uid = lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)), 2) || '-' || substr('89ab', 1 + (abs(random()) % 4), 1) || substr(hex(randomblob(2)), 2) || '-' || hex(randomblob(6)));
+        CREATE UNIQUE INDEX projects_uid_idx ON projects(uid);
+        INSERT INTO sync_outbox (entity, uid, deleted, changed_at) SELECT 'projects', uid, 0, CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER) FROM projects WHERE true;
+        CREATE TRIGGER projects_sync_insert AFTER INSERT ON projects BEGIN
+            UPDATE projects SET uid = lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)), 2) || '-' || substr('89ab', 1 + (abs(random()) % 4), 1) || substr(hex(randomblob(2)), 2) || '-' || hex(randomblob(6))) WHERE id = NEW.id AND uid IS NULL;
+            INSERT INTO sync_outbox (entity, uid, deleted, changed_at) SELECT 'projects', uid, 0, CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER) FROM projects WHERE id = NEW.id AND (SELECT applying FROM sync_guard) = 0 ON CONFLICT(entity, uid) DO UPDATE SET deleted = excluded.deleted, changed_at = excluded.changed_at, version = sync_outbox.version + 1;
+        END;
+        CREATE TRIGGER projects_sync_update AFTER UPDATE OF title, brief, created_at ON projects WHEN (SELECT applying FROM sync_guard) = 0 AND NEW.uid IS NOT NULL BEGIN
+            INSERT INTO sync_outbox (entity, uid, deleted, changed_at) VALUES ('projects', NEW.uid, 0, CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER)) ON CONFLICT(entity, uid) DO UPDATE SET deleted = excluded.deleted, changed_at = excluded.changed_at, version = sync_outbox.version + 1;
+        END;
+        CREATE TRIGGER projects_sync_delete AFTER DELETE ON projects WHEN (SELECT applying FROM sync_guard) = 0 AND OLD.uid IS NOT NULL BEGIN
+            INSERT INTO sync_outbox (entity, uid, deleted, changed_at) VALUES ('projects', OLD.uid, 1, CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER)) ON CONFLICT(entity, uid) DO UPDATE SET deleted = excluded.deleted, changed_at = excluded.changed_at, version = sync_outbox.version + 1;
+        END;
+        ALTER TABLE sources ADD COLUMN uid TEXT;
+        UPDATE sources SET uid = lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)), 2) || '-' || substr('89ab', 1 + (abs(random()) % 4), 1) || substr(hex(randomblob(2)), 2) || '-' || hex(randomblob(6)));
+        CREATE UNIQUE INDEX sources_uid_idx ON sources(uid);
+        INSERT INTO sync_outbox (entity, uid, deleted, changed_at) SELECT 'sources', uid, 0, CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER) FROM sources WHERE true;
+        CREATE TRIGGER sources_sync_insert AFTER INSERT ON sources BEGIN
+            UPDATE sources SET uid = lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)), 2) || '-' || substr('89ab', 1 + (abs(random()) % 4), 1) || substr(hex(randomblob(2)), 2) || '-' || hex(randomblob(6))) WHERE id = NEW.id AND uid IS NULL;
+            INSERT INTO sync_outbox (entity, uid, deleted, changed_at) SELECT 'sources', uid, 0, CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER) FROM sources WHERE id = NEW.id AND (SELECT applying FROM sync_guard) = 0 ON CONFLICT(entity, uid) DO UPDATE SET deleted = excluded.deleted, changed_at = excluded.changed_at, version = sync_outbox.version + 1;
+        END;
+        CREATE TRIGGER sources_sync_update AFTER UPDATE OF project_id, kind, title, locator, added_at, digest ON sources WHEN (SELECT applying FROM sync_guard) = 0 AND NEW.uid IS NOT NULL BEGIN
+            INSERT INTO sync_outbox (entity, uid, deleted, changed_at) VALUES ('sources', NEW.uid, 0, CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER)) ON CONFLICT(entity, uid) DO UPDATE SET deleted = excluded.deleted, changed_at = excluded.changed_at, version = sync_outbox.version + 1;
+        END;
+        CREATE TRIGGER sources_sync_delete AFTER DELETE ON sources WHEN (SELECT applying FROM sync_guard) = 0 AND OLD.uid IS NOT NULL BEGIN
+            INSERT INTO sync_outbox (entity, uid, deleted, changed_at) VALUES ('sources', OLD.uid, 1, CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER)) ON CONFLICT(entity, uid) DO UPDATE SET deleted = excluded.deleted, changed_at = excluded.changed_at, version = sync_outbox.version + 1;
+        END;
+        ALTER TABLE meetings ADD COLUMN uid TEXT;
+        UPDATE meetings SET uid = lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)), 2) || '-' || substr('89ab', 1 + (abs(random()) % 4), 1) || substr(hex(randomblob(2)), 2) || '-' || hex(randomblob(6)));
+        CREATE UNIQUE INDEX meetings_uid_idx ON meetings(uid);
+        INSERT INTO sync_outbox (entity, uid, deleted, changed_at) SELECT 'meetings', uid, 0, CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER) FROM meetings WHERE true;
+        CREATE TRIGGER meetings_sync_insert AFTER INSERT ON meetings BEGIN
+            UPDATE meetings SET uid = lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)), 2) || '-' || substr('89ab', 1 + (abs(random()) % 4), 1) || substr(hex(randomblob(2)), 2) || '-' || hex(randomblob(6))) WHERE id = NEW.id AND uid IS NULL;
+            INSERT INTO sync_outbox (entity, uid, deleted, changed_at) SELECT 'meetings', uid, 0, CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER) FROM meetings WHERE id = NEW.id AND (SELECT applying FROM sync_guard) = 0 ON CONFLICT(entity, uid) DO UPDATE SET deleted = excluded.deleted, changed_at = excluded.changed_at, version = sync_outbox.version + 1;
+        END;
+        CREATE TRIGGER meetings_sync_update AFTER UPDATE OF project_id, title, created_at, status, context, rolling_summary, filed_by, input_mode ON meetings WHEN (SELECT applying FROM sync_guard) = 0 AND NEW.uid IS NOT NULL BEGIN
+            INSERT INTO sync_outbox (entity, uid, deleted, changed_at) VALUES ('meetings', NEW.uid, 0, CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER)) ON CONFLICT(entity, uid) DO UPDATE SET deleted = excluded.deleted, changed_at = excluded.changed_at, version = sync_outbox.version + 1;
+        END;
+        CREATE TRIGGER meetings_sync_delete AFTER DELETE ON meetings WHEN (SELECT applying FROM sync_guard) = 0 AND OLD.uid IS NOT NULL BEGIN
+            INSERT INTO sync_outbox (entity, uid, deleted, changed_at) VALUES ('meetings', OLD.uid, 1, CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER)) ON CONFLICT(entity, uid) DO UPDATE SET deleted = excluded.deleted, changed_at = excluded.changed_at, version = sync_outbox.version + 1;
+        END;
+        ALTER TABLE sessions ADD COLUMN uid TEXT;
+        UPDATE sessions SET uid = lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)), 2) || '-' || substr('89ab', 1 + (abs(random()) % 4), 1) || substr(hex(randomblob(2)), 2) || '-' || hex(randomblob(6)));
+        CREATE UNIQUE INDEX sessions_uid_idx ON sessions(uid);
+        INSERT INTO sync_outbox (entity, uid, deleted, changed_at) SELECT 'sessions', uid, 0, CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER) FROM sessions WHERE true;
+        CREATE TRIGGER sessions_sync_insert AFTER INSERT ON sessions BEGIN
+            UPDATE sessions SET uid = lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)), 2) || '-' || substr('89ab', 1 + (abs(random()) % 4), 1) || substr(hex(randomblob(2)), 2) || '-' || hex(randomblob(6))) WHERE id = NEW.id AND uid IS NULL;
+            INSERT INTO sync_outbox (entity, uid, deleted, changed_at) SELECT 'sessions', uid, 0, CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER) FROM sessions WHERE id = NEW.id AND (SELECT applying FROM sync_guard) = 0 ON CONFLICT(entity, uid) DO UPDATE SET deleted = excluded.deleted, changed_at = excluded.changed_at, version = sync_outbox.version + 1;
+        END;
+        CREATE TRIGGER sessions_sync_update AFTER UPDATE OF meeting_id, started_at, ended_at, summary ON sessions WHEN (SELECT applying FROM sync_guard) = 0 AND NEW.uid IS NOT NULL BEGIN
+            INSERT INTO sync_outbox (entity, uid, deleted, changed_at) VALUES ('sessions', NEW.uid, 0, CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER)) ON CONFLICT(entity, uid) DO UPDATE SET deleted = excluded.deleted, changed_at = excluded.changed_at, version = sync_outbox.version + 1;
+        END;
+        CREATE TRIGGER sessions_sync_delete AFTER DELETE ON sessions WHEN (SELECT applying FROM sync_guard) = 0 AND OLD.uid IS NOT NULL BEGIN
+            INSERT INTO sync_outbox (entity, uid, deleted, changed_at) VALUES ('sessions', OLD.uid, 1, CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER)) ON CONFLICT(entity, uid) DO UPDATE SET deleted = excluded.deleted, changed_at = excluded.changed_at, version = sync_outbox.version + 1;
+        END;
+        ALTER TABLE transcript_lines ADD COLUMN uid TEXT;
+        UPDATE transcript_lines SET uid = lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)), 2) || '-' || substr('89ab', 1 + (abs(random()) % 4), 1) || substr(hex(randomblob(2)), 2) || '-' || hex(randomblob(6)));
+        CREATE UNIQUE INDEX transcript_lines_uid_idx ON transcript_lines(uid);
+        INSERT INTO sync_outbox (entity, uid, deleted, changed_at) SELECT 'transcript_lines', uid, 0, CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER) FROM transcript_lines WHERE true;
+        CREATE TRIGGER transcript_lines_sync_insert AFTER INSERT ON transcript_lines BEGIN
+            UPDATE transcript_lines SET uid = lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)), 2) || '-' || substr('89ab', 1 + (abs(random()) % 4), 1) || substr(hex(randomblob(2)), 2) || '-' || hex(randomblob(6))) WHERE id = NEW.id AND uid IS NULL;
+            INSERT INTO sync_outbox (entity, uid, deleted, changed_at) SELECT 'transcript_lines', uid, 0, CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER) FROM transcript_lines WHERE id = NEW.id AND (SELECT applying FROM sync_guard) = 0 ON CONFLICT(entity, uid) DO UPDATE SET deleted = excluded.deleted, changed_at = excluded.changed_at, version = sync_outbox.version + 1;
+        END;
+        CREATE TRIGGER transcript_lines_sync_update AFTER UPDATE OF session_id, ts, speaker, text ON transcript_lines WHEN (SELECT applying FROM sync_guard) = 0 AND NEW.uid IS NOT NULL BEGIN
+            INSERT INTO sync_outbox (entity, uid, deleted, changed_at) VALUES ('transcript_lines', NEW.uid, 0, CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER)) ON CONFLICT(entity, uid) DO UPDATE SET deleted = excluded.deleted, changed_at = excluded.changed_at, version = sync_outbox.version + 1;
+        END;
+        CREATE TRIGGER transcript_lines_sync_delete AFTER DELETE ON transcript_lines WHEN (SELECT applying FROM sync_guard) = 0 AND OLD.uid IS NOT NULL BEGIN
+            INSERT INTO sync_outbox (entity, uid, deleted, changed_at) VALUES ('transcript_lines', OLD.uid, 1, CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER)) ON CONFLICT(entity, uid) DO UPDATE SET deleted = excluded.deleted, changed_at = excluded.changed_at, version = sync_outbox.version + 1;
+        END;
+        ALTER TABLE interventions ADD COLUMN uid TEXT;
+        UPDATE interventions SET uid = lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)), 2) || '-' || substr('89ab', 1 + (abs(random()) % 4), 1) || substr(hex(randomblob(2)), 2) || '-' || hex(randomblob(6)));
+        CREATE UNIQUE INDEX interventions_uid_idx ON interventions(uid);
+        INSERT INTO sync_outbox (entity, uid, deleted, changed_at) SELECT 'interventions', uid, 0, CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER) FROM interventions WHERE true;
+        CREATE TRIGGER interventions_sync_insert AFTER INSERT ON interventions BEGIN
+            UPDATE interventions SET uid = lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)), 2) || '-' || substr('89ab', 1 + (abs(random()) % 4), 1) || substr(hex(randomblob(2)), 2) || '-' || hex(randomblob(6))) WHERE id = NEW.id AND uid IS NULL;
+            INSERT INTO sync_outbox (entity, uid, deleted, changed_at) SELECT 'interventions', uid, 0, CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER) FROM interventions WHERE id = NEW.id AND (SELECT applying FROM sync_guard) = 0 ON CONFLICT(entity, uid) DO UPDATE SET deleted = excluded.deleted, changed_at = excluded.changed_at, version = sync_outbox.version + 1;
+        END;
+        CREATE TRIGGER interventions_sync_update AFTER UPDATE OF session_id, ts, kind, text, reason, dismissed ON interventions WHEN (SELECT applying FROM sync_guard) = 0 AND NEW.uid IS NOT NULL BEGIN
+            INSERT INTO sync_outbox (entity, uid, deleted, changed_at) VALUES ('interventions', NEW.uid, 0, CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER)) ON CONFLICT(entity, uid) DO UPDATE SET deleted = excluded.deleted, changed_at = excluded.changed_at, version = sync_outbox.version + 1;
+        END;
+        CREATE TRIGGER interventions_sync_delete AFTER DELETE ON interventions WHEN (SELECT applying FROM sync_guard) = 0 AND OLD.uid IS NOT NULL BEGIN
+            INSERT INTO sync_outbox (entity, uid, deleted, changed_at) VALUES ('interventions', OLD.uid, 1, CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER)) ON CONFLICT(entity, uid) DO UPDATE SET deleted = excluded.deleted, changed_at = excluded.changed_at, version = sync_outbox.version + 1;
+        END;",
+    ),
 ];
+
+/// The schema as it was before cloud sync, for the migration test.
+#[cfg(test)]
+pub(crate) fn migrations_before_sync() -> Vec<M<'static>> {
+    MIGRATIONS[..MIGRATIONS.len() - 1].to_vec()
+}
 
 /// Durable result of a judged window, including candidates the backend suppressed.
 pub struct ObserverCheck {
@@ -227,7 +334,7 @@ impl ProjectStore {
         }
     }
 
-    fn conn(&self) -> Result<Connection> {
+    pub(crate) fn conn(&self) -> Result<Connection> {
         let conn = Connection::open(&self.db_path)?;
         conn.busy_timeout(std::time::Duration::from_secs(5))?;
         conn.execute_batch("PRAGMA foreign_keys = ON;")?;

@@ -11,6 +11,7 @@ import {
   AssistantSettings,
   AudioSettings,
   GeneralSettings,
+  AccountSettings,
   AdvancedSettings,
   DebugSettings,
   AboutSettings,
@@ -44,6 +45,11 @@ export const SETTINGS_SECTIONS = {
   general: {
     labelKey: "sidebar.general",
     component: GeneralSettings,
+    enabled: () => true,
+  },
+  account: {
+    labelKey: "sidebar.account",
+    component: AccountSettings,
     enabled: () => true,
   },
   advanced: {

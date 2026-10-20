@@ -707,6 +707,36 @@ async unloadModelManually() : Promise<Result<null, string>> {
     else return { status: "error", error: e  as any };
 }
 },
+async cloudStatus() : Promise<CloudStatus> {
+    return await TAURI_INVOKE("cloud_status");
+},
+async cloudSignIn(email: string, password: string) : Promise<Result<CloudStatus, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("cloud_sign_in", { email, password }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async cloudSignUp(email: string, password: string) : Promise<Result<CloudStatus, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("cloud_sign_up", { email, password }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async cloudSignOut() : Promise<Result<CloudStatus, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("cloud_sign_out") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async cloudSyncNow() : Promise<void> {
+    await TAURI_INVOKE("cloud_sync_now");
+},
 async listProjects() : Promise<Result<Project[], string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("list_projects") };
@@ -1003,6 +1033,7 @@ async summarizeSession(sessionId: number) : Promise<Result<null, string>> {
 
 
 export const events = __makeEvents__<{
+cloudStatus: CloudStatus,
 interventionPayload: InterventionPayload,
 meetingCaptureWarningPayload: MeetingCaptureWarningPayload,
 meetingFiledPayload: MeetingFiledPayload,
@@ -1016,6 +1047,7 @@ sourceStatusPayload: SourceStatusPayload,
 testerTrace: TesterTrace,
 transcriptLinePayload: TranscriptLinePayload
 }>({
+cloudStatus: "cloud-status",
 interventionPayload: "intervention-payload",
 meetingCaptureWarningPayload: "meeting-capture-warning-payload",
 meetingFiledPayload: "meeting-filed-payload",
@@ -1115,6 +1147,16 @@ export type ChineseScript =
  * Keep whatever script the model produced.
  */
 "as_transcribed" | "simplified" | "traditional"
+export type CloudState = "signed_out" | "idle" | "syncing" | "offline" | "error" | 
+/**
+ * Signed in with an account other than the one this device's data belongs to.
+ */
+"account_mismatch"
+export type CloudStatus = { state: CloudState; email: string | null; last_synced_at: number | null; pending: number; message: string | null; 
+/**
+ * Bumped whenever a pull changed local data, so the UI knows to reload.
+ */
+revision: number }
 export type CustomSounds = { start: boolean; stop: boolean }
 export type DetectionScores = { loop_score: number; stuck: number; info: number; idea: number }
 export type EfficiencyIssue = { 
