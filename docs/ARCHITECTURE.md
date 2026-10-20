@@ -26,6 +26,10 @@ Meeting
 
 The global shortcut (the only binding, `toggle_meeting`), the tray Start/End Meeting item, the `--toggle-meeting` CLI flag, and SIGUSR2 all call `meeting::toggle::toggle_meeting`. It ends a running (live or paused) meeting; otherwise it starts a new, unfiled one. Once the meeting has 20 transcript lines, the observer loop runs `meeting::filing`: a tool loop (`list_projects`, `read_project`, `assign_meeting`, `create_project`, `rename_meeting`) that files the meeting into a project and renames it. It retries up to 3 times as the transcript grows and makes one last attempt when the meeting ends. Writes are conditional on `meetings.filed_by IS NULL`, so a user move (`move_meeting`, `filed_by = 'user'`) always wins. A filing shows on the floating card with Change and Undo.
 
+## macOS app visibility
+
+CASE keeps a Dock icon while running, including when its main window is closed or it starts hidden. The menu-bar icon is independent. The app keeps macOS's regular activation policy for its whole lifetime, so the Dock entry never disappears and reappears. Closing the window hides it, and clicking the Dock icon reopens it.
+
 ## Settings
 
 One LLM provider serves the observer, summaries, and vision digests: `llm_provider_id`, `llm_providers`, `llm_api_keys`, `llm_models` (serde aliases accept the old `post_process_*` names). Settings schema version 3 migrates `meeting_provider_id` into `llm_provider_id`, moves the old transcribe shortcut to `toggle_meeting`, prunes stale bindings, and drops the `apple_intelligence` provider.
