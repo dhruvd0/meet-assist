@@ -860,6 +860,17 @@ async getMeetingDetail(id: number) : Promise<Result<MeetingDetail | null, string
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * Every AI call the meeting made, with tokens and estimated cost.
+ */
+async getMeetingUsage(id: number) : Promise<Result<MeetingUsage, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_meeting_usage", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async startMeeting(projectId: number | null, meetingId: number | null) : Promise<Result<Meeting, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("start_meeting", { projectId, meetingId }) };
@@ -1206,6 +1217,14 @@ export type ImplementationChangeResult = { success: boolean;
 reset_bindings: string[] }
 export type Intervention = { id: number; session_id: number; ts: number; kind: string; text: string; reason: string; dismissed: boolean }
 export type InterventionPayload = { meeting_id: number; intervention: Intervention }
+/**
+ * One Jev answer, as shown in the live panel.
+ */
+export type JevCheck = { ts: number; 
+/**
+ * The kind Jev flagged for the main model, or `None` when it stayed quiet.
+ */
+hint: string | null; scores: DetectionScores }
 export type KeyboardImplementation = "tauri" | "native_keys"
 /**
  * Request format an LLM endpoint speaks. Built-in providers have a
@@ -1269,6 +1288,15 @@ export type MeetingStatus = "live" | "paused" | "ended"
  * Emitted when the assistant names a meeting without filing it.
  */
 export type MeetingTitledPayload = { meeting_id: number; title: string }
+export type MeetingUsage = { lines: UsageLine[]; jev_checks: number; model_calls: number; tool_calls: number; 
+/**
+ * Sum of the priced lines.
+ */
+cost_usd: number; 
+/**
+ * True when some calls could not be priced, so `cost_usd` is a floor.
+ */
+partial_cost: boolean; prices_checked: string }
 export type ModelInfo = { id: string; name: string; description: string; filename: string; source: ModelSource; size_mb: number; is_downloaded: boolean; is_downloading: boolean; partial_size: number; is_directory: boolean; engine_type: EngineType; accuracy_score: number; speed_score: number; supports_translation: boolean; is_recommended: boolean; supported_languages: string[]; supports_language_selection: boolean; is_custom: boolean; supports_streaming: boolean; supports_language_detection: boolean }
 export type ModelLoadStatus = { is_loaded: boolean; current_model: string | null }
 /**
@@ -1317,7 +1345,15 @@ detail: string | null;
 /**
  * The observer's last few verdicts for this meeting, oldest first.
  */
-thoughts: ObserverThought[] }
+thoughts: ObserverThought[]; 
+/**
+ * Jev's latest answer, when Jev gates this meeting.
+ */
+jev: JevCheck | null; 
+/**
+ * Every AI call this meeting has made so far.
+ */
+usage: MeetingUsage | null }
 /**
  * One judged window: the model's reason, and whether it nudged.
  */
@@ -1371,6 +1407,18 @@ export type Theme = "system" | "light" | "dark"
 export type TranscribeAcceleratorSetting = "auto" | "cpu" | "gpu"
 export type TranscriptLine = { id: number; session_id: number; ts: number; speaker: string; text: string }
 export type TranscriptLinePayload = { meeting_id: number; line: TranscriptLine }
+/**
+ * Totals for one purpose and model within a meeting.
+ */
+export type UsageLine = { purpose: string; model: string; 
+/**
+ * Calls made (one per Jev check, one per main-model run).
+ */
+calls: number; failed: number; requests: number; tool_calls: number; input_tokens: number; cached_input_tokens: number; output_tokens: number; 
+/**
+ * `None` when the model has no known price (Jev, unlisted models).
+ */
+cost_usd: number | null }
 export type VadBackend = "silero" | "earshot"
 export type WindowsMicrophonePermissionStatus = { supported: boolean; overall_access: PermissionAccess; device_access: PermissionAccess; app_access: PermissionAccess; desktop_app_access: PermissionAccess }
 

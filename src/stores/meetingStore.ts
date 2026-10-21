@@ -7,6 +7,8 @@ import {
   type Meeting,
   type MeetingDetail,
   type MeetingStatePayload,
+  type JevCheck,
+  type MeetingUsage,
   type ObserverThought,
 } from "@/bindings";
 import { useProjectStore } from "./projectStore";
@@ -24,6 +26,8 @@ interface ObserverView {
   consecutive_failures: number;
   last_error: string | null;
   thoughts: ObserverThought[];
+  jev: JevCheck | null;
+  usage: MeetingUsage | null;
   readiness: ObserverReadinessCode;
   detail: string | null;
 }
@@ -86,6 +90,8 @@ const idleCounters = {
   consecutive_failures: 0,
   last_error: null,
   thoughts: [] as ObserverThought[],
+  jev: null as JevCheck | null,
+  usage: null as MeetingUsage | null,
 };
 const idleObserver: ObserverView = {
   ...idleCounters,
@@ -391,11 +397,20 @@ export const useMeetingStore = create<MeetingStore>((set, get) => ({
         readiness,
         detail,
         thoughts,
+        jev,
+        usage,
       } = e.payload;
       // Readiness is global; the counters belong to one meeting.
       const counters =
         meeting_id === null || meeting_id === get().activeMeetingId
-          ? { tools_unavailable, consecutive_failures, last_error, thoughts }
+          ? {
+              tools_unavailable,
+              consecutive_failures,
+              last_error,
+              thoughts,
+              jev,
+              usage,
+            }
           : {};
       set((s) => ({
         observer: {

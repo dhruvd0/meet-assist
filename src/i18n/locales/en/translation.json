@@ -215,6 +215,15 @@
         "unsupported_provider": "{{detail}} cannot run the meeting assistant. Choose another provider in Assistant.",
         "missing_api_key": "No API key for {{detail}}. Add one in Assistant.",
         "no_model": "No model is selected for {{detail}}. Pick one in Assistant."
+      },
+      "jev": "Jev",
+      "jevQuiet": "quiet · top {{top}}",
+      "jevFlagged": "flagged {{kind}} for the main model · top {{top}}",
+      "kind": {
+        "loop": "loop",
+        "stuck": "stuck",
+        "info": "info",
+        "idea": "idea"
       }
     },
     "summary": {
@@ -301,6 +310,39 @@
         "cooldown": "Nudge cooldown · {{seconds}} seconds remaining",
         "scores": "Loop {{loop}} · Stuck {{stuck}} · Fact {{info}} · Idea {{idea}}"
       }
+    },
+    "usage": {
+      "jevChecks_one": "{{count}} Jev check",
+      "jevChecks_other": "{{count}} Jev checks",
+      "modelCalls_one": "{{count}} main-model call",
+      "modelCalls_other": "{{count}} main-model calls",
+      "toolCalls_one": "{{count}} tool call",
+      "toolCalls_other": "{{count}} tool calls",
+      "cost": "{{cost}} est.",
+      "costPartial": "{{cost}}+ est.",
+      "details": "Details",
+      "failed_one": "({{count}} failed)",
+      "failed_other": "({{count}} failed)",
+      "tokens": "{{input}} in ({{cached}} cached) · {{output}} out",
+      "notReported": "not reported",
+      "col": {
+        "purpose": "Purpose",
+        "model": "Model",
+        "calls": "Calls",
+        "tools": "Tools",
+        "tokens": "Tokens",
+        "cost": "Cost"
+      },
+      "purpose": {
+        "jev": "Jev check",
+        "check": "Flagged by Jev",
+        "memory": "Memory refresh",
+        "catch_up": "Catch-up",
+        "fallback": "Without Jev",
+        "filing": "Filing and title",
+        "summary": "Summary"
+      },
+      "footnote": "Costs are estimates from OpenAI list prices checked {{date}}, using the token counts the provider reported. Jev does not report usage or cost, so “+” means the total excludes it."
     }
   },
   "onboarding": {

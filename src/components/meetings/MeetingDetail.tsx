@@ -8,6 +8,7 @@ import {
   Play,
   Square,
 } from "lucide-react";
+import { commands, type MeetingUsage } from "@/bindings";
 import { useMeetingStore } from "@/stores/meetingStore";
 import { Alert } from "../ui/Alert";
 import Badge from "../ui/Badge";
@@ -22,6 +23,7 @@ import { MeetingProjectPicker } from "./MeetingProjectPicker";
 import { TranscriptThread } from "./TranscriptThread";
 import { NotesMarkdown } from "./NotesMarkdown";
 import { ObserverStatus } from "./ObserverStatus";
+import { MeetingUsageSummary } from "./MeetingUsageSummary";
 import { useTranscriptPlayer } from "./useTranscriptPlayer";
 
 /** One meeting as a page of notes: summary first, transcript last. */
@@ -47,6 +49,20 @@ export const MeetingDetail: React.FC = () => {
   const meetingId = detail?.meeting.id;
   useEffect(() => {
     setShowTranscript(isLive);
+  }, [isLive, meetingId]);
+
+  // Live meetings get usage from the observer status; past ones load it once.
+  const [usage, setUsage] = useState<MeetingUsage | null>(null);
+  useEffect(() => {
+    setUsage(null);
+    if (meetingId === undefined || isLive) return;
+    let current = true;
+    void commands.getMeetingUsage(meetingId).then((res) => {
+      if (current && res.status === "ok") setUsage(res.data);
+    });
+    return () => {
+      current = false;
+    };
   }, [isLive, meetingId]);
 
   if (!detail)
@@ -191,6 +207,7 @@ export const MeetingDetail: React.FC = () => {
           {isLive && observer.readiness === "ready" && (
             <ObserverStatus recording={live.status === "live"} />
           )}
+          {!isLive && usage && <MeetingUsageSummary usage={usage} />}
           {captureWarning?.source === "system_audio" &&
             captureWarning.meeting_id === m.id && (
               <Alert variant="warning">
