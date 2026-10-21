@@ -1,9 +1,10 @@
 //! End-of-meeting summaries: a structured per-session summary plus a rolling
 //! summary that carries the meeting's state across sessions.
 
-use crate::llm_client;
+use crate::llm_client::{self, LlmUsage};
 use crate::meeting::observer::History;
 use crate::meeting::store::{ProjectStore, TranscriptLine};
+use crate::meeting::usage::Purpose;
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -93,6 +94,10 @@ pub trait Summarizer: Send + Sync {
     ) -> Result<SessionSummary>;
     fn merge_rolling(&self, previous: Option<&str>, new_session: &SessionSummary)
         -> Result<String>;
+    /// Calls made since the last drain, as (model, succeeded, usage).
+    fn take_usage(&self) -> Vec<(String, bool, LlmUsage)> {
+        Vec::new()
+    }
 }
 
 pub fn session_summary_schema() -> Value {
@@ -238,6 +243,7 @@ Reply with JSON: {\"rolling_summary\": string}."
 
 pub struct LlmSummarizer {
     pub app: AppHandle,
+    pub usage: std::sync::Mutex<Vec<(String, bool, LlmUsage)>>,
 }
 
 impl LlmSummarizer {
@@ -251,12 +257,20 @@ impl LlmSummarizer {
             .llm_model()
             .ok_or_else(|| anyhow!("no model configured"))?;
         let api_key = settings.llm_api_key();
-        let fut = async move {
-            llm_client::complete_json(&provider, api_key, &model, system, user, schema).await
-        };
-        tauri::async_runtime::block_on(async move { tokio::time::timeout(LLM_BUDGET, fut).await })
-            .map_err(|_| anyhow!("summary timed out"))?
-            .map_err(|e| anyhow!(e))
+        let mut usage = LlmUsage::default();
+        let fut =
+            llm_client::complete_json(&provider, api_key, &model, system, user, schema, &mut usage);
+        let result =
+            tauri::async_runtime::block_on(
+                async move { tokio::time::timeout(LLM_BUDGET, fut).await },
+            )
+            .map_err(|_| anyhow!("summary timed out"))
+            .and_then(|r| r.map_err(|e| anyhow!(e)));
+        self.usage
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .push((model, result.is_ok(), usage));
+        result
     }
 }
 
@@ -297,6 +311,10 @@ fn flatten_text_fields(v: &mut Value) {
 }
 
 impl Summarizer for LlmSummarizer {
+    fn take_usage(&self) -> Vec<(String, bool, LlmUsage)> {
+        std::mem::take(&mut *self.usage.lock().unwrap_or_else(|e| e.into_inner()))
+    }
+
     fn summarize_session(
         &self,
         title: &str,
@@ -363,9 +381,18 @@ pub fn run_summary_job(
         return Ok(None);
     }
     let history = History::load(store, &meeting)?;
-    let summary =
-        summarizer.summarize_session(&meeting.title, &meeting.context, &history, &lines)?;
-    let rolling = summarizer.merge_rolling(meeting.rolling_summary.as_deref(), &summary)?;
+    let calls = (|| {
+        let summary =
+            summarizer.summarize_session(&meeting.title, &meeting.context, &history, &lines)?;
+        let rolling = summarizer.merge_rolling(meeting.rolling_summary.as_deref(), &summary)?;
+        Ok::<_, anyhow::Error>((summary, rolling))
+    })();
+    for (model, ok, usage) in summarizer.take_usage() {
+        if let Err(e) = store.record_usage(meeting.id, Purpose::Summary, &model, ok, &usage) {
+            log::warn!("summary: record usage: {e:#}");
+        }
+    }
+    let (summary, rolling) = calls?;
     // `set_rolling_summary` truncates at its cap rather than erroring.
     store.set_session_summary(session_id, &serde_json::to_string(&summary)?)?;
     store.set_rolling_summary(meeting.id, &rolling)?;

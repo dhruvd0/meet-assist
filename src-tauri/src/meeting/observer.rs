@@ -5,12 +5,13 @@
 use super::tester::TesterTraceKind;
 use crate::audio_feedback;
 use crate::llm_client::{self, ToolLoopError};
-use crate::meeting::jev::{GateMode, JevDetector};
+use crate::meeting::jev::{GateMode, JevCall, JevCheck, JevDetector};
 use crate::meeting::session::MeetingManager;
 use crate::meeting::store::{
     Intervention, Meeting, MeetingRecap, ObserverCheck, ProjectStore, TranscriptLine,
 };
 use crate::meeting::tools::{handle_tool, tool_defs, ToolContext};
+use crate::meeting::usage::{MeetingUsage, Purpose, JEV_MODEL};
 use crate::settings::{AppSettings, LlmProvider, MeetingSensitivity};
 use anyhow::Result;
 use log::{info, warn};
@@ -39,8 +40,10 @@ pub const EARLIER_MIN_LINES: i64 = 20;
 pub const RECAP_MAX_CHARS: usize = 1500;
 /// Bound both catch-up work and the durable model-written ledger.
 pub const CATCHUP_LINES: usize = 100;
-const MEMORY_FLOOR_LINES: usize = 40;
-const MEMORY_FLOOR_MS: i64 = 90_000;
+/// A silent memory refresh runs once this much transcript has gone unread by
+/// the main model (Jev quiet throughout): a full catch-up batch, or 5 minutes.
+const MEMORY_FLOOR_LINES: usize = CATCHUP_LINES;
+const MEMORY_FLOOR_MS: i64 = 300_000;
 pub const LEDGER_ITEMS: usize = 12;
 pub const LEDGER_ITEM_CHARS: usize = 240;
 
@@ -296,6 +299,8 @@ pub fn readiness(settings: &AppSettings) -> Readiness {
 pub struct JudgeInput {
     pub system: String,
     pub user: String,
+    /// Why the main model is running, for the usage record.
+    pub purpose: Purpose,
 }
 
 #[derive(Debug)]
@@ -356,6 +361,7 @@ impl Judge for LlmJudge {
             .map_err(JudgeError::Other)?;
         let defs = if allow_tools { tool_defs() } else { Vec::new() };
         let handler = |c: &llm_client::ToolCall| handle_tool(tools_ctx, c);
+        let mut usage = llm_client::LlmUsage::default();
         let fut = llm_client::send_with_tools_with_client(
             &client,
             &provider,
@@ -366,16 +372,27 @@ impl Judge for LlmJudge {
             verdict_schema(),
             MAX_TOOL_CALLS,
             &handler,
+            &mut usage,
         );
         let budget = std::time::Duration::from_secs(15);
         let text =
             tauri::async_runtime::block_on(async move { tokio::time::timeout(budget, fut).await });
-        match text {
+        let verdict = match text {
             Err(_) => Err(JudgeError::Other("judge timed out".into())),
             Ok(Err(ToolLoopError::ToolsRejected(_))) => Err(JudgeError::ToolsRejected),
             Ok(Err(ToolLoopError::Other(e))) => Err(JudgeError::Other(e)),
             Ok(Ok(t)) => parse_verdict(&t).map_err(JudgeError::Other),
+        };
+        if let Err(e) = tools_ctx.store.record_usage(
+            tools_ctx.meeting_id,
+            input.purpose,
+            &model,
+            verdict.is_ok(),
+            &usage,
+        ) {
+            warn!("observer: record usage: {e:#}");
         }
+        verdict
     }
 }
 
@@ -454,7 +471,11 @@ pub fn build_prompt(
     for l in lines {
         user.push_str(&format!("[{}] {}: {}\n", l.ts, l.speaker, l.text));
     }
-    JudgeInput { system, user }
+    JudgeInput {
+        system,
+        user,
+        purpose: Purpose::Fallback,
+    }
 }
 
 #[derive(Debug, Default, Clone)]
@@ -470,6 +491,8 @@ pub struct ObserverState {
     pub jev_through: i64,
     /// When the model last ran, to cap model calls at the check interval.
     pub last_judge_ms: i64,
+    /// Jev's latest answer in this meeting.
+    pub jev: Option<JevCheck>,
 }
 
 /// One judged window: the model's reason, and whether it nudged.
@@ -666,7 +689,25 @@ pub fn tick(
         );
         GateMode::Evaluate { hint: None }
     } else {
-        detector.decide(&input.user, memory_due, mm, session_id)
+        let (mode, call) = detector.decide(&input.user, memory_due, mm, session_id);
+        let jev_ok = match call {
+            JevCall::Skipped => None,
+            JevCall::Failed => Some(false),
+            JevCall::Answered(check) => {
+                state.jev = Some(check);
+                Some(true)
+            }
+        };
+        if let Some(ok) = jev_ok {
+            let one = llm_client::LlmUsage {
+                requests: 1,
+                ..Default::default()
+            };
+            if let Err(e) = store.record_usage(meeting_id, Purpose::Jev, JEV_MODEL, ok, &one) {
+                warn!("observer: record jev usage: {e:#}");
+            }
+        }
+        mode
     };
     if matches!(mode, GateMode::Deferred) {
         state.jev_through = latest;
@@ -677,6 +718,12 @@ pub fn tick(
         return Ok(None);
     }
     mode.instruct(&mut input.system);
+    input.purpose = match (&mode, catching_up) {
+        (_, true) => Purpose::CatchUp,
+        (GateMode::Memory, _) => Purpose::Memory,
+        (GateMode::Evaluate { hint: Some(_) }, _) => Purpose::Check,
+        _ => Purpose::Fallback,
+    };
     let ctx = ToolContext {
         store: Arc::new(store.clone_handle()),
         project_id: meeting.project_id,
@@ -689,6 +736,7 @@ pub fn tick(
         Err(JudgeError::ToolsRejected) => {
             warn!("observer: provider rejected tools; falling back without tools");
             state.tools_unavailable = true;
+            let purpose = input.purpose;
             let mut input = build_prompt(
                 &brief,
                 &history,
@@ -699,6 +747,7 @@ pub fn tick(
                 false,
             );
             mode.instruct(&mut input.system);
+            input.purpose = purpose;
             mm.trace_tester(
                 session_id,
                 TesterTraceKind::Error {
@@ -792,6 +841,10 @@ pub struct ObserverStatusPayload {
     pub detail: Option<String>,
     /// The observer's last few verdicts for this meeting, oldest first.
     pub thoughts: Vec<ObserverThought>,
+    /// Jev's latest answer, when Jev gates this meeting.
+    pub jev: Option<JevCheck>,
+    /// Every AI call this meeting has made so far.
+    pub usage: Option<MeetingUsage>,
 }
 
 /// Sleep between ticks: the interval, or `BACKOFF_FACTOR` times it after
@@ -865,6 +918,8 @@ pub fn spawn_observer(
                         readiness: ready.code().to_string(),
                         detail: ready.detail(),
                         thoughts: state.thoughts.clone(),
+                        jev: state.jev.clone(),
+                        usage: st.meeting_id.and_then(|id| store.meeting_usage(id).ok()),
                     };
                     if last_status.as_ref() != Some(&payload) {
                         let _ = payload.clone().emit(&app);

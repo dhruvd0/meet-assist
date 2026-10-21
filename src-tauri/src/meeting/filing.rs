@@ -5,6 +5,7 @@
 use crate::llm_client::{self, ToolCall, ToolClientCache, ToolDef, ToolLoopError};
 use crate::meeting::observer::{readiness, Readiness};
 use crate::meeting::store::{Meeting, ProjectStore, TranscriptLine, FILED_BY_AI, FILED_BY_USER};
+use crate::meeting::usage::Purpose;
 use log::{info, warn};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -489,6 +490,7 @@ impl LlmFiler {
             meeting.created_at,
         );
         let handler = |c: &ToolCall| ctx.handle(c);
+        let mut usage = llm_client::LlmUsage::default();
         let fut = llm_client::send_with_tools_with_client(
             &client,
             &provider,
@@ -499,9 +501,14 @@ impl LlmFiler {
             final_schema(),
             MAX_TOOL_CALLS,
             &handler,
+            &mut usage,
         );
         let result =
             tauri::async_runtime::block_on(async move { tokio::time::timeout(BUDGET, fut).await });
+        let ok = matches!(result, Ok(Ok(_))) || ctx.outcome().is_some() || ctx.renamed();
+        if let Err(e) = store.record_usage(meeting_id, Purpose::Filing, &model, ok, &usage) {
+            warn!("filing: record usage: {e:#}");
+        }
         if let Some(filed) = ctx.outcome() {
             return Ok(Some(filed));
         }

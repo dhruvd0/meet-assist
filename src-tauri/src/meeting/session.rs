@@ -380,6 +380,7 @@ impl MeetingManager {
             app: Some(app.clone()),
             summarizer: Some(Arc::new(crate::meeting::summary::LlmSummarizer {
                 app: app.clone(),
+                usage: Default::default(),
             })),
             summary_lock: Arc::new(Mutex::new(())),
             filer: Some(Arc::new(crate::meeting::filing::LlmFiler::new(app.clone()))),

@@ -530,6 +530,40 @@ fn merge_reasoning(body: &mut Value, reasoning: &ReasoningParams) {
     }
 }
 
+/// What one tool loop cost: HTTP requests sent (including retries and failed
+/// ones), tool calls answered, and the tokens the provider reported.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct LlmUsage {
+    pub requests: i64,
+    pub tool_calls: i64,
+    pub input_tokens: i64,
+    pub cached_input_tokens: i64,
+    pub output_tokens: i64,
+}
+
+impl LlmUsage {
+    /// Add the `usage` block of one response. OpenAI-format bodies report
+    /// cached tokens inside `prompt_tokens`; Anthropic reports them apart.
+    fn add_response(&mut self, json: &Value, anthropic: bool) {
+        let u = &json["usage"];
+        let n = |v: &Value| v.as_i64().unwrap_or(0);
+        if anthropic {
+            let cached = n(&u["cache_read_input_tokens"]);
+            self.input_tokens +=
+                n(&u["input_tokens"]) + cached + n(&u["cache_creation_input_tokens"]);
+            self.cached_input_tokens += cached;
+        } else {
+            self.input_tokens += n(&u["prompt_tokens"]);
+            self.cached_input_tokens += n(&u["prompt_tokens_details"]["cached_tokens"]);
+        }
+        self.output_tokens += n(&u[if anthropic {
+            "output_tokens"
+        } else {
+            "completion_tokens"
+        }]);
+    }
+}
+
 /// Run a tool-calling conversation until the model answers without tool
 /// calls, or `max_tool_calls` is reached (then one final request with
 /// `tool_choice: none` demanding the answer). Returns the final assistant
@@ -546,6 +580,7 @@ pub async fn send_with_tools(
     final_schema: Value,
     max_tool_calls: usize,
     handler: &(dyn Fn(&ToolCall) -> String + Sync),
+    usage: &mut LlmUsage,
 ) -> Result<String, ToolLoopError> {
     let client = create_client(provider, &api_key).map_err(ToolLoopError::Other)?;
     send_with_tools_with_client(
@@ -558,6 +593,7 @@ pub async fn send_with_tools(
         final_schema,
         max_tool_calls,
         handler,
+        usage,
     )
     .await
 }
@@ -606,6 +642,7 @@ pub async fn send_with_tools_with_client(
     final_schema: Value,
     max_tool_calls: usize,
     handler: &(dyn Fn(&ToolCall) -> String + Sync),
+    usage: &mut LlmUsage,
 ) -> Result<String, ToolLoopError> {
     let base = provider.base_url.trim_end_matches('/');
     let anthropic = provider.api_format == LlmApiFormat::Anthropic;
@@ -656,6 +693,7 @@ pub async fn send_with_tools_with_client(
                 body
             }
         };
+        usage.requests += 1;
         let (mut status, mut text) = post_json(client, &url, &build(&reasoning)).await?;
         // A 400/422 on a request carrying reasoning-disable fields is most
         // likely the endpoint rejecting them: retry once without and remember.
@@ -664,6 +702,7 @@ pub async fn send_with_tools_with_client(
                 "Tool loop: endpoint rejected reasoning fields (status {status}); retrying without them"
             );
             reasoning = ReasoningParams::default();
+            usage.requests += 1;
             (status, text) = post_json(client, &url, &build(&reasoning)).await?;
             if (200..300).contains(&status) {
                 remember_rejection(key.clone());
@@ -681,6 +720,7 @@ pub async fn send_with_tools_with_client(
         first_request = false;
         let json: Value = serde_json::from_str(&text)
             .map_err(|e| ToolLoopError::Other(format!("bad json: {e}")))?;
+        usage.add_response(&json, anthropic);
         let (answer, calls) = if anthropic {
             parse_anthropic_tool_calls(&json)
         } else {
@@ -696,6 +736,7 @@ pub async fn send_with_tools_with_client(
                 continue;
             }
             calls_made += 1;
+            usage.tool_calls += 1;
             let mut r = handler(c);
             if r.len() > 4096 {
                 truncate_at_char_boundary(&mut r, 4096);
@@ -764,6 +805,7 @@ pub async fn complete_json(
     system_prompt: String,
     user_content: String,
     schema: Value,
+    usage: &mut LlmUsage,
 ) -> Result<Value, String> {
     let handler = |_c: &ToolCall| String::new();
     let text = send_with_tools(
@@ -776,6 +818,7 @@ pub async fn complete_json(
         schema,
         0,
         &handler,
+        usage,
     )
     .await
     .map_err(|e| format!("{e}"))?;
