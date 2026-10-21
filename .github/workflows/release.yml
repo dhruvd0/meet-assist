@@ -128,8 +128,12 @@ jobs:
             for (const target of ['darwin-aarch64', 'darwin-x86_64', 'windows-x86_64', 'windows-x86_64-nsis', 'windows-x86_64-msi']) {
               const entry = manifest.platforms?.[target];
               if (!entry?.signature) throw new Error(`Missing updater signature: ${target}`);
-              const asset = assets.find(asset => asset.browser_download_url === entry.url);
-              if (!asset || !entry.url.includes(`/releases/download/v${version}/`)) {
+              // A draft's assets are served from an `untagged-...` path until it is
+              // published, so match by file name and check the manifest's own URL.
+              const prefix = `/releases/download/v${version}/`;
+              const name = entry.url.includes(prefix) ? decodeURIComponent(entry.url.split(prefix)[1]) : null;
+              const asset = assets.find(asset => asset.name === name && asset.state === 'uploaded');
+              if (!asset) {
                 throw new Error(`Missing or incorrect updater package: ${target}`);
               }
               if ((await readAsset(`${asset.name}.sig`)).trim() !== entry.signature.trim()) {
