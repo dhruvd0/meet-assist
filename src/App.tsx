@@ -36,6 +36,7 @@ import { commands } from "@/bindings";
 import { useMeetingStore } from "./stores/meetingStore";
 import { useProjectStore } from "./stores/projectStore";
 import { useCloudStore } from "./stores/cloudStore";
+import { AccountChip } from "./components/settings/account/AccountChip";
 import { getLanguageDirection, initializeRTL } from "@/lib/utils/rtl";
 
 type OnboardingStep = "model" | "assistant" | "done";
@@ -352,6 +353,14 @@ function App() {
                 {t("nav.back")}
               </button>
             )}
+            <div className="ms-auto">
+              <AccountChip
+                onOpen={() => {
+                  setSettingsSection("account");
+                  navigate("settings");
+                }}
+              />
+            </div>
           </div>
           <div ref={scrollRef} className="@container flex-1 overflow-y-auto">
             {page}
