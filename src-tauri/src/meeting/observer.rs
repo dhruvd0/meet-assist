@@ -423,6 +423,7 @@ pub fn build_prompt(
     };
     let system = format!(
         "You are a silent copilot for one person following a live conversation. It can be a meeting or call, an interview, a debate, a class or talk, or a broadcast they are only listening to. You read the live transcript and answer ONE question: should you speak up right now? Silence is the default answer; most checks end in silence.\n\
+         Always write generated content in English, regardless of the language of the transcript, input, or existing content. Preserve proper nouns and verbatim quotes in their original form. This applies to nudge text, Circle topics and checklist lines, reasons, and every live_context entry.\n\
          Speakers: `me` is the user's own microphone; `them` is everything else they hear (other people on a call, or audio playing on their computer). The user may only be listening, so `me` can be silent throughout.\n\
          The transcript is raw speech-to-text: it has fragments, misheard words, mixed languages (for example Hindi and English), and the same sentence sometimes appears twice. None of that is a reason to speak, and never comment on the conversation being unclear.\n\
          Signals:\n\

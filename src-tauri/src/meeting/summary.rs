@@ -157,7 +157,7 @@ pub fn session_prompt(
     let system = "You summarize one session of a conversation (a meeting or call, interview, \
 debate, class or talk, or a broadcast) for the user, who may have taken part or only listened. \
 Transcript lines are labelled `me` (the user's microphone) or `them` (everything else they \
-heard). Reply with JSON: `decisions` (what was decided or settled), `open_questions` (raised \
+heard). Always write generated content in English, regardless of the language of the transcript, input, or existing content. Preserve proper nouns and verbatim quotes in their original form. Reply with JSON: `decisions` (what was decided or settled), `open_questions` (raised \
 but unresolved), `action_items` (who does what, when known), `recap` (a three-line recap \
 of what was said), and `efficiency`, a frank report on where the talk lost time: \
 `score` (0-100, the share of the talk that moved things forward: new information, \
@@ -226,7 +226,7 @@ pub fn format_session_summary_for_rolling(s: &SessionSummary) -> String {
 /// session summary.
 pub fn rolling_prompt(previous: Option<&str>, new_session: &SessionSummary) -> (String, String) {
     let system = "You maintain a running summary of a conversation that spans several sessions. \
-Merge the previous rolling summary with the new session summary. Keep it under 300 words, \
+Always write generated content in English, regardless of the language of the transcript, input, or existing content. Preserve proper nouns and verbatim quotes in their original form. Merge the previous rolling summary with the new session summary. Keep it under 300 words, \
 keep decisions and open questions, and drop questions that the new session resolved. \
 Reply with JSON: {\"rolling_summary\": string}."
         .to_string();
@@ -403,6 +403,76 @@ pub fn run_summary_job(
 mod tests {
     use super::*;
     use std::sync::Mutex;
+
+    #[test]
+    fn generated_content_prompts_require_english_without_translating_evidence() {
+        use crate::meeting::{filing, indexer, observer};
+        use crate::settings::MeetingSensitivity;
+
+        let (_dir, store, mid, sid) = setup();
+        let source = "रवि: कल लॉन्च करें — CASE API";
+        store.append_line(sid, "me", source, 1).unwrap();
+        let lines = store.session_lines(sid).unwrap();
+        let history = History {
+            this_meeting: Some("पहले की चर्चा".into()),
+            ..History::default()
+        };
+        let (session, evidence) = session_prompt("योजना", source, &history, &lines);
+        assert!(evidence.contains(source));
+        assert!(evidence.contains("पहले की चर्चा"));
+        let (rolling, previous) = rolling_prompt(
+            Some(source),
+            &SessionSummary {
+                recap: source.into(),
+                ..SessionSummary::default()
+            },
+        );
+        assert!(previous.contains(source));
+        assert!(filing::user_prompt("योजना", source, &lines).contains(source));
+
+        let mut prompts = vec![
+            ("session notes and efficiency", session),
+            ("rolling summary", rolling),
+            ("image digest", indexer::image_digest_prompt()),
+        ];
+        // Both the tool-enabled judge and its no-tools fallback must apply
+        // the same policy to circles, reasons, and persistent live memory.
+        for tools in [true, false] {
+            let input = observer::build_prompt(
+                source,
+                &history,
+                source,
+                &[],
+                &lines,
+                MeetingSensitivity::Medium,
+                tools,
+            );
+            assert!(input.user.contains(source));
+            prompts.push(("observer", input.system));
+        }
+        prompts.push(("filing", filing::SYSTEM_PROMPT.to_string()));
+        prompts.push(("title only", filing::TITLE_PROMPT.to_string()));
+        for (path, prompt) in prompts {
+            assert!(
+                prompt.contains("Always write generated content in English"),
+                "{path}: missing English output policy"
+            );
+            assert!(
+                prompt.contains("regardless of the language"),
+                "{path}: missing input-language override"
+            );
+            assert!(
+                prompt.contains("proper nouns") && prompt.contains("verbatim quotes"),
+                "{path}: missing source-preservation exceptions"
+            );
+            assert!(
+                !prompt.contains("in the transcript's language"),
+                "{path}: conflicting language policy"
+            );
+        }
+        assert_eq!(store.session_lines(sid).unwrap()[0].text, source);
+        assert_eq!(store.get_meeting(mid).unwrap().unwrap().title, "Kickoff");
+    }
 
     struct Fake {
         previous_seen: Mutex<Vec<Option<String>>>,
