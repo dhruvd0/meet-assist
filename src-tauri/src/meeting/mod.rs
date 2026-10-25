@@ -17,5 +17,6 @@ pub mod summary;
 pub mod system_capture;
 pub mod toggle;
 pub mod tools;
+pub mod usage;
 
 pub mod tester;

@@ -17,7 +17,7 @@ impl TesterSpeaker {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, Type)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Type)]
 pub struct DetectionScores {
     pub loop_score: f64,
     pub stuck: f64,

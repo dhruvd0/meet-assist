@@ -5,8 +5,9 @@ use super::{
 };
 use crate::settings::{self, AppSettings, MeetingSensitivity};
 use futures_util::StreamExt;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
+use specta::Type;
 use std::time::Duration;
 use tauri::AppHandle;
 
@@ -62,6 +63,23 @@ pub fn eligible(settings: &AppSettings) -> bool {
         && readiness(settings) == Readiness::Ready
 }
 
+/// One Jev answer, as shown in the live panel.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Type)]
+pub struct JevCheck {
+    pub ts: i64,
+    /// The kind Jev flagged for the main model, or `None` when it stayed quiet.
+    pub hint: Option<String>,
+    pub scores: DetectionScores,
+}
+
+pub enum JevCall {
+    /// Jev was not asked: disabled, ineligible provider, or inactive session.
+    Skipped,
+    /// Jev was asked and gave no usable answer; the main model runs instead.
+    Failed,
+    Answered(JevCheck),
+}
+
 pub struct JevDetector {
     app: AppHandle,
     client: Option<reqwest::Client>,
@@ -90,7 +108,7 @@ impl JevDetector {
         memory_due: bool,
         mm: &MeetingManager,
         session_id: i64,
-    ) -> GateMode {
+    ) -> (GateMode, JevCall) {
         let fallback = || {
             log::warn!("jev: session={session_id} fallback to main model");
             mm.trace_tester(
@@ -100,7 +118,7 @@ impl JevDetector {
                         .into(),
                 },
             );
-            GateMode::Evaluate { hint: None }
+            (GateMode::Evaluate { hint: None }, JevCall::Failed)
         };
         let settings = settings::get_settings(&self.app);
         if !eligible(&settings) || !mm.is_live() || mm.state().session_id != Some(session_id) {
@@ -112,7 +130,7 @@ impl JevDetector {
                             .into(),
                 },
             );
-            return GateMode::Evaluate { hint: None };
+            return (GateMode::Evaluate { hint: None }, JevCall::Skipped);
         }
         let (Some(key), Some(client)) = (settings.jev_api_key(), self.client.as_ref()) else {
             return fallback();
@@ -249,13 +267,19 @@ impl JevDetector {
                 }
                 .into(),
                 kind: hint.map(str::to_string),
-                scores,
+                scores: scores.clone(),
             },
         );
-        match hint {
+        let mode = match hint {
             Some(kind) => GateMode::Evaluate { hint: Some(kind) },
             None if memory_due => GateMode::Memory,
             None => GateMode::Deferred,
-        }
+        };
+        let check = JevCheck {
+            ts: chrono::Utc::now().timestamp_millis(),
+            hint: hint.map(str::to_string),
+            scores,
+        };
+        (mode, JevCall::Answered(check))
     }
 }

@@ -948,6 +948,7 @@ pub async fn ping_llm_model(app: AppHandle) -> Result<LlmPing, String> {
         "additionalProperties": false
     });
     let started = std::time::Instant::now();
+    let mut usage = crate::llm_client::LlmUsage::default();
     let call = crate::llm_client::complete_json(
         &provider,
         settings.llm_api_key(),
@@ -955,6 +956,7 @@ pub async fn ping_llm_model(app: AppHandle) -> Result<LlmPing, String> {
         "You are a connection test. Answer with JSON only.".to_string(),
         r#"Reply with exactly {"reply": "pong"}."#.to_string(),
         schema,
+        &mut usage,
     );
     let value = tokio::time::timeout(std::time::Duration::from_secs(30), call)
         .await

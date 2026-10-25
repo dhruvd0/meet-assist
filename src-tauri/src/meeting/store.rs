@@ -204,12 +204,30 @@ static MIGRATIONS: &[M] = &[
             INSERT INTO sync_outbox (entity, uid, deleted, changed_at) VALUES ('interventions', OLD.uid, 1, CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER)) ON CONFLICT(entity, uid) DO UPDATE SET deleted = excluded.deleted, changed_at = excluded.changed_at, version = sync_outbox.version + 1;
         END;",
     ),
+    // Every AI call a meeting caused, for the per-meeting usage and cost view.
+    // Local only: not part of cloud sync.
+    M::up(
+        "CREATE TABLE llm_usage (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            meeting_id INTEGER NOT NULL REFERENCES meetings(id) ON DELETE CASCADE,
+            ts INTEGER NOT NULL,
+            purpose TEXT NOT NULL,
+            model TEXT NOT NULL,
+            ok INTEGER NOT NULL,
+            requests INTEGER NOT NULL,
+            tool_calls INTEGER NOT NULL,
+            input_tokens INTEGER NOT NULL,
+            cached_input_tokens INTEGER NOT NULL,
+            output_tokens INTEGER NOT NULL
+        );
+        CREATE INDEX llm_usage_meeting_idx ON llm_usage(meeting_id);",
+    ),
 ];
 
 /// The schema as it was before cloud sync, for the migration test.
 #[cfg(test)]
 pub(crate) fn migrations_before_sync() -> Vec<M<'static>> {
-    MIGRATIONS[..MIGRATIONS.len() - 1].to_vec()
+    MIGRATIONS[..MIGRATIONS.len() - 2].to_vec()
 }
 
 /// Durable result of a judged window, including candidates the backend suppressed.
