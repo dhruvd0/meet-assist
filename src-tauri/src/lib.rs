@@ -1037,28 +1037,31 @@ pub fn run(cli_args: CliArgs) {
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
 
-    app.run(|app, event| match &event {
-        #[cfg(target_os = "macos")]
-        tauri::RunEvent::Reopen { .. } => {
-            // Fired when the already-running bundle is launched again from
-            // Spotlight/Finder or the Dock icon is clicked. If the settings
-            // window is hidden, the user is likely looking for a tray icon
-            // that vanished (#1948): recreate it. When the window is
-            // already visible this is just a focus request and the tray is
-            // left alone.
-            let window_visible = app
-                .get_webview_window("main")
-                .and_then(|w| w.is_visible().ok())
-                .unwrap_or(false);
-            if !window_visible {
-                tray::recreate_tray_icon(app);
+    // `app` is only used by the macOS Reopen arm.
+    app.run(
+        |#[cfg_attr(not(target_os = "macos"), allow(unused_variables))] app, event| match &event {
+            #[cfg(target_os = "macos")]
+            tauri::RunEvent::Reopen { .. } => {
+                // Fired when the already-running bundle is launched again from
+                // Spotlight/Finder or the Dock icon is clicked. If the settings
+                // window is hidden, the user is likely looking for a tray icon
+                // that vanished (#1948): recreate it. When the window is
+                // already visible this is just a focus request and the tray is
+                // left alone.
+                let window_visible = app
+                    .get_webview_window("main")
+                    .and_then(|w| w.is_visible().ok())
+                    .unwrap_or(false);
+                if !window_visible {
+                    tray::recreate_tray_icon(app);
+                }
+                show_main_window(app);
             }
-            show_main_window(app);
-        }
-        // No transcription teardown on exit: transcribe.cpp runs only in the
-        // worker process, which exits by itself as soon as this process's end
-        // of its stdin closes, even if it is hung. Waiting on an unload here
-        // could block quitting behind a hung model load.
-        _ => {}
-    });
+            // No transcription teardown on exit: transcribe.cpp runs only in the
+            // worker process, which exits by itself as soon as this process's end
+            // of its stdin closes, even if it is hung. Waiting on an unload here
+            // could block quitting behind a hung model load.
+            _ => {}
+        },
+    );
 }
