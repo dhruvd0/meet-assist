@@ -122,7 +122,8 @@ function run() {
       trigger: el,
       start: "top 88%",
       once: true,
-      onEnter: () => gsap.to(el, { opacity: 1, y: 0, duration: 0.7, ease: "power3.out" }),
+      onEnter: () =>
+        gsap.to(el, { opacity: 1, y: 0, duration: 0.7, ease: "power3.out" }),
     });
   });
 
@@ -134,13 +135,21 @@ function run() {
     start: "top 80%",
     once: true,
     onEnter: () =>
-      gsap.to(nudges, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out", stagger: 0.18 }),
+      gsap.to(nudges, {
+        opacity: 1,
+        y: 0,
+        duration: 0.6,
+        ease: "power3.out",
+        stagger: 0.18,
+      }),
   });
 
   // Measurements change when fonts and the film's poster arrive.
   document.fonts?.ready.then(() => ScrollTrigger.refresh());
   const video = document.getElementById("film-video");
-  video?.addEventListener("loadedmetadata", () => ScrollTrigger.refresh(), { once: true });
+  video?.addEventListener("loadedmetadata", () => ScrollTrigger.refresh(), {
+    once: true,
+  });
 
   // Pause everything while the tab is hidden; resume on return.
   const onVisibility = () => {
@@ -151,7 +160,9 @@ function run() {
     }
   };
   document.addEventListener("visibilitychange", onVisibility);
-  cleanups.push(() => document.removeEventListener("visibilitychange", onVisibility));
+  cleanups.push(() =>
+    document.removeEventListener("visibilitychange", onVisibility),
+  );
 
   // If the user flips reduced motion mid-session, finish immediately.
   const onReduce = (e) => {
@@ -160,12 +171,16 @@ function run() {
     ScrollTrigger.killAll();
     gsap.globalTimeline.progress(1);
     document.documentElement.classList.remove("js");
-    gsap.set("[data-reveal], .w, [data-nudge], #app, #card", { clearProps: "all" });
+    gsap.set("[data-reveal], .w, [data-nudge], #app, #card", {
+      clearProps: "all",
+    });
   };
   reduced.addEventListener("change", onReduce);
   cleanups.push(() => reduced.removeEventListener("change", onReduce));
 
-  window.addEventListener("pagehide", () => cleanups.forEach((fn) => fn()), { once: true });
+  window.addEventListener("pagehide", () => cleanups.forEach((fn) => fn()), {
+    once: true,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -188,7 +203,12 @@ function buildHero() {
   gsap.set(heroReveals, { opacity: 0, y: 12 });
   gsap.set(app, { opacity: 0, y: 28 });
   gsap.set(lines, { opacity: 0, y: 8 });
-  gsap.set(card, { opacity: 0, y: -14, scale: 0.97, transformOrigin: "top right" });
+  gsap.set(card, {
+    opacity: 0,
+    y: -14,
+    scale: 0.97,
+    transformOrigin: "top right",
+  });
 
   // The level meter breathes for as long as the "meeting" is live.
   const breathe = gsap.to(meter, {
@@ -211,7 +231,11 @@ function buildHero() {
 
   // Transcript: the question comes back three times.
   lines.forEach((line, i) => {
-    tl.to(line, { opacity: 1, y: 0, duration: 0.45 }, i === 0 ? "-=0.1" : "+=0.55");
+    tl.to(
+      line,
+      { opacity: 1, y: 0, duration: 0.45 },
+      i === 0 ? "-=0.1" : "+=0.55",
+    );
     tl.add(() => {
       clock.textContent = stamps[i];
     }, "<");
@@ -225,9 +249,13 @@ function buildHero() {
       ring,
       { opacity: 0.9, scale: 1 },
       { opacity: 0, scale: 1.08, duration: 0.9, ease: "power2.out" },
-      "<"
+      "<",
     )
-    .to(card, { opacity: 1, y: 0, scale: 1, duration: 0.55, ease: "back.out(1.6)" }, "<")
+    .to(
+      card,
+      { opacity: 1, y: 0, scale: 1, duration: 0.55, ease: "back.out(1.6)" },
+      "<",
+    )
     .add(() => {
       nudgeRow.classList.add("is-on");
       nudgeEmpty.classList.add("is-off");
@@ -244,7 +272,12 @@ function buildHero() {
     const r = stage.getBoundingClientRect();
     const dx = (x - (r.left + r.width / 2)) / r.width;
     const dy = (y - (r.top + r.height / 2)) / r.height;
-    gsap.to(app, { rotationY: dx * 4, rotationX: -dy * 3, duration: 0.8, ease: "power2.out" });
+    gsap.to(app, {
+      rotationY: dx * 4,
+      rotationX: -dy * 3,
+      duration: 0.8,
+      ease: "power2.out",
+    });
   };
   const onMove = (e) => {
     if (!fine.matches || tl.progress() < 0.3) return;
@@ -256,7 +289,13 @@ function buildHero() {
       });
     }
   };
-  const reset = () => gsap.to(app, { rotationX: 0, rotationY: 0, duration: 0.8, ease: "power2.out" });
+  const reset = () =>
+    gsap.to(app, {
+      rotationX: 0,
+      rotationY: 0,
+      duration: 0.8,
+      ease: "power2.out",
+    });
   stage.addEventListener("pointermove", onMove);
   stage.addEventListener("pointerleave", reset);
   window.addEventListener("blur", reset);

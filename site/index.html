@@ -28,7 +28,13 @@
 
     <header class="nav" id="top">
       <a class="brand" href="#top" aria-label="CASE, home">
-        <img class="brand-mark" src="/case-mark.svg" alt="" width="20" height="20" />
+        <img
+          class="brand-mark"
+          src="/case-mark.svg"
+          alt=""
+          width="20"
+          height="20"
+        />
         <span class="brand-name">CASE</span>
       </a>
       <nav class="nav-links" aria-label="Sections">
@@ -52,7 +58,9 @@
           <a href="#private">Private</a>
           <a href="#threads">Threads</a>
           <a href="#film">Film</a>
-          <a href="https://github.com/dhruvd0/meet-assist/releases/latest">Download</a>
+          <a href="https://github.com/dhruvd0/meet-assist/releases/latest"
+            >Download</a
+          >
         </div>
       </details>
     </header>
@@ -65,23 +73,29 @@
             Calls drift. CASE taps <em>only you.</em>
           </h1>
           <p class="lede" data-reveal>
-            A private meeting copilot. It listens to both sides of a call on your
-            machine, transcribes locally, and beeps with a small card nobody else
-            on the call sees when the conversation starts going in circles.
+            A private meeting copilot. It listens to both sides of a call on
+            your machine, transcribes locally, and beeps with a small card
+            nobody else on the call sees when the conversation starts going in
+            circles.
           </p>
           <div class="hero-actions" data-reveal>
             <a
               class="button button-primary button-lg"
               href="https://github.com/dhruvd0/meet-assist/releases/latest"
             >
-              <iconify-icon icon="solar:download-minimalistic-linear" aria-hidden="true"></iconify-icon>
+              <iconify-icon
+                icon="solar:download-minimalistic-linear"
+                aria-hidden="true"
+              ></iconify-icon>
               Download for macOS
             </a>
-            <a class="button button-ghost button-lg" href="#speaks-up">See when it speaks up</a>
+            <a class="button button-ghost button-lg" href="#speaks-up"
+              >See when it speaks up</a
+            >
           </div>
           <p class="fineprint" data-reveal>
-            Free and open source. Nothing leaves your machine unless you point it
-            at a cloud model.
+            Free and open source. Nothing leaves your machine unless you point
+            it at a cloud model.
           </p>
         </div>
 
@@ -107,11 +121,13 @@
                   <iconify-icon icon="solar:folder-linear"></iconify-icon>Hiring
                 </div>
                 <div class="app-nav-item">
-                  <iconify-icon icon="solar:folder-linear"></iconify-icon>Platform
+                  <iconify-icon icon="solar:folder-linear"></iconify-icon
+                  >Platform
                 </div>
               </div>
               <div class="app-nav-item app-nav-bottom">
-                <iconify-icon icon="solar:settings-linear"></iconify-icon>Settings
+                <iconify-icon icon="solar:settings-linear"></iconify-icon
+                >Settings
               </div>
             </div>
 
@@ -127,7 +143,9 @@
                 <div class="app-h">Nudges</div>
                 <div class="app-empty" id="nudge-empty">No nudges yet.</div>
                 <div class="app-nudge-row" id="nudge-row">
-                  <iconify-icon icon="solar:refresh-circle-linear"></iconify-icon>
+                  <iconify-icon
+                    icon="solar:refresh-circle-linear"
+                  ></iconify-icon>
                   <span>Going in circles</span>
                   <span class="mono">12:54</span>
                 </div>
@@ -136,12 +154,35 @@
               <div class="app-section">
                 <div class="app-h">Transcript</div>
                 <ol class="app-lines" id="lines">
-                  <li class="line them"><span class="who">Them</span><span>Okay, so are we shipping Friday?</span><span class="mono">12:04</span></li>
-                  <li class="line me"><span class="who">You</span><span>Friday works if the payments fix lands.</span><span class="mono">12:11</span></li>
-                  <li class="line them"><span class="who">Them</span><span>Does it land, though?</span><span class="mono">12:19</span></li>
-                  <li class="line me"><span class="who">You</span><span>Let’s come back to Friday.</span><span class="mono">12:26</span></li>
-                  <li class="line them"><span class="who">Them</span><span>Right. So… Friday?</span><span class="mono">12:40</span></li>
-                  <li class="line me"><span class="who">You</span><span>I mean, Friday is the plan.</span><span class="mono">12:47</span></li>
+                  <li class="line them">
+                    <span class="who">Them</span
+                    ><span>Okay, so are we shipping Friday?</span
+                    ><span class="mono">12:04</span>
+                  </li>
+                  <li class="line me">
+                    <span class="who">You</span
+                    ><span>Friday works if the payments fix lands.</span
+                    ><span class="mono">12:11</span>
+                  </li>
+                  <li class="line them">
+                    <span class="who">Them</span
+                    ><span>Does it land, though?</span
+                    ><span class="mono">12:19</span>
+                  </li>
+                  <li class="line me">
+                    <span class="who">You</span
+                    ><span>Let’s come back to Friday.</span
+                    ><span class="mono">12:26</span>
+                  </li>
+                  <li class="line them">
+                    <span class="who">Them</span><span>Right. So… Friday?</span
+                    ><span class="mono">12:40</span>
+                  </li>
+                  <li class="line me">
+                    <span class="who">You</span
+                    ><span>I mean, Friday is the plan.</span
+                    ><span class="mono">12:47</span>
+                  </li>
                 </ol>
               </div>
 
@@ -149,10 +190,17 @@
                 <span class="app-meter"><i></i><i></i><i></i><i></i></span>
                 <span class="app-dock-text">
                   <strong>Launch sync</strong>
-                  <span class="mono">Recording · <span id="clock">12:54</span></span>
+                  <span class="mono"
+                    >Recording · <span id="clock">12:54</span></span
+                  >
                 </span>
-                <span class="app-dock-btn"><iconify-icon icon="solar:pause-linear"></iconify-icon></span>
-                <span class="app-dock-end"><iconify-icon icon="solar:stop-linear"></iconify-icon>End meeting</span>
+                <span class="app-dock-btn"
+                  ><iconify-icon icon="solar:pause-linear"></iconify-icon
+                ></span>
+                <span class="app-dock-end"
+                  ><iconify-icon icon="solar:stop-linear"></iconify-icon>End
+                  meeting</span
+                >
               </div>
             </div>
           </div>
@@ -160,9 +208,15 @@
           <!-- The intervention card: the only thing on the page in the accent colour. -->
           <div class="card" id="card">
             <div class="card-head">
-              <iconify-icon class="card-icon" icon="solar:refresh-circle-linear"></iconify-icon>
+              <iconify-icon
+                class="card-icon"
+                icon="solar:refresh-circle-linear"
+              ></iconify-icon>
               <span>Going in circles</span>
-              <iconify-icon class="card-close" icon="solar:close-circle-linear"></iconify-icon>
+              <iconify-icon
+                class="card-close"
+                icon="solar:close-circle-linear"
+              ></iconify-icon>
             </div>
             <p class="card-body">
               Third pass on Friday vs. the payments fix. Ask who owns the call.
@@ -176,12 +230,14 @@
       <!-- Four reasons -->
       <section class="section" id="speaks-up" aria-labelledby="speaks-title">
         <div class="section-head">
-          <h2 class="h2" id="speaks-title" data-words>Four reasons it speaks up. Otherwise, silence.</h2>
+          <h2 class="h2" id="speaks-title" data-words>
+            Four reasons it speaks up. Otherwise, silence.
+          </h2>
           <p class="section-lede" data-reveal>
-            Every twenty seconds CASE reads the last three minutes of the call and
-            asks the model one question: is there a reason to speak up right now?
-            Most of the time the answer is no, and you hear nothing. When it is
-            yes, you get a beep and a card. Nobody else does.
+            Every twenty seconds CASE reads the last three minutes of the call
+            and asks the model one question: is there a reason to speak up right
+            now? Most of the time the answer is no, and you hear nothing. When
+            it is yes, you get a beep and a card. Nobody else does.
           </p>
         </div>
 
@@ -189,42 +245,78 @@
           <li class="nudge" data-nudge>
             <div class="nudge-card">
               <div class="card-head">
-                <iconify-icon class="card-icon" icon="solar:refresh-circle-linear"></iconify-icon>
+                <iconify-icon
+                  class="card-icon"
+                  icon="solar:refresh-circle-linear"
+                ></iconify-icon>
                 <span>Going in circles</span>
               </div>
-              <p class="card-body">Third pass on Friday vs. the payments fix. Ask who owns the call.</p>
+              <p class="card-body">
+                Third pass on Friday vs. the payments fix. Ask who owns the
+                call.
+              </p>
             </div>
-            <p class="nudge-why">The same point has been restated with no decision. CASE names it so someone can close it.</p>
+            <p class="nudge-why">
+              The same point has been restated with no decision. CASE names it
+              so someone can close it.
+            </p>
           </li>
           <li class="nudge" data-nudge>
             <div class="nudge-card">
               <div class="card-head">
-                <iconify-icon class="card-icon" icon="solar:hand-stars-linear"></iconify-icon>
+                <iconify-icon
+                  class="card-icon"
+                  icon="solar:hand-stars-linear"
+                ></iconify-icon>
                 <span>Someone is stuck</span>
               </div>
-              <p class="card-body">Priya has gone quiet since the schema question. Offer to pair on the migration after the call.</p>
+              <p class="card-body">
+                Priya has gone quiet since the schema question. Offer to pair on
+                the migration after the call.
+              </p>
             </div>
-            <p class="nudge-why">A participant has stopped moving because they do not know the next step.</p>
+            <p class="nudge-why">
+              A participant has stopped moving because they do not know the next
+              step.
+            </p>
           </li>
           <li class="nudge" data-nudge>
             <div class="nudge-card">
               <div class="card-head">
-                <iconify-icon class="card-icon" icon="solar:magnifer-linear"></iconify-icon>
+                <iconify-icon
+                  class="card-icon"
+                  icon="solar:magnifer-linear"
+                ></iconify-icon>
                 <span>Quick fact</span>
               </div>
-              <p class="card-body">The brief says the beta cutoff is 14 November, not the 21st. From Launch › brief.md.</p>
+              <p class="card-body">
+                The brief says the beta cutoff is 14 November, not the 21st.
+                From Launch › brief.md.
+              </p>
             </div>
-            <p class="nudge-why">A detail is missing and it is in your project sources. CASE looked it up.</p>
+            <p class="nudge-why">
+              A detail is missing and it is in your project sources. CASE looked
+              it up.
+            </p>
           </li>
           <li class="nudge" data-nudge>
             <div class="nudge-card">
               <div class="card-head">
-                <iconify-icon class="card-icon" icon="solar:lightbulb-linear"></iconify-icon>
+                <iconify-icon
+                  class="card-icon"
+                  icon="solar:lightbulb-linear"
+                ></iconify-icon>
                 <span>An idea</span>
               </div>
-              <p class="card-body">Last week’s session parked the feature-flag route. It fits what Sam just described.</p>
+              <p class="card-body">
+                Last week’s session parked the feature-flag route. It fits what
+                Sam just described.
+              </p>
             </div>
-            <p class="nudge-why">An alternative nobody has raised, often from an earlier session of the same thread.</p>
+            <p class="nudge-why">
+              An alternative nobody has raised, often from an earlier session of
+              the same thread.
+            </p>
           </li>
         </ul>
         <p class="section-note" data-reveal>
@@ -234,48 +326,85 @@
       </section>
 
       <!-- Private -->
-      <section class="section section-tint" id="private" aria-labelledby="private-title">
+      <section
+        class="section section-tint"
+        id="private"
+        aria-labelledby="private-title"
+      >
         <div class="section-head">
-          <h2 class="h2" id="private-title" data-words>It never joins the call, and nothing leaves your machine.</h2>
+          <h2 class="h2" id="private-title" data-words>
+            It never joins the call, and nothing leaves your machine.
+          </h2>
         </div>
         <div class="facts">
           <div class="fact" data-reveal>
-            <iconify-icon icon="solar:microphone-linear" aria-hidden="true"></iconify-icon>
+            <iconify-icon
+              icon="solar:microphone-linear"
+              aria-hidden="true"
+            ></iconify-icon>
             <h3>Both sides, transcribed locally</h3>
             <p>
               Your microphone and the system audio of everyone else run through
-              local speech models on your computer. Each line is tagged as you or
-              them. There is no bot in the participant list.
+              local speech models on your computer. Each line is tagged as you
+              or them. There is no bot in the participant list.
             </p>
           </div>
           <div class="fact" data-reveal>
-            <iconify-icon icon="solar:shield-check-linear" aria-hidden="true"></iconify-icon>
+            <iconify-icon
+              icon="solar:shield-check-linear"
+              aria-hidden="true"
+            ></iconify-icon>
             <h3>Your model, your choice</h3>
             <p>
-              Point the assistant at a local model through Ollama or LM Studio and
-              nothing leaves the machine. Use a cloud provider with your own key
-              if you prefer. One provider runs the observer, summaries, and vision.
+              Point the assistant at a local model through Ollama or LM Studio
+              and nothing leaves the machine. Use a cloud provider with your own
+              key if you prefer. One provider runs the observer, summaries, and
+              vision.
             </p>
           </div>
           <div class="fact" data-reveal>
-            <iconify-icon icon="solar:laptop-linear" aria-hidden="true"></iconify-icon>
+            <iconify-icon
+              icon="solar:laptop-linear"
+              aria-hidden="true"
+            ></iconify-icon>
             <h3>Only you hear it</h3>
             <p>
-              The beep plays on your side. The card floats above the call on your
-              screen. CASE never speaks into the call. Whether to say the thing
-              out loud stays your decision.
+              The beep plays on your side. The card floats above the call on
+              your screen. CASE never speaks into the call. Whether to say the
+              thing out loud stays your decision.
             </p>
           </div>
         </div>
         <table class="platforms" data-reveal>
-          <caption>Where it runs today</caption>
+          <caption>
+            Where it runs today
+          </caption>
           <thead>
-            <tr><th scope="col">Platform</th><th scope="col">Microphone</th><th scope="col">System audio</th></tr>
+            <tr>
+              <th scope="col">Platform</th>
+              <th scope="col">Microphone</th>
+              <th scope="col">System audio</th>
+            </tr>
           </thead>
           <tbody>
-            <tr><th scope="row">macOS</th><td>Working</td><td>Working on 14.2 and later. Asks for the audio capture permission once.</td></tr>
-            <tr><th scope="row">Windows</th><td>Working</td><td>Built, not yet verified on real machines.</td></tr>
-            <tr><th scope="row">Linux</th><td>Working</td><td>Built, not yet verified on real machines.</td></tr>
+            <tr>
+              <th scope="row">macOS</th>
+              <td>Working</td>
+              <td>
+                Working on 14.2 and later. Asks for the audio capture permission
+                once.
+              </td>
+            </tr>
+            <tr>
+              <th scope="row">Windows</th>
+              <td>Working</td>
+              <td>Built, not yet verified on real machines.</td>
+            </tr>
+            <tr>
+              <th scope="row">Linux</th>
+              <td>Working</td>
+              <td>Built, not yet verified on real machines.</td>
+            </tr>
           </tbody>
         </table>
       </section>
@@ -284,19 +413,21 @@
       <section class="section" id="threads" aria-labelledby="threads-title">
         <div class="threads-grid">
           <div class="section-head">
-            <h2 class="h2" id="threads-title" data-words>A meeting is a thread, not a file.</h2>
+            <h2 class="h2" id="threads-title" data-words>
+              A meeting is a thread, not a file.
+            </h2>
             <p class="section-lede" data-reveal>
-              End a meeting today and continue it tomorrow. Each session ends with
-              a short summary that merges into the thread’s rolling summary, so
-              the assistant walks into the next call already knowing what was
-              decided.
+              End a meeting today and continue it tomorrow. Each session ends
+              with a short summary that merges into the thread’s rolling
+              summary, so the assistant walks into the next call already knowing
+              what was decided.
             </p>
             <p class="section-lede" data-reveal>
               Meetings live in projects. A project holds a brief and sources:
               pasted notes, local files and folders, checked-out repos, links,
-              images. The assistant starts each check with only the brief and the
-              last summary, and reads sources on its own when the conversation
-              calls for it.
+              images. The assistant starts each check with only the brief and
+              the last summary, and reads sources on its own when the
+              conversation calls for it.
             </p>
           </div>
 
@@ -305,32 +436,52 @@
             <div class="thread-meta mono">3 sessions · Launch</div>
             <div class="thread-h">Rolling summary</div>
             <p>
-              Ship date is Friday if the payments fix lands; Ana owns the call by
-              Wednesday. Beta cutoff is 14 November. Feature-flag route parked
-              for v2.
+              Ship date is Friday if the payments fix lands; Ana owns the call
+              by Wednesday. Beta cutoff is 14 November. Feature-flag route
+              parked for v2.
             </p>
             <div class="thread-h">Sessions</div>
             <ul class="thread-sessions">
-              <li><span class="mono">Oct 21</span>Decided Ana owns the Friday call. Two nudges.</li>
-              <li><span class="mono">Oct 14</span>Payments fix scoped. Flag route parked.</li>
-              <li><span class="mono">Oct 7</span>Launch window set. Brief attached.</li>
+              <li>
+                <span class="mono">Oct 21</span>Decided Ana owns the Friday
+                call. Two nudges.
+              </li>
+              <li>
+                <span class="mono">Oct 14</span>Payments fix scoped. Flag route
+                parked.
+              </li>
+              <li>
+                <span class="mono">Oct 7</span>Launch window set. Brief
+                attached.
+              </li>
             </ul>
             <div class="thread-h">Sources</div>
             <ul class="thread-sources">
-              <li><iconify-icon icon="solar:folder-linear"></iconify-icon>~/code/launch</li>
-              <li><iconify-icon icon="solar:history-linear"></iconify-icon>brief.md</li>
+              <li>
+                <iconify-icon icon="solar:folder-linear"></iconify-icon
+                >~/code/launch
+              </li>
+              <li>
+                <iconify-icon icon="solar:history-linear"></iconify-icon
+                >brief.md
+              </li>
             </ul>
           </div>
         </div>
       </section>
 
       <!-- Shortcut -->
-      <section class="section section-tint shortcut" aria-labelledby="shortcut-title">
+      <section
+        class="section section-tint shortcut"
+        aria-labelledby="shortcut-title"
+      >
         <div class="keys" aria-hidden="true" data-reveal>
           <kbd>⌘</kbd><kbd>⇧</kbd><kbd>M</kbd>
         </div>
         <div class="section-head">
-          <h2 class="h2" id="shortcut-title" data-words>One shortcut runs the whole loop.</h2>
+          <h2 class="h2" id="shortcut-title" data-words>
+            One shortcut runs the whole loop.
+          </h2>
           <p class="section-lede" data-reveal>
             Press it once to start a meeting, once more to end it. The meeting
             starts unfiled; the assistant files it into a project once it knows
@@ -343,7 +494,9 @@
       <!-- Film -->
       <section class="section" id="film" aria-labelledby="film-title">
         <div class="section-head">
-          <h2 class="h2" id="film-title" data-words>Twenty seconds, start to card.</h2>
+          <h2 class="h2" id="film-title" data-words>
+            Twenty seconds, start to card.
+          </h2>
         </div>
         <figure class="film" data-reveal>
           <video
@@ -356,8 +509,8 @@
             poster="/media/case-launch-poster.jpg"
           >
             <source src="/media/case-launch.mp4" type="video/mp4" />
-            Your browser cannot play this video. The poster shows the frame where
-            the card lands.
+            Your browser cannot play this video. The poster shows the frame
+            where the card lands.
           </video>
           <figcaption>
             The project’s own launch film. The transcript in it is a fictional
@@ -368,39 +521,55 @@
 
       <!-- Download -->
       <section class="section cta" aria-labelledby="cta-title">
-        <h2 class="display cta-title" id="cta-title" data-words>Put it beside your next call.</h2>
+        <h2 class="display cta-title" id="cta-title" data-words>
+          Put it beside your next call.
+        </h2>
         <div class="hero-actions" data-reveal>
           <a
             class="button button-primary button-lg"
             href="https://github.com/dhruvd0/meet-assist/releases/latest"
           >
-            <iconify-icon icon="solar:download-minimalistic-linear" aria-hidden="true"></iconify-icon>
+            <iconify-icon
+              icon="solar:download-minimalistic-linear"
+              aria-hidden="true"
+            ></iconify-icon>
             Download for macOS
           </a>
-          <a class="button button-ghost button-lg" href="https://github.com/dhruvd0/meet-assist"
+          <a
+            class="button button-ghost button-lg"
+            href="https://github.com/dhruvd0/meet-assist"
             >Read the source</a
           >
         </div>
         <p class="fineprint" data-reveal>
-          Windows and Linux builds are on the same releases page. System audio on
-          those platforms is built but not yet verified.
+          Windows and Linux builds are on the same releases page. System audio
+          on those platforms is built but not yet verified.
         </p>
       </section>
     </main>
 
     <footer class="footer">
       <a class="brand" href="#top" aria-label="CASE, back to top">
-        <img class="brand-mark" src="/case-mark.svg" alt="" width="20" height="20" />
+        <img
+          class="brand-mark"
+          src="/case-mark.svg"
+          alt=""
+          width="20"
+          height="20"
+        />
         <span class="brand-name">CASE</span>
       </a>
       <p>
-        MIT licensed. Built on a shared local speech engine; dependency and model
-        notices stay with their own licenses.
+        MIT licensed. Built on a shared local speech engine; dependency and
+        model notices stay with their own licenses.
       </p>
       <nav aria-label="Footer">
         <a href="https://github.com/dhruvd0/meet-assist">GitHub</a>
         <a href="https://github.com/dhruvd0/meet-assist/releases">Releases</a>
-        <a href="https://github.com/dhruvd0/meet-assist/blob/main/docs/VISION.md">Vision</a>
+        <a
+          href="https://github.com/dhruvd0/meet-assist/blob/main/docs/VISION.md"
+          >Vision</a
+        >
       </nav>
     </footer>
   </body>
