@@ -121,7 +121,8 @@ function validateTranslations(): void {
       continue;
     }
 
-    // Find missing keys
+    // Missing keys are a warning: i18next falls back to English, and new
+    // keys land in en first (AGENTS.md, CONTRIBUTING_TRANSLATIONS.md).
     const missing = referenceKeyPaths.filter(
       (keyPath) => !hasKeyPath(langData, keyPath),
     );
@@ -138,7 +139,8 @@ function validateTranslations(): void {
       extra,
     };
 
-    if (missing.length > 0 || extra.length > 0) {
+    // Extra keys are stale strings no code reads: still an error.
+    if (extra.length > 0) {
       hasErrors = true;
     }
   }
@@ -155,7 +157,14 @@ function validateTranslations(): void {
         colorize(`✓ ${lang.toUpperCase()}: All keys present`, "green"),
       );
     } else {
-      console.log(colorize(`✗ ${lang.toUpperCase()}: Issues found`, "red"));
+      console.log(
+        result.extra.length > 0
+          ? colorize(`✗ ${lang.toUpperCase()}: Issues found`, "red")
+          : colorize(
+              `! ${lang.toUpperCase()}: Missing keys fall back to English`,
+              "yellow",
+            ),
+      );
 
       if (result.missing.length > 0) {
         console.log(
@@ -212,7 +221,7 @@ function validateTranslations(): void {
   } else {
     console.log(
       colorize(
-        `\n✓ All ${totalCount} languages have complete translations!`,
+        `\n✓ No stale keys; ${validCount}/${totalCount} languages complete, the rest fall back to English`,
         "green",
       ),
     );

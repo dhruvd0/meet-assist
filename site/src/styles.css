@@ -18,9 +18,11 @@
   --accent: oklch(0.55 0.19 255);
   --accent-soft: oklch(0.55 0.19 255 / 0.12);
 
-  --sans: "DM Sans Variable", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --sans:
+    "DM Sans Variable", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   --serif: "Newsreader Variable", "Iowan Old Style", Georgia, serif;
-  --mono: "JetBrains Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --mono:
+    "JetBrains Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace;
 
   --r-sm: 6px;
   --r-md: 8px;

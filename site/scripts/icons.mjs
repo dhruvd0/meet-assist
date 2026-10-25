@@ -27,4 +27,7 @@ const subset = getIcons(icons, names);
 if (!subset || (subset.not_found && subset.not_found.length)) {
   throw new Error(`Missing Solar icons: ${subset?.not_found?.join(", ")}`);
 }
-writeFileSync(new URL("../src/solar-subset.json", import.meta.url), JSON.stringify(subset));
+writeFileSync(
+  new URL("../src/solar-subset.json", import.meta.url),
+  JSON.stringify(subset),
+);
