@@ -178,16 +178,18 @@ pub fn final_schema() -> Value {
     })
 }
 
-const SYSTEM_PROMPT: &str = "You file a recorded conversation (a meeting or call, interview, debate, class or talk, or a broadcast the user listened to) into the user's projects, using the tools.
+pub(super) const SYSTEM_PROMPT: &str = "You file a recorded conversation (a meeting or call, interview, debate, class or talk, or a broadcast the user listened to) into the user's projects, using the tools.
+Always write generated content in English, regardless of the language of the transcript, input, or existing content. Preserve proper nouns and verbatim quotes in their original form. This includes meeting titles, new project titles and briefs, tool arguments, and the final reason.
 1. Call list_projects. Call read_project on any project that might match.
 2. If one project clearly fits, call assign_meeting with its id. Prefer an existing project.
 3. If none fits and the transcript makes the conversation's subject clear, call create_project with a short title and a one-paragraph brief describing the subject, people, and goals heard so far.
-4. Call rename_meeting with a short descriptive title (under 60 characters) in the transcript's language.
+4. Call rename_meeting with a short descriptive title (under 60 characters) in English.
 5. If the transcript does not yet show what the conversation is about, do not file or rename; answer outcome \"wait\".
 Finish with JSON {\"outcome\": \"filed\" | \"wait\", \"reason\": \"...\"}.";
 
-const TITLE_PROMPT: &str = "You name a recorded conversation (a meeting or call, interview, debate, class or talk, or a broadcast the user listened to). Its project is already chosen.
-1. If the transcript shows what the conversation is about, call rename_meeting with a short descriptive title (under 60 characters) in the transcript's language, naming the subject rather than the format (\"Chagos deal and Iran strikes\", not \"Parliament session\").
+pub(super) const TITLE_PROMPT: &str = "You name a recorded conversation (a meeting or call, interview, debate, class or talk, or a broadcast the user listened to). Its project is already chosen.
+Always write generated content in English, regardless of the language of the transcript, input, or existing content. Preserve proper nouns and verbatim quotes in their original form. This includes the meeting title, tool arguments, and the final reason.
+1. If the transcript shows what the conversation is about, call rename_meeting with a short descriptive title (under 60 characters) in English, naming the subject rather than the format (\"Chagos deal and Iran strikes\", not \"Parliament session\").
 2. If it does not yet, do not rename; answer outcome \"wait\".
 Finish with JSON {\"outcome\": \"named\" | \"wait\", \"reason\": \"...\"}.";
 

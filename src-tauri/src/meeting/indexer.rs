@@ -220,7 +220,7 @@ pub fn copy_image_into(source_path: &Path, dest_dir: &Path, source_id: i64) -> R
 }
 
 pub fn image_digest_prompt() -> String {
-    "Describe this image for someone who cannot see it, in at most 120 words: what it shows, any text in it, and why it might matter in a meeting.".to_string()
+    "Always write generated content in English, regardless of the language of the transcript, input, or existing content. Preserve proper nouns and verbatim quotes in their original form. Describe this image for someone who cannot see it, in at most 120 words: what it shows, any text in it, and why it might matter in a meeting.".to_string()
 }
 
 /// Anthropic caps the base64 payload at 5 MB; base64 inflates by 4/3, so
