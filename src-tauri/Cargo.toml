@@ -1,6 +1,6 @@
 [package]
 name = "case"
-version = "0.9.14"
+version = "0.9.15"
 description = "CASE, a private meeting companion"
 authors = ["CASE contributors"]
 edition = "2021"

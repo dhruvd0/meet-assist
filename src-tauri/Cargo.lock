@@ -729,7 +729,7 @@ dependencies = [
 
 [[package]]
 name = "case"
-version = "0.9.14"
+version = "0.9.15"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
