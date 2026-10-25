@@ -1,6 +1,7 @@
 use crate::meeting::filing::MeetingFiledPayload;
 use crate::meeting::session::{MeetingManager, MeetingStatePayload};
 use crate::meeting::store::{Intervention, Meeting, MeetingDetail};
+use crate::meeting::usage::MeetingUsage;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use std::sync::Arc;
@@ -23,6 +24,13 @@ pub fn list_meetings(mm: Mm<'_>, project_id: Option<i64>) -> Result<Vec<Meeting>
 #[specta::specta]
 pub fn get_meeting_detail(mm: Mm<'_>, id: i64) -> Result<Option<MeetingDetail>, String> {
     mm.store().get_meeting_detail(id).map_err(err)
+}
+
+/// Every AI call the meeting made, with tokens and estimated cost.
+#[tauri::command]
+#[specta::specta]
+pub fn get_meeting_usage(mm: Mm<'_>, id: i64) -> Result<MeetingUsage, String> {
+    mm.store().meeting_usage(id).map_err(err)
 }
 
 #[tauri::command]

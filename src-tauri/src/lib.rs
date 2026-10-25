@@ -690,6 +690,7 @@ pub fn run(cli_args: CliArgs) {
             commands::project::pick_source_path,
             commands::meeting::list_meetings,
             commands::meeting::get_meeting_detail,
+            commands::meeting::get_meeting_usage,
             commands::meeting::start_meeting,
             commands::meeting::start_text_tester,
             commands::meeting::append_tester_turn,
