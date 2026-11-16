@@ -110,7 +110,7 @@ fn encode(lines: &[PendingLine], out: &Path) -> Result<(Vec<LineAudio>, u64)> {
             .encode(frame, &mut packet)
             .map_err(|e| anyhow!("opus encode: {e}"))?;
         if let Some(prev) = held.replace(packet[..n].to_vec()) {
-            let end = if *frames % FRAMES_PER_PAGE == 0 {
+            let end = if frames.is_multiple_of(FRAMES_PER_PAGE) {
                 PacketWriteEndInfo::EndPage
             } else {
                 PacketWriteEndInfo::NormalPacket
