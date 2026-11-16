@@ -9,6 +9,7 @@ pub mod indexer;
 pub mod jev;
 pub mod manager;
 pub mod observer;
+pub mod recording;
 pub mod resample;
 pub mod segment;
 pub mod session;

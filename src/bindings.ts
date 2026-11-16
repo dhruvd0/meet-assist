@@ -962,11 +962,12 @@ async deleteMeeting(id: number) : Promise<Result<null, string>> {
 }
 },
 /**
- * File path of a transcript line's recorded audio, if one was saved.
+ * File the webview can play for a session's recording, if it has one.
+ * `as_wav` asks for a decoded copy, for a webview that cannot play Opus.
  */
-async getLineAudioPath(lineId: number) : Promise<Result<string | null, string>> {
+async getSessionAudioPath(sessionId: number, asWav: boolean) : Promise<Result<string | null, string>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("get_line_audio_path", { lineId }) };
+    return { status: "ok", data: await TAURI_INVOKE("get_session_audio_path", { sessionId, asWav }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -1244,6 +1245,10 @@ export type LlmApiFormat =
  */
 export type LlmPing = { model: string; reply: string; ms: number }
 export type LlmProvider = { id: string; label: string; base_url: string; allow_base_url_edit?: boolean; models_endpoint?: string | null; supports_structured_output?: boolean; api_format?: LlmApiFormat }
+/**
+ * Where one line sits in its session's recording.
+ */
+export type LineAudio = { line_id: number; start_ms: number; ms: number }
 export type LogLevel = "trace" | "debug" | "info" | "warn" | "error"
 export type Meeting = { input_mode: MeetingInputMode; id: number; project_id: number | null; title: string; created_at: number; updated_at: number; status: MeetingStatus; context: string; rolling_summary: string | null; 
 /**
@@ -1259,7 +1264,11 @@ export type MeetingCaptureWarningPayload = { meeting_id: number;
  * `"microphone"` or `"system_audio"`.
  */
 source: string; message: string }
-export type MeetingDetail = { meeting: Meeting; sessions: Session[]; lines: TranscriptLine[]; interventions: Intervention[] }
+export type MeetingDetail = { meeting: Meeting; sessions: Session[]; lines: TranscriptLine[]; interventions: Intervention[]; 
+/**
+ * Lines that can be played, with their place in the session recording.
+ */
+audio: LineAudio[] }
 /**
  * A meeting's project changed, by the assistant or the user.
  */

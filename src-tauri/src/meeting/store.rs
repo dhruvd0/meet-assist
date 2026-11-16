@@ -222,6 +222,17 @@ static MIGRATIONS: &[M] = &[
         );
         CREATE INDEX llm_usage_meeting_idx ON llm_usage(meeting_id);",
     ),
+    // Where each line sits in its session's joined recording; see
+    // meeting/recording.rs.
+    M::up(
+        "CREATE TABLE line_audio (
+            line_id INTEGER PRIMARY KEY REFERENCES transcript_lines(id) ON DELETE CASCADE,
+            session_id INTEGER NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+            start_ms INTEGER NOT NULL,
+            ms INTEGER NOT NULL
+        );
+        CREATE INDEX line_audio_session_idx ON line_audio(session_id);",
+    ),
 ];
 
 /// The schema as it was before cloud sync, for the migration test.
@@ -325,20 +336,99 @@ impl ProjectStore {
         crate::audio_toolkit::save_wav_file(dir.join(format!("{}.wav", line.id)), samples)
     }
 
-    /// Path of a line's saved audio, if it was recorded.
-    pub fn line_audio_path(&self, line_id: i64) -> Result<Option<PathBuf>> {
-        let meeting_id: Option<i64> = self
-            .conn()?
-            .query_row(
-                "SELECT s.meeting_id FROM transcript_lines l JOIN sessions s ON s.id = l.session_id
-                 WHERE l.id = ?1",
-                params![line_id],
-                |r| r.get(0),
-            )
-            .optional()?;
-        Ok(meeting_id
-            .map(|m| self.meeting_audio_dir(m).join(format!("{line_id}.wav")))
-            .filter(|p| p.is_file()))
+    fn session_meeting(&self, session_id: i64) -> Result<i64> {
+        Ok(self.conn()?.query_row(
+            "SELECT meeting_id FROM sessions WHERE id = ?1",
+            params![session_id],
+            |r| r.get(0),
+        )?)
+    }
+
+    /// Where a session's joined recording lives, whether or not it exists.
+    pub fn session_audio_path(&self, session_id: i64) -> Result<PathBuf> {
+        let meeting_id = self.session_meeting(session_id)?;
+        Ok(self
+            .meeting_audio_dir(meeting_id)
+            .join(format!("session-{session_id}.ogg")))
+    }
+
+    /// Lines of a session whose utterance is still a separate WAV, in
+    /// transcript order.
+    pub fn pending_line_audio(
+        &self,
+        session_id: i64,
+    ) -> Result<Vec<crate::meeting::recording::PendingLine>> {
+        let dir = self.meeting_audio_dir(self.session_meeting(session_id)?);
+        Ok(self
+            .session_lines(session_id)?
+            .into_iter()
+            .map(|l| crate::meeting::recording::PendingLine {
+                line_id: l.id,
+                wav: dir.join(format!("{}.wav", l.id)),
+            })
+            .filter(|l| l.wav.is_file())
+            .collect())
+    }
+
+    /// Lines already in the session's joined recording.
+    pub fn session_audio_lines(&self, session_id: i64) -> Result<Vec<i64>> {
+        let conn = self.conn()?;
+        let mut stmt = conn.prepare("SELECT line_id FROM line_audio WHERE session_id = ?1")?;
+        let rows = stmt.query_map(params![session_id], |r| r.get(0))?;
+        Ok(rows.collect::<rusqlite::Result<Vec<i64>>>()?)
+    }
+
+    /// Record where each line sits in the session's joined recording.
+    pub fn set_session_audio(&self, session_id: i64, spans: &[LineAudio]) -> Result<()> {
+        let mut conn = self.conn()?;
+        let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        tx.execute(
+            "DELETE FROM line_audio WHERE session_id = ?1",
+            params![session_id],
+        )?;
+        for s in spans {
+            // A line deleted while its audio was being joined is skipped.
+            tx.execute(
+                "INSERT INTO line_audio (line_id, session_id, start_ms, ms)
+                 SELECT ?1, ?2, ?3, ?4 WHERE EXISTS (SELECT 1 FROM transcript_lines WHERE id = ?1)",
+                params![s.line_id, session_id, s.start_ms, s.ms],
+            )?;
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
+    /// Ended sessions that still have per-line WAVs on disk, newest first.
+    pub fn sessions_with_pending_audio(&self) -> Result<Vec<i64>> {
+        let root = self.db_path.with_file_name("meeting-audio");
+        let mut meetings: Vec<i64> = Vec::new();
+        let Ok(entries) = std::fs::read_dir(&root) else {
+            return Ok(Vec::new());
+        };
+        for entry in entries.flatten() {
+            let Some(id) = entry.file_name().to_str().and_then(|n| n.parse().ok()) else {
+                continue;
+            };
+            let has_wav = std::fs::read_dir(entry.path())
+                .map(|d| {
+                    d.flatten()
+                        .any(|f| f.path().extension().is_some_and(|x| x == "wav"))
+                })
+                .unwrap_or(false);
+            if has_wav {
+                meetings.push(id);
+            }
+        }
+        let conn = self.conn()?;
+        let mut stmt =
+            conn.prepare("SELECT id FROM sessions WHERE meeting_id = ?1 AND ended_at IS NOT NULL")?;
+        let mut sessions: Vec<i64> = Vec::new();
+        for m in meetings {
+            let rows = stmt.query_map(params![m], |r| r.get(0))?;
+            sessions.extend(rows.collect::<rusqlite::Result<Vec<i64>>>()?);
+        }
+        sessions.sort_unstable_by(|a, b| b.cmp(a));
+        Ok(sessions)
     }
 
     /// Remove a deleted meeting's audio. The rows are already gone, so a
@@ -868,6 +958,16 @@ pub struct MeetingDetail {
     pub sessions: Vec<Session>,
     pub lines: Vec<TranscriptLine>,
     pub interventions: Vec<Intervention>,
+    /// Lines that can be played, with their place in the session recording.
+    pub audio: Vec<LineAudio>,
+}
+
+/// Where one line sits in its session's recording.
+#[derive(Clone, Debug, Serialize, Deserialize, Type)]
+pub struct LineAudio {
+    pub line_id: i64,
+    pub start_ms: i64,
+    pub ms: i64,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Type)]
@@ -1021,6 +1121,21 @@ impl ProjectStore {
             let rows = stmt.query_map(params![id], Self::map_line)?;
             rows.collect::<rusqlite::Result<Vec<_>>>()?
         };
+        let audio = {
+            let mut stmt = conn.prepare(
+                "SELECT a.line_id, a.start_ms, a.ms FROM line_audio a
+                 JOIN sessions s ON s.id = a.session_id
+                 WHERE s.meeting_id = ?1 ORDER BY a.session_id ASC, a.start_ms ASC",
+            )?;
+            let rows = stmt.query_map(params![id], |r| {
+                Ok(LineAudio {
+                    line_id: r.get(0)?,
+                    start_ms: r.get(1)?,
+                    ms: r.get(2)?,
+                })
+            })?;
+            rows.collect::<rusqlite::Result<Vec<_>>>()?
+        };
         drop(conn);
         let interventions = self.list_interventions(id)?;
         Ok(Some(MeetingDetail {
@@ -1028,6 +1143,7 @@ impl ProjectStore {
             sessions,
             lines,
             interventions,
+            audio,
         }))
     }
 
