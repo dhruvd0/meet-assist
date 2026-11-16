@@ -1228,6 +1228,10 @@ export type JevCheck = { ts: number;
 hint: string | null; scores: DetectionScores }
 export type KeyboardImplementation = "tauri" | "native_keys"
 /**
+ * Where one line sits in its session's recording.
+ */
+export type LineAudio = { line_id: number; start_ms: number; ms: number }
+/**
  * Request format an LLM endpoint speaks. Built-in providers have a
  * fixed format; only the custom provider lets the user change it.
  */
@@ -1245,10 +1249,6 @@ export type LlmApiFormat =
  */
 export type LlmPing = { model: string; reply: string; ms: number }
 export type LlmProvider = { id: string; label: string; base_url: string; allow_base_url_edit?: boolean; models_endpoint?: string | null; supports_structured_output?: boolean; api_format?: LlmApiFormat }
-/**
- * Where one line sits in its session's recording.
- */
-export type LineAudio = { line_id: number; start_ms: number; ms: number }
 export type LogLevel = "trace" | "debug" | "info" | "warn" | "error"
 export type Meeting = { input_mode: MeetingInputMode; id: number; project_id: number | null; title: string; created_at: number; updated_at: number; status: MeetingStatus; context: string; rolling_summary: string | null; 
 /**
