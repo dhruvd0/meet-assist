@@ -497,6 +497,7 @@ fn call_apps(users: &[MicUser]) -> Vec<MicUser> {
 /// The app a process belongs to, from its executable path: the outermost
 /// `.app` bundle's name, else the file name. A browser's helper processes
 /// resolve to the browser.
+#[cfg(target_os = "macos")]
 fn app_name(path: &str) -> String {
     let bundle = path
         .split('/')
