@@ -2,6 +2,10 @@ import React, { useEffect } from "react";
 import ReactDOM from "react-dom/client";
 import { listen } from "@tauri-apps/api/event";
 import { LiveDock } from "@/components/meetings/LiveDock";
+import {
+  DetectionBar,
+  useDetectionPrompt,
+} from "@/components/meetings/DetectionBar";
 import { useMeetingStore } from "@/stores/meetingStore";
 import {
   applyTheme,
@@ -18,7 +22,10 @@ applyTheme(getStoredTheme());
 syncThemeFromSettings();
 listen<Theme>("theme-changed", (event) => applyTheme(event.payload));
 
-/** The floating meeting bar shown while the app is in the background. */
+/**
+ * The floating bar: a "meeting detected" or "call ended" prompt when there is
+ * one, otherwise the running meeting while the app is in the background.
+ */
 const Pill: React.FC = () => {
   useEffect(() => {
     const store = useMeetingStore.getState();
@@ -29,7 +36,8 @@ const Pill: React.FC = () => {
       unsubscribe.then((f) => f());
     };
   }, []);
-  return <LiveDock floating />;
+  const prompt = useDetectionPrompt();
+  return prompt ? <DetectionBar prompt={prompt} /> : <LiveDock floating />;
 };
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(

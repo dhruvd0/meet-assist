@@ -146,6 +146,10 @@ const settingUpdaters: {
     commands.changeMeetingMaxLineSetting(value as number),
   meeting_beep_enabled: (value) =>
     commands.changeMeetingBeepSetting(value as boolean),
+  meeting_detect_calls: (value) =>
+    commands.changeMeetingDetectCallsSetting(value as boolean),
+  meeting_detect_voices: (value) =>
+    commands.changeMeetingDetectVoicesSetting(value as boolean),
   cloud_audio_backup_enabled: (value) =>
     commands.changeCloudAudioBackupSetting(value as boolean),
   log_level: (value) => commands.setLogLevel(value as any),

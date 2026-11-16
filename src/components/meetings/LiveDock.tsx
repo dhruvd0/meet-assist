@@ -4,6 +4,7 @@ import { Loader2, Pause, Play, Square } from "lucide-react";
 import { commands } from "@/bindings";
 import { useMeetingStore } from "@/stores/meetingStore";
 import { ok, toastError } from "@/lib/result";
+import { PillShell } from "./PillShell";
 
 /** Start time (ms) of the running session, or null when nothing runs. */
 export const useLiveSessionStart = (): number | null => {
@@ -108,22 +109,7 @@ export const LiveDock: React.FC<{ floating?: boolean }> = ({
   };
 
   return (
-    <div
-      className={
-        floating
-          ? "h-screen w-screen flex items-center justify-center px-2"
-          : "pointer-events-none absolute inset-x-0 bottom-5 flex justify-center px-6 z-20"
-      }
-    >
-      <div
-        role="region"
-        aria-label={t("meetings.dock.label")}
-        className={`pointer-events-auto flex items-center gap-1 h-12 ps-2 pe-1.5 rounded-full bg-surface/95 border border-line-strong backdrop-blur-md max-w-full ${
-          floating
-            ? "shadow-[0_4px_12px_-4px_rgb(0_0_0/0.4)]"
-            : "shadow-[0_16px_40px_-12px_rgb(0_0_0/0.45),0_2px_6px_-2px_rgb(0_0_0/0.2)]"
-        }`}
-      >
+    <PillShell floating={floating} label={t("meetings.dock.label")}>
         <span
           data-tauri-drag-region={floating || undefined}
           className={`w-9 h-9 shrink-0 rounded-full inline-flex items-center justify-center ${
@@ -211,7 +197,6 @@ export const LiveDock: React.FC<{ floating?: boolean }> = ({
           )}
           {t("meetings.controls.end")}
         </button>
-      </div>
-    </div>
+    </PillShell>
   );
 };

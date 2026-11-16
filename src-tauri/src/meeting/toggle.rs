@@ -27,19 +27,35 @@ pub fn toggle_meeting(app: &AppHandle) {
             }
             return;
         }
-        match mm.start(None, None) {
-            Ok(m) => info!("toggle_meeting: started meeting {}", m.id),
-            Err(e) => {
-                // A double press can race another start; the meeting the
-                // user wanted is running, so there is nothing to report.
-                if mm.state().meeting_id.is_some() {
-                    info!("toggle_meeting: start skipped, a meeting is already running");
-                    return;
-                }
-                error!("toggle_meeting: start failed: {e:#}");
-                crate::show_main_window(&app);
-                let _ = app.emit("meeting-toggle-error", format!("{e:#}"));
-            }
-        }
+        start(&mm, &app);
     });
+}
+
+/// Starts a new, unfiled meeting unless one is already running (the answer
+/// to a "meeting detected" prompt). Blocks while capture opens.
+pub fn start_meeting(app: &AppHandle) {
+    let Some(mm) = app.try_state::<Arc<MeetingManager>>() else {
+        error!("start_meeting: MeetingManager not initialised");
+        return;
+    };
+    if mm.state().meeting_id.is_none() {
+        start(mm.inner(), app);
+    }
+}
+
+fn start(mm: &Arc<MeetingManager>, app: &AppHandle) {
+    match mm.start(None, None) {
+        Ok(m) => info!("toggle_meeting: started meeting {}", m.id),
+        Err(e) => {
+            // A double press can race another start; the meeting the
+            // user wanted is running, so there is nothing to report.
+            if mm.state().meeting_id.is_some() {
+                info!("toggle_meeting: start skipped, a meeting is already running");
+                return;
+            }
+            error!("toggle_meeting: start failed: {e:#}");
+            crate::show_main_window(app);
+            let _ = app.emit("meeting-toggle-error", format!("{e:#}"));
+        }
+    }
 }
