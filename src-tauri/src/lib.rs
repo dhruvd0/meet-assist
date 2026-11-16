@@ -311,6 +311,7 @@ fn initialize_core_logic(app_handle: &AppHandle) {
     // Create the meeting intervention card window (hidden by default)
     intervention::create_intervention_window(app_handle);
     live_pill::create_window(app_handle);
+    meeting::detect::spawn(app_handle);
 }
 
 #[tauri::command]
@@ -602,6 +603,8 @@ pub fn run(cli_args: CliArgs) {
             shortcut::change_meeting_observer_interval_setting,
             shortcut::change_meeting_max_line_setting,
             shortcut::change_meeting_beep_setting,
+            shortcut::change_meeting_detect_calls_setting,
+            shortcut::change_meeting_detect_voices_setting,
             shortcut::change_experimental_enabled_setting,
             shortcut::change_llm_base_url_setting,
             shortcut::change_llm_api_format_setting,
@@ -711,6 +714,8 @@ pub fn run(cli_args: CliArgs) {
             commands::meeting::list_interventions,
             commands::meeting::dismiss_intervention,
             commands::meeting::hide_intervention_window,
+            commands::meeting::get_meeting_detection,
+            commands::meeting::answer_meeting_detection,
             commands::meeting::focus_meeting,
             commands::meeting::get_observer_readiness,
             commands::meeting::summarize_session,
@@ -719,6 +724,7 @@ pub fn run(cli_args: CliArgs) {
             cloud::service::CloudStatus,
             meeting::manager::SourceStatusPayload,
             meeting::session::MeetingStatePayload,
+            meeting::detect::MeetingDetectionPayload,
             meeting::session::TranscriptLinePayload,
             meeting::session::MeetingCaptureWarningPayload,
             meeting::summary::SessionSummaryPayload,

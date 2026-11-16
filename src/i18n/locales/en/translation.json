@@ -350,6 +350,27 @@
         "summary": "Summary"
       },
       "footnote": "Costs are estimates from OpenAI list prices checked {{date}}, using the token counts the provider reported. Jev does not report usage or cost, so “+” means the total excludes it."
+    },
+    "detect": {
+      "label": "Meeting detected",
+      "start": "Start",
+      "dismiss": "Not now",
+      "call": {
+        "title": "Meeting detected",
+        "app": "{{app}} is using the microphone",
+        "hint": "An app is using the microphone"
+      },
+      "voices": {
+        "title": "Conversation detected",
+        "hint": "People are talking"
+      },
+      "call_ended": {
+        "title": "Call ended",
+        "hint": "The call has ended",
+        "stopping": "Stopping in",
+        "stop": "Stop now",
+        "keep": "Keep recording"
+      }
     }
   },
   "onboarding": {
@@ -809,6 +830,17 @@
       "systemAudio": {
         "label": "Capture system audio",
         "description": "Hear the other side of the call. Takes effect when the next meeting starts."
+      },
+      "detect": {
+        "title": "Meeting detection",
+        "calls": {
+          "label": "Notice calls",
+          "description": "When a meeting app or browser starts using the microphone, offer to record. Nothing is recorded until you press Start."
+        },
+        "voices": {
+          "label": "Notice conversations",
+          "description": "Keep the microphone open while nothing is recording and offer to record when people are talking. The sound is only measured on this computer; it is never saved or sent. The system's microphone indicator stays on."
+        }
       }
     }
   },

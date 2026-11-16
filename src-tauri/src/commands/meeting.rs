@@ -308,3 +308,22 @@ pub fn get_tester_trace(
 ) -> Vec<crate::meeting::tester::TesterTrace> {
     mm.tester_trace(meeting_id, session_id)
 }
+
+/// What the floating bar is asking, if anything (see `meeting::detect`).
+#[tauri::command]
+#[specta::specta]
+pub fn get_meeting_detection(
+    detector: State<'_, Arc<crate::meeting::detect::MeetingDetector>>,
+) -> Option<crate::meeting::detect::DetectionPrompt> {
+    detector.prompt()
+}
+
+/// The user's answer to the floating bar's prompt.
+#[tauri::command]
+#[specta::specta]
+pub fn answer_meeting_detection(
+    detector: State<'_, Arc<crate::meeting::detect::MeetingDetector>>,
+    accept: bool,
+) {
+    detector.answer(accept);
+}

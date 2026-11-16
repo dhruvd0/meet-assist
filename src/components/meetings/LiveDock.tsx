@@ -4,6 +4,7 @@ import { Loader2, Pause, Play, Square } from "lucide-react";
 import { commands } from "@/bindings";
 import { useMeetingStore } from "@/stores/meetingStore";
 import { ok, toastError } from "@/lib/result";
+import { PillShell } from "./PillShell";
 
 /** Start time (ms) of the running session, or null when nothing runs. */
 export const useLiveSessionStart = (): number | null => {
@@ -108,110 +109,92 @@ export const LiveDock: React.FC<{ floating?: boolean }> = ({
   };
 
   return (
-    <div
-      className={
-        floating
-          ? "h-screen w-screen flex items-center justify-center px-2"
-          : "pointer-events-none absolute inset-x-0 bottom-5 flex justify-center px-6 z-20"
-      }
-    >
-      <div
-        role="region"
-        aria-label={t("meetings.dock.label")}
-        className={`pointer-events-auto flex items-center gap-1 h-12 ps-2 pe-1.5 rounded-full bg-surface/95 border border-line-strong backdrop-blur-md max-w-full ${
-          floating
-            ? "shadow-[0_4px_12px_-4px_rgb(0_0_0/0.4)]"
-            : "shadow-[0_16px_40px_-12px_rgb(0_0_0/0.45),0_2px_6px_-2px_rgb(0_0_0/0.2)]"
+    <PillShell floating={floating} label={t("meetings.dock.label")}>
+      <span
+        data-tauri-drag-region={floating || undefined}
+        className={`w-9 h-9 shrink-0 rounded-full inline-flex items-center justify-center ${
+          recording ? "bg-accent/15 text-accent" : "bg-surface-hover text-faint"
         }`}
       >
-        <span
-          data-tauri-drag-region={floating || undefined}
-          className={`w-9 h-9 shrink-0 rounded-full inline-flex items-center justify-center ${
-            recording
-              ? "bg-accent/15 text-accent"
-              : "bg-surface-hover text-faint"
-          }`}
-        >
-          <Level active={recording} />
+        <Level active={recording} />
+      </span>
+      <button
+        type="button"
+        disabled={onThisMeeting}
+        onClick={open}
+        title={onThisMeeting ? undefined : t("meetings.dock.open")}
+        className="min-w-0 flex flex-col items-start px-2 text-start enabled:cursor-pointer enabled:hover:opacity-80"
+      >
+        <span className="text-[13px] leading-4 text-text truncate max-w-[16rem]">
+          {title}
         </span>
-        <button
-          type="button"
-          disabled={onThisMeeting}
-          onClick={open}
-          title={onThisMeeting ? undefined : t("meetings.dock.open")}
-          className="min-w-0 flex flex-col items-start px-2 text-start enabled:cursor-pointer enabled:hover:opacity-80"
-        >
-          <span className="text-[13px] leading-4 text-text truncate max-w-[16rem]">
-            {title}
+        {floating && controlError ? (
+          <span
+            role="alert"
+            className="text-[11.5px] leading-4 text-error truncate max-w-[16rem]"
+            title={controlError}
+          >
+            {controlError}
           </span>
-          {floating && controlError ? (
-            <span
-              role="alert"
-              className="text-[11.5px] leading-4 text-error truncate max-w-[16rem]"
-              title={controlError}
-            >
-              {controlError}
-            </span>
-          ) : (
-            <span className="text-[11.5px] leading-4 text-faint">
-              {recording
-                ? t("meetings.dock.recording")
-                : t("meetings.status.paused")}
-              {recording && start !== null && (
-                <span className="font-mono tabular ms-1.5">
-                  {formatElapsed(now - start)}
-                </span>
-              )}
-              {recording && aiReady && (
-                <span className="text-accent">
-                  {" · "}
-                  {t("meetings.dock.aiListening")}
-                </span>
-              )}
-            </span>
-          )}
-        </button>
-        <span className="w-px h-6 bg-line mx-1" />
-        <button
-          type="button"
-          onClick={recording ? pause : resume}
-          disabled={pending !== null}
-          aria-busy={pending === "pause" || pending === "resume"}
-          title={
-            recording
-              ? t("meetings.controls.pause")
-              : t("meetings.controls.resume")
-          }
-          aria-label={
-            recording
-              ? t("meetings.controls.pause")
-              : t("meetings.controls.resume")
-          }
-          className="w-9 h-9 inline-flex items-center justify-center rounded-full text-muted hover:text-text hover:bg-surface-hover transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          {pending === "pause" || pending === "resume" ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : recording ? (
-            <Pause className="w-4 h-4" />
-          ) : (
-            <Play className="w-4 h-4" />
-          )}
-        </button>
-        <button
-          type="button"
-          onClick={() => end(null)}
-          disabled={pending !== null}
-          aria-busy={pending === "end"}
-          className="h-9 px-3.5 inline-flex items-center gap-1.5 rounded-full bg-text text-background text-[13px] font-medium hover:bg-text/85 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-        >
-          {pending === "end" ? (
-            <Loader2 className="w-3 h-3 animate-spin" />
-          ) : (
-            <Square className="w-3 h-3 fill-current" />
-          )}
-          {t("meetings.controls.end")}
-        </button>
-      </div>
-    </div>
+        ) : (
+          <span className="text-[11.5px] leading-4 text-faint">
+            {recording
+              ? t("meetings.dock.recording")
+              : t("meetings.status.paused")}
+            {recording && start !== null && (
+              <span className="font-mono tabular ms-1.5">
+                {formatElapsed(now - start)}
+              </span>
+            )}
+            {recording && aiReady && (
+              <span className="text-accent">
+                {" · "}
+                {t("meetings.dock.aiListening")}
+              </span>
+            )}
+          </span>
+        )}
+      </button>
+      <span className="w-px h-6 bg-line mx-1" />
+      <button
+        type="button"
+        onClick={recording ? pause : resume}
+        disabled={pending !== null}
+        aria-busy={pending === "pause" || pending === "resume"}
+        title={
+          recording
+            ? t("meetings.controls.pause")
+            : t("meetings.controls.resume")
+        }
+        aria-label={
+          recording
+            ? t("meetings.controls.pause")
+            : t("meetings.controls.resume")
+        }
+        className="w-9 h-9 inline-flex items-center justify-center rounded-full text-muted hover:text-text hover:bg-surface-hover transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+      >
+        {pending === "pause" || pending === "resume" ? (
+          <Loader2 className="w-4 h-4 animate-spin" />
+        ) : recording ? (
+          <Pause className="w-4 h-4" />
+        ) : (
+          <Play className="w-4 h-4" />
+        )}
+      </button>
+      <button
+        type="button"
+        onClick={() => end(null)}
+        disabled={pending !== null}
+        aria-busy={pending === "end"}
+        className="h-9 px-3.5 inline-flex items-center gap-1.5 rounded-full bg-text text-background text-[13px] font-medium hover:bg-text/85 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+      >
+        {pending === "end" ? (
+          <Loader2 className="w-3 h-3 animate-spin" />
+        ) : (
+          <Square className="w-3 h-3 fill-current" />
+        )}
+        {t("meetings.controls.end")}
+      </button>
+    </PillShell>
   );
 };

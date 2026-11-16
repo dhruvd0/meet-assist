@@ -288,6 +288,27 @@
         "cooldown": "Nudge cooldown · {{seconds}} seconds remaining",
         "scores": "Loop {{loop}} · Stuck {{stuck}} · Fact {{info}} · Idea {{idea}}"
       }
+    },
+    "detect": {
+      "label": "Meeting detected",
+      "start": "Start",
+      "dismiss": "Not now",
+      "call": {
+        "title": "Meeting detected",
+        "app": "{{app}} is using the microphone",
+        "hint": "An app is using the microphone"
+      },
+      "voices": {
+        "title": "Conversation detected",
+        "hint": "People are talking"
+      },
+      "call_ended": {
+        "title": "Call ended",
+        "hint": "The call has ended",
+        "stopping": "Stopping in",
+        "stop": "Stop now",
+        "keep": "Keep recording"
+      }
     }
   },
   "onboarding": {
@@ -747,6 +768,17 @@
       "maxLine": {
         "label": "Longest transcript line",
         "description": "Seconds of non-stop speech before it is cut into a new line. Lower values give the assistant new lines, and so checks, more often during long monologues, but may split a sentence. Takes effect when the next meeting starts."
+      },
+      "detect": {
+        "title": "Meeting detection",
+        "calls": {
+          "label": "Notice calls",
+          "description": "When a meeting app or browser starts using the microphone, offer to record. Nothing is recorded until you press Start."
+        },
+        "voices": {
+          "label": "Notice conversations",
+          "description": "Keep the microphone open while nothing is recording and offer to record when people are talking. The sound is only measured on this computer; it is never saved or sent. The system's microphone indicator stays on."
+        }
       }
     }
   },

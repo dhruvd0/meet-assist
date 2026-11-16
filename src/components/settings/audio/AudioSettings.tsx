@@ -20,6 +20,26 @@ export const AudioSettings: React.FC = () => {
       <SettingsGroup title={t("settings.general.shortcut.title")}>
         <ShortcutInput shortcutId="toggle_meeting" grouped={true} />
       </SettingsGroup>
+      <SettingsGroup title={t("settings.meeting.detect.title")}>
+        <ToggleSwitch
+          checked={getSetting("meeting_detect_calls") ?? true}
+          onChange={(v) => updateSetting("meeting_detect_calls", v)}
+          isUpdating={isUpdating("meeting_detect_calls")}
+          label={t("settings.meeting.detect.calls.label")}
+          description={t("settings.meeting.detect.calls.description")}
+          descriptionMode="inline"
+          grouped={true}
+        />
+        <ToggleSwitch
+          checked={getSetting("meeting_detect_voices") ?? true}
+          onChange={(v) => updateSetting("meeting_detect_voices", v)}
+          isUpdating={isUpdating("meeting_detect_voices")}
+          label={t("settings.meeting.detect.voices.label")}
+          description={t("settings.meeting.detect.voices.description")}
+          descriptionMode="inline"
+          grouped={true}
+        />
+      </SettingsGroup>
       <SettingsGroup title={t("settings.sound.title")}>
         <MicrophoneSelector descriptionMode="tooltip" grouped={true} />
         <ChannelSelector descriptionMode="tooltip" grouped={true} />

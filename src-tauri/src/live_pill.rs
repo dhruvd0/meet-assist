@@ -2,6 +2,8 @@
 //! front, a small always-on-top copy of the in-app live dock (title, time,
 //! assistant status, pause/resume, end) so the meeting stays in reach from
 //! the call. It never takes focus, and hides when the main window comes back.
+//! The same bar carries the "meeting detected" and "call ended" prompts
+//! (`meeting::detect`), which show wherever the main window is.
 
 use crate::meeting::session::MeetingManager;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -28,13 +30,17 @@ pub fn main_focus_changed(app: &AppHandle, focused: bool) {
     sync(app);
 }
 
-/// Show the bar while a meeting is running or paused and the main window is
-/// not in front; hide it otherwise.
+/// Show the bar while a detection prompt is waiting for an answer, or a
+/// meeting is running or paused and the main window is not in front; hide it
+/// otherwise.
 pub fn sync(app: &AppHandle) {
     let running = app
         .try_state::<Arc<MeetingManager>>()
         .is_some_and(|mm| mm.state().meeting_id.is_some());
-    let show = running && !MAIN_FOCUSED.load(Ordering::SeqCst);
+    let asking = app
+        .try_state::<Arc<crate::meeting::detect::MeetingDetector>>()
+        .is_some_and(|d| d.prompt().is_some());
+    let show = asking || (running && !MAIN_FOCUSED.load(Ordering::SeqCst));
     let handle = app.clone();
     let _ = app.run_on_main_thread(move || {
         let Some(window) = handle.get_webview_window(LABEL) else {

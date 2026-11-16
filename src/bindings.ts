@@ -157,6 +157,22 @@ async changeMeetingBeepSetting(enabled: boolean) : Promise<Result<null, string>>
     else return { status: "error", error: e  as any };
 }
 },
+async changeMeetingDetectCallsSetting(enabled: boolean) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("change_meeting_detect_calls_setting", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async changeMeetingDetectVoicesSetting(enabled: boolean) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("change_meeting_detect_voices_setting", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async changeExperimentalEnabledSetting(enabled: boolean) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("change_experimental_enabled_setting", { enabled }) };
@@ -1027,6 +1043,18 @@ async dismissIntervention(id: number) : Promise<Result<null, string>> {
 async hideInterventionWindow() : Promise<void> {
     await TAURI_INVOKE("hide_intervention_window");
 },
+/**
+ * What the floating bar is asking, if anything (see `meeting::detect`).
+ */
+async getMeetingDetection() : Promise<DetectionPrompt | null> {
+    return await TAURI_INVOKE("get_meeting_detection");
+},
+/**
+ * The user's answer to the floating bar's prompt.
+ */
+async answerMeetingDetection(accept: boolean) : Promise<void> {
+    await TAURI_INVOKE("answer_meeting_detection", { accept });
+},
 async focusMeeting(meetingId: number) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("focus_meeting", { meetingId }) };
@@ -1060,6 +1088,7 @@ export const events = __makeEvents__<{
 cloudStatus: CloudStatus,
 interventionPayload: InterventionPayload,
 meetingCaptureWarningPayload: MeetingCaptureWarningPayload,
+meetingDetectionPayload: MeetingDetectionPayload,
 meetingFiledPayload: MeetingFiledPayload,
 meetingStatePayload: MeetingStatePayload,
 meetingTitledPayload: MeetingTitledPayload,
@@ -1074,6 +1103,7 @@ transcriptLinePayload: TranscriptLinePayload
 cloudStatus: "cloud-status",
 interventionPayload: "intervention-payload",
 meetingCaptureWarningPayload: "meeting-capture-warning-payload",
+meetingDetectionPayload: "meeting-detection-payload",
 meetingFiledPayload: "meeting-filed-payload",
 meetingStatePayload: "meeting-state-payload",
 meetingTitledPayload: "meeting-titled-payload",
@@ -1145,6 +1175,15 @@ meeting_jev_enabled?: boolean; meeting_sensitivity?: MeetingSensitivity; meeting
  */
 meeting_max_line_secs?: number; meeting_beep_enabled?: boolean; 
 /**
+ * Offer to record when a call app is using the microphone.
+ */
+meeting_detect_calls?: boolean; 
+/**
+ * Keep the microphone open while idle and offer to record when people
+ * are talking. The audio is only measured, never kept.
+ */
+meeting_detect_voices?: boolean; 
+/**
  * Copy session recordings to the signed-in account's cloud storage.
  */
 cloud_audio_backup_enabled?: boolean; app_language?: string; theme?: Theme; experimental_enabled?: boolean; keyboard_implementation?: KeyboardImplementation; show_tray_icon?: boolean; filler_word_removal_enabled?: boolean; custom_filler_words?: string[] | null; 
@@ -1194,6 +1233,31 @@ audio_waiting: number;
  */
 audio_message: string | null }
 export type CustomSounds = { start: boolean; stop: boolean }
+export type DetectionKind = 
+/**
+ * A call app is using the microphone.
+ */
+"call" | 
+/**
+ * People are talking near the microphone.
+ */
+"voices" | 
+/**
+ * The call the meeting was recording has ended.
+ */
+"call_ended"
+/**
+ * What the floating bar is asking the user right now.
+ */
+export type DetectionPrompt = { kind: DetectionKind; 
+/**
+ * The app on the call, when known.
+ */
+app: string | null; 
+/**
+ * Unix ms when "call ended" ends the meeting by itself.
+ */
+deadline: number | null }
 export type DetectionScores = { loop_score: number; stuck: number; info: number; idea: number }
 export type EfficiencyIssue = { 
 /**
@@ -1293,6 +1357,7 @@ export type MeetingDetail = { meeting: Meeting; sessions: Session[]; lines: Tran
  * Lines that can be played, with their place in the session recording.
  */
 audio: LineAudio[] }
+export type MeetingDetectionPayload = { prompt: DetectionPrompt | null }
 /**
  * A meeting's project changed, by the assistant or the user.
  */

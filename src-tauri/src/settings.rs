@@ -381,6 +381,13 @@ pub struct AppSettings {
     pub meeting_max_line_secs: u32,
     #[serde(default = "default_meeting_beep_enabled")]
     pub meeting_beep_enabled: bool,
+    /// Offer to record when a call app is using the microphone.
+    #[serde(default = "default_true")]
+    pub meeting_detect_calls: bool,
+    /// Keep the microphone open while idle and offer to record when people
+    /// are talking. The audio is only measured, never kept.
+    #[serde(default = "default_true")]
+    pub meeting_detect_voices: bool,
     /// Copy session recordings to the signed-in account's cloud storage.
     #[serde(default = "default_cloud_audio_backup_enabled")]
     pub cloud_audio_backup_enabled: bool,
@@ -522,6 +529,10 @@ fn default_meeting_beep_enabled() -> bool {
 }
 
 fn default_cloud_audio_backup_enabled() -> bool {
+    true
+}
+
+fn default_true() -> bool {
     true
 }
 
@@ -788,6 +799,8 @@ pub fn get_default_settings() -> AppSettings {
         meeting_max_line_secs: default_meeting_max_line_secs(),
         meeting_beep_enabled: default_meeting_beep_enabled(),
         cloud_audio_backup_enabled: default_cloud_audio_backup_enabled(),
+        meeting_detect_calls: true,
+        meeting_detect_voices: true,
         app_language: default_app_language(),
         theme: default_theme(),
         experimental_enabled: false,
