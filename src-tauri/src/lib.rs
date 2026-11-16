@@ -676,6 +676,7 @@ pub fn run(cli_args: CliArgs) {
             commands::cloud::cloud_sign_up,
             commands::cloud::cloud_sign_out,
             commands::cloud::cloud_sync_now,
+            commands::cloud::change_cloud_audio_backup_setting,
             commands::project::list_projects,
             commands::project::get_project,
             commands::project::create_project,

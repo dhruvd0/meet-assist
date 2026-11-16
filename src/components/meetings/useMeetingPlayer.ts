@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import type { MeetingDetail } from "@/bindings";
 import { commands } from "@/bindings";
+import { toastError } from "@/lib/result";
 import {
   buildTimeline,
   lineAt,
@@ -30,6 +31,8 @@ export const useMeetingPlayer = (detail: MeetingDetail | null) => {
   const loadedTrack = useRef<number | null>(null);
   const request = useRef(0);
   const [playing, setPlaying] = useState(false);
+  // A recording made on another device is downloaded on first play.
+  const [loading, setLoading] = useState(false);
   const [positionMs, setPositionMs] = useState(0);
   // Nothing is highlighted until the user first plays or seeks.
   const [started, setStarted] = useState(false);
@@ -74,12 +77,16 @@ export const useMeetingPlayer = (detail: MeetingDetail | null) => {
 
     if (loadedTrack.current !== index) {
       audio.pause();
+      setLoading(true);
       const res = await commands.getSessionAudioPath(
         track.sessionId,
         needsWav(),
       );
       if (mine !== request.current) return;
-      if (res.status !== "ok" || !res.data) return;
+      setLoading(false);
+      if (res.status !== "ok")
+        return toastError("meetings.player.loadFailed", res.error);
+      if (!res.data) return;
       loadedTrack.current = index;
       audio.src = convertFileSrc(res.data);
       await new Promise<void>((resolve) => {
@@ -112,6 +119,7 @@ export const useMeetingPlayer = (detail: MeetingDetail | null) => {
       audioRef.current = null;
       loadedTrack.current = null;
       setPlaying(false);
+      setLoading(false);
       setPositionMs(0);
       setStarted(false);
       setFocusLineId(null);
@@ -154,6 +162,7 @@ export const useMeetingPlayer = (detail: MeetingDetail | null) => {
       [timeline],
     ),
     playing,
+    loading,
     positionMs,
     activeLineId,
     focusLineId,

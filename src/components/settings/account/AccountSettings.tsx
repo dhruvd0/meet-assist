@@ -5,6 +5,8 @@ import { useCloudStore } from "@/stores/cloudStore";
 import { SettingsGroup } from "../../ui/SettingsGroup";
 import { Button } from "../../ui/Button";
 import { Input } from "../../ui/Input";
+import { ToggleSwitch } from "../../ui/ToggleSwitch";
+import { useSettings } from "../../../hooks/useSettings";
 
 const STATE_TONE: Record<CloudState, string> = {
   signed_out: "text-faint",
@@ -20,6 +22,7 @@ export const AccountSettings: React.FC = () => {
   const { t, i18n } = useTranslation();
   const status = useCloudStore((s) => s.status);
   const apply = useCloudStore((s) => s.apply);
+  const { getSetting, updateSetting, isUpdating } = useSettings();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState<"in" | "up" | "out" | null>(null);
@@ -111,6 +114,7 @@ export const AccountSettings: React.FC = () => {
     );
   }
 
+  const backupOn = getSetting("cloud_audio_backup_enabled") ?? true;
   const lastSynced = status.last_synced_at
     ? new Date(status.last_synced_at).toLocaleString(i18n.language)
     : null;
@@ -152,6 +156,31 @@ export const AccountSettings: React.FC = () => {
             </Button>
           </div>
         </div>
+      </SettingsGroup>
+      <SettingsGroup title={t("account.recordings.title")}>
+        <ToggleSwitch
+          checked={backupOn}
+          onChange={(v) => updateSetting("cloud_audio_backup_enabled", v)}
+          isUpdating={isUpdating("cloud_audio_backup_enabled")}
+          label={t("account.recordings.label")}
+          description={t("account.recordings.description")}
+          descriptionMode="inline"
+          grouped
+        />
+        {backupOn && (status.audio_message || status.audio_waiting > 0) && (
+          <p
+            role={status.audio_message ? "alert" : "status"}
+            className={`px-4 pb-4 text-[12px] ${status.audio_message ? "text-error" : "text-faint"}`}
+          >
+            {status.audio_message
+              ? t("account.recordings.paused", {
+                  message: status.audio_message,
+                })
+              : t("account.recordings.waiting", {
+                  count: status.audio_waiting,
+                })}
+          </p>
+        )}
       </SettingsGroup>
     </div>
   );

@@ -381,6 +381,9 @@ pub struct AppSettings {
     pub meeting_max_line_secs: u32,
     #[serde(default = "default_meeting_beep_enabled")]
     pub meeting_beep_enabled: bool,
+    /// Copy session recordings to the signed-in account's cloud storage.
+    #[serde(default = "default_cloud_audio_backup_enabled")]
+    pub cloud_audio_backup_enabled: bool,
     #[serde(default = "default_app_language")]
     pub app_language: String,
     #[serde(default = "default_theme")]
@@ -515,6 +518,10 @@ fn default_meeting_max_line_secs() -> u32 {
 }
 
 fn default_meeting_beep_enabled() -> bool {
+    true
+}
+
+fn default_cloud_audio_backup_enabled() -> bool {
     true
 }
 
@@ -780,6 +787,7 @@ pub fn get_default_settings() -> AppSettings {
         meeting_observer_interval_secs: default_meeting_observer_interval_secs(),
         meeting_max_line_secs: default_meeting_max_line_secs(),
         meeting_beep_enabled: default_meeting_beep_enabled(),
+        cloud_audio_backup_enabled: default_cloud_audio_backup_enabled(),
         app_language: default_app_language(),
         theme: default_theme(),
         experimental_enabled: false,

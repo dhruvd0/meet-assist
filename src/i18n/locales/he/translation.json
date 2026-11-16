@@ -141,7 +141,9 @@
       "play": "Play recording",
       "pause": "Pause recording",
       "seek": "Position in recording",
-      "nudge": "{{kind}} at {{time}}"
+      "nudge": "{{kind}} at {{time}}",
+      "loading": "Loading recording",
+      "loadFailed": "Couldn't load the recording: {{error}}"
     },
     "errors": {
       "load": "Could not load meetings.",

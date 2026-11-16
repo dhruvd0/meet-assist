@@ -233,6 +233,9 @@ static MIGRATIONS: &[M] = &[
         );
         CREATE INDEX line_audio_session_idx ON line_audio(session_id);",
     ),
+    // Recordings of deleted sessions that still have to be removed from the
+    // account's cloud storage; see cloud/audio.rs.
+    M::up("CREATE TABLE audio_deletions (uid TEXT PRIMARY KEY) WITHOUT ROWID;"),
 ];
 
 /// The schema as it was before cloud sync, for the migration test.
@@ -398,6 +401,160 @@ impl ProjectStore {
         Ok(())
     }
 
+    /// Sessions with a joined recording, newest first.
+    pub fn session_recordings(&self) -> Result<Vec<SessionRecording>> {
+        let conn = self.conn()?;
+        let mut stmt = conn.prepare(
+            "SELECT s.id, s.uid, s.meeting_id FROM sessions s
+             WHERE s.uid IS NOT NULL AND s.ended_at IS NOT NULL
+               AND EXISTS (SELECT 1 FROM line_audio a WHERE a.session_id = s.id)
+             ORDER BY s.id DESC",
+        )?;
+        let rows = stmt.query_map([], |r| {
+            Ok((
+                r.get::<_, i64>(0)?,
+                r.get::<_, String>(1)?,
+                r.get::<_, i64>(2)?,
+            ))
+        })?;
+        let mut out = Vec::new();
+        for row in rows {
+            let (session_id, uid, meeting_id) = row?;
+            let path = self
+                .meeting_audio_dir(meeting_id)
+                .join(format!("session-{session_id}.ogg"));
+            out.push(SessionRecording {
+                session_id,
+                uid,
+                on_disk: path.is_file(),
+                path,
+            });
+        }
+        Ok(out)
+    }
+
+    /// Ended sessions with transcript lines but no recording yet, as
+    /// `(id, sync id)`, newest first.
+    pub fn sessions_without_recording(&self) -> Result<Vec<(i64, String)>> {
+        let conn = self.conn()?;
+        let mut stmt = conn.prepare(
+            "SELECT s.id, s.uid FROM sessions s
+             WHERE s.uid IS NOT NULL AND s.ended_at IS NOT NULL
+               AND EXISTS (SELECT 1 FROM transcript_lines l WHERE l.session_id = s.id)
+               AND NOT EXISTS (SELECT 1 FROM line_audio a WHERE a.session_id = s.id)
+             ORDER BY s.id DESC",
+        )?;
+        let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?;
+        Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+    }
+
+    pub fn session_uid(&self, session_id: i64) -> Result<Option<String>> {
+        Ok(self
+            .conn()?
+            .query_row(
+                "SELECT uid FROM sessions WHERE id = ?1",
+                params![session_id],
+                |r| r.get(0),
+            )
+            .optional()?
+            .flatten())
+    }
+
+    /// A session's line positions keyed by each line's sync id.
+    pub fn session_audio_manifest(&self, session_id: i64) -> Result<Vec<(String, LineAudio)>> {
+        let conn = self.conn()?;
+        let mut stmt = conn.prepare(
+            "SELECT l.uid, a.line_id, a.start_ms, a.ms FROM line_audio a
+             JOIN transcript_lines l ON l.id = a.line_id
+             WHERE a.session_id = ?1 AND l.uid IS NOT NULL ORDER BY a.start_ms ASC",
+        )?;
+        let rows = stmt.query_map(params![session_id], |r| {
+            Ok((
+                r.get(0)?,
+                LineAudio {
+                    line_id: r.get(1)?,
+                    start_ms: r.get(2)?,
+                    ms: r.get(3)?,
+                },
+            ))
+        })?;
+        Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+    }
+
+    /// Store line positions that came from another device, keyed by line sync
+    /// id. Nothing is stored, and false returned, until every line is here.
+    pub fn restore_session_audio(
+        &self,
+        session_id: i64,
+        lines: &[(String, LineAudio)],
+    ) -> Result<bool> {
+        let mut spans = Vec::with_capacity(lines.len());
+        {
+            let conn = self.conn()?;
+            let mut stmt =
+                conn.prepare("SELECT id FROM transcript_lines WHERE uid = ?1 AND session_id = ?2")?;
+            for (uid, a) in lines {
+                let id: Option<i64> = stmt
+                    .query_row(params![uid, session_id], |r| r.get(0))
+                    .optional()?;
+                let Some(line_id) = id else {
+                    return Ok(false);
+                };
+                spans.push(LineAudio {
+                    line_id,
+                    start_ms: a.start_ms,
+                    ms: a.ms,
+                });
+            }
+        }
+        if spans.is_empty() {
+            return Ok(false);
+        }
+        self.set_session_audio(session_id, &spans)?;
+        Ok(true)
+    }
+
+    /// Sync ids of deleted sessions whose cloud recording is not removed yet.
+    pub fn audio_deletions(&self) -> Result<Vec<String>> {
+        let conn = self.conn()?;
+        let mut stmt = conn.prepare("SELECT uid FROM audio_deletions")?;
+        let rows = stmt.query_map([], |r| r.get(0))?;
+        Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+    }
+
+    pub fn clear_audio_deletions(&self, uids: &[String]) -> Result<()> {
+        let conn = self.conn()?;
+        let mut stmt = conn.prepare("DELETE FROM audio_deletions WHERE uid = ?1")?;
+        for uid in uids {
+            stmt.execute(params![uid])?;
+        }
+        Ok(())
+    }
+
+    /// Remove audio folders of meetings that no longer exist: a meeting
+    /// deleted on another device loses its rows in a pull, not its files.
+    pub fn prune_orphan_audio(&self) -> Result<()> {
+        let root = self.db_path.with_file_name("meeting-audio");
+        let Ok(entries) = std::fs::read_dir(&root) else {
+            return Ok(());
+        };
+        let conn = self.conn()?;
+        let mut exists = conn.prepare("SELECT 1 FROM meetings WHERE id = ?1")?;
+        for entry in entries.flatten() {
+            let Some(id) = entry
+                .file_name()
+                .to_str()
+                .and_then(|n| n.parse::<i64>().ok())
+            else {
+                continue;
+            };
+            if !exists.exists(params![id])? {
+                self.remove_meeting_audio(id);
+            }
+        }
+        Ok(())
+    }
+
     /// Ended sessions that still have per-line WAVs on disk, newest first.
     pub fn sessions_with_pending_audio(&self) -> Result<Vec<i64>> {
         let root = self.db_path.with_file_name("meeting-audio");
@@ -543,6 +700,13 @@ impl ProjectStore {
         tx.execute(
             "DELETE FROM transcript_lines WHERE session_id IN
                (SELECT s.id FROM sessions s JOIN meetings m ON m.id = s.meeting_id WHERE m.project_id = ?1)",
+            params![id],
+        )?;
+        tx.execute(
+            "INSERT OR IGNORE INTO audio_deletions (uid)
+             SELECT uid FROM sessions WHERE meeting_id IN (SELECT id FROM meetings WHERE project_id = ?1)
+               AND uid IS NOT NULL
+               AND EXISTS (SELECT 1 FROM line_audio a WHERE a.session_id = sessions.id)",
             params![id],
         )?;
         tx.execute(
@@ -962,6 +1126,16 @@ pub struct MeetingDetail {
     pub audio: Vec<LineAudio>,
 }
 
+/// A session whose lines have a place in a joined recording.
+pub struct SessionRecording {
+    pub session_id: i64,
+    /// The session's sync id.
+    pub uid: String,
+    pub path: PathBuf,
+    /// False on a device that knows the recording but has not downloaded it.
+    pub on_disk: bool,
+}
+
 /// Where one line sits in its session's recording.
 #[derive(Clone, Debug, Serialize, Deserialize, Type)]
 pub struct LineAudio {
@@ -1186,6 +1360,12 @@ impl ProjectStore {
         )?;
         tx.execute(
             "DELETE FROM transcript_lines WHERE session_id IN (SELECT id FROM sessions WHERE meeting_id = ?1)",
+            params![id],
+        )?;
+        tx.execute(
+            "INSERT OR IGNORE INTO audio_deletions (uid)
+             SELECT uid FROM sessions WHERE meeting_id = ?1 AND uid IS NOT NULL
+               AND EXISTS (SELECT 1 FROM line_audio a WHERE a.session_id = sessions.id)",
             params![id],
         )?;
         tx.execute("DELETE FROM sessions WHERE meeting_id = ?1", params![id])?;

@@ -41,3 +41,20 @@ pub async fn cloud_sign_out(cloud: Cloud<'_>) -> Result<CloudStatus, String> {
 pub fn cloud_sync_now(cloud: Cloud<'_>) {
     cloud.sync_now();
 }
+
+/// Turn recording backup on or off for this device.
+#[tauri::command]
+#[specta::specta]
+pub fn change_cloud_audio_backup_setting(
+    app: tauri::AppHandle,
+    cloud: Cloud<'_>,
+    enabled: bool,
+) -> Result<(), String> {
+    let mut settings = crate::settings::get_settings(&app);
+    settings.cloud_audio_backup_enabled = enabled;
+    crate::settings::write_settings(&app, settings);
+    if enabled {
+        cloud.resume_audio_backup();
+    }
+    Ok(())
+}

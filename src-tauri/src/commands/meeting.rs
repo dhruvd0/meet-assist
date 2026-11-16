@@ -97,24 +97,33 @@ pub fn delete_meeting(mm: Mm<'_>, id: i64) -> Result<(), String> {
     mm.store().delete_meeting(id).map_err(err)
 }
 
-/// File the webview can play for a session's recording, if it has one.
+/// File the webview can play for a session's recording, if it has one. A
+/// recording made on another device is downloaded from the account first.
 /// `as_wav` asks for a decoded copy, for a webview that cannot play Opus.
 #[tauri::command]
 #[specta::specta]
 pub async fn get_session_audio_path(
     mm: Mm<'_>,
+    cloud: State<'_, Arc<crate::cloud::service::CloudService>>,
     session_id: i64,
     as_wav: bool,
 ) -> Result<Option<String>, String> {
     let store = mm.store().clone_handle();
-    tauri::async_runtime::spawn_blocking(move || {
-        let ogg = store.session_audio_path(session_id).map_err(err)?;
-        if !ogg.is_file() {
+    let ogg = store.session_audio_path(session_id).map_err(err)?;
+    if !ogg.is_file() {
+        if store
+            .session_audio_lines(session_id)
+            .map_err(err)?
+            .is_empty()
+        {
             return Ok(None);
         }
-        if !as_wav {
-            return Ok(Some(ogg.to_string_lossy().into_owned()));
-        }
+        cloud.fetch_session_audio(session_id).await?;
+    }
+    if !as_wav {
+        return Ok(Some(ogg.to_string_lossy().into_owned()));
+    }
+    tauri::async_runtime::spawn_blocking(move || {
         let wav = std::env::temp_dir()
             .join("case-playback")
             .join(format!("session-{session_id}.wav"));
