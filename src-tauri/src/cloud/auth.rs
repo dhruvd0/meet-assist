@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 
 const KEYCHAIN_SERVICE: &str = "com.case.app.cloud";
 const KEYCHAIN_ACCOUNT: &str = "session";
+const KEYCHAIN_DEV_ACCOUNT: &str = "session-dev";
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Session {
@@ -158,7 +159,14 @@ async fn token_request(
 }
 
 fn entry() -> keyring::Result<keyring::Entry> {
-    keyring::Entry::new(KEYCHAIN_SERVICE, KEYCHAIN_ACCOUNT)
+    // A debug build pointed at another Supabase must not replace the real
+    // account's session.
+    let account = if super::using_dev_backend() {
+        KEYCHAIN_DEV_ACCOUNT
+    } else {
+        KEYCHAIN_ACCOUNT
+    };
+    keyring::Entry::new(KEYCHAIN_SERVICE, account)
 }
 
 pub fn load() -> Option<Session> {

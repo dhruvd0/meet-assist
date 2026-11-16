@@ -31,3 +31,8 @@ pub fn anon_key() -> &'static str {
     static KEY: OnceLock<String> = OnceLock::new();
     KEY.get_or_init(|| setting("CASE_SUPABASE_ANON_KEY", ANON_KEY))
 }
+
+/// True when a debug build was pointed at another Supabase.
+pub fn using_dev_backend() -> bool {
+    supabase_url() != SUPABASE_URL
+}
