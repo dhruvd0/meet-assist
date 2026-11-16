@@ -134,9 +134,14 @@
       "show_other": "Show {{count}} lines",
       "hide": "Hide",
       "playLine": "Play this line",
-      "pauseLine": "Pause",
-      "playAll": "Play recording",
-      "stopAll": "Stop"
+      "pauseLine": "Pause"
+    },
+    "player": {
+      "label": "Recording",
+      "play": "Play recording",
+      "pause": "Pause recording",
+      "seek": "Position in recording",
+      "nudge": "{{kind}} at {{time}}"
     },
     "errors": {
       "load": "Could not load meetings.",

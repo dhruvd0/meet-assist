@@ -17,12 +17,19 @@ const clock = (ms: number, locale: string) =>
 export const TranscriptThread: React.FC<{
   detail: MeetingDetail;
   autoscroll: boolean;
+  /** The line the recording is at, if it has been played. */
   playingId: number | null;
+  paused: boolean;
+  /** The line a nudge was jumped to; shown ringed and scrolled into view. */
+  focusId: number | null;
+  /** Lines that have audio. */
+  playable: Set<number>;
   onPlay: (lineId: number) => void;
-}> = ({ detail, autoscroll, playingId, onPlay }) => {
+}> = ({ detail, autoscroll, playingId, paused, focusId, playable, onPlay }) => {
   const { t, i18n } = useTranslation();
   const endRef = useRef<HTMLDivElement>(null);
   const playingRef = useRef<HTMLDivElement>(null);
+  const focusRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (autoscroll)
@@ -35,6 +42,10 @@ export const TranscriptThread: React.FC<{
       behavior: "smooth",
     });
   }, [playingId]);
+
+  useEffect(() => {
+    focusRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [focusId]);
 
   const sessionIndex = new Map(detail.sessions.map((s, i) => [s.id, i + 1]));
 
@@ -67,14 +78,16 @@ export const TranscriptThread: React.FC<{
             <div className="space-y-0.5">
               {lines.map((l) => {
                 const me = l.speaker !== "them";
-                const playing = playingId === l.id;
+                const current = playingId === l.id;
+                const playing = current && !paused;
+                const focused = focusId === l.id;
                 return (
                   <div
                     key={l.id}
-                    ref={playing ? playingRef : undefined}
+                    ref={focused ? focusRef : current ? playingRef : undefined}
                     className={`group -mx-2 px-2 py-1 rounded-lg grid grid-cols-[3.25rem_1fr_auto] gap-x-3 text-[14.5px] leading-6 transition-colors ${
-                      playing ? "bg-accent/10" : ""
-                    }`}
+                      current ? "bg-accent/10" : ""
+                    } ${focused ? "ring-1 ring-inset ring-accent/40" : ""}`}
                   >
                     <span
                       className={`text-[13px] leading-6 font-medium ${me ? "text-accent" : "text-faint"}`}
@@ -90,31 +103,33 @@ export const TranscriptThread: React.FC<{
                       <span className="font-mono text-[11px] leading-6 text-faint tabular opacity-0 group-hover:opacity-100 transition-opacity">
                         {clock(l.ts, i18n.language)}
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => onPlay(l.id)}
-                        title={
-                          playing
-                            ? t("meetings.transcript.pauseLine")
-                            : t("meetings.transcript.playLine")
-                        }
-                        aria-label={
-                          playing
-                            ? t("meetings.transcript.pauseLine")
-                            : t("meetings.transcript.playLine")
-                        }
-                        className={`w-6 h-6 inline-flex items-center justify-center rounded-md transition-[opacity,color,background-color] cursor-pointer focus-visible:opacity-100 ${
-                          playing
-                            ? "opacity-100 text-accent"
-                            : "opacity-0 group-hover:opacity-100 text-faint hover:text-text hover:bg-surface-hover"
-                        }`}
-                      >
-                        {playing ? (
-                          <Pause className="w-3 h-3 fill-current" />
-                        ) : (
-                          <Play className="w-3 h-3 fill-current" />
-                        )}
-                      </button>
+                      {playable.has(l.id) && (
+                        <button
+                          type="button"
+                          onClick={() => onPlay(l.id)}
+                          title={
+                            playing
+                              ? t("meetings.transcript.pauseLine")
+                              : t("meetings.transcript.playLine")
+                          }
+                          aria-label={
+                            playing
+                              ? t("meetings.transcript.pauseLine")
+                              : t("meetings.transcript.playLine")
+                          }
+                          className={`w-6 h-6 inline-flex items-center justify-center rounded-md transition-[opacity,color,background-color] cursor-pointer focus-visible:opacity-100 ${
+                            playing
+                              ? "opacity-100 text-accent"
+                              : "opacity-0 group-hover:opacity-100 text-faint hover:text-text hover:bg-surface-hover"
+                          }`}
+                        >
+                          {playing ? (
+                            <Pause className="w-3 h-3 fill-current" />
+                          ) : (
+                            <Play className="w-3 h-3 fill-current" />
+                          )}
+                        </button>
+                      )}
                     </span>
                   </div>
                 );

@@ -1036,11 +1036,33 @@ impl MeetingManager {
         // write failed, and the UI must see that.
         *self.lock_active() = None;
         self.emit_state();
+        // Joined whether or not the DB write worked: the session's audio is
+        // picked up again at the next start if this run misses it.
+        let drained = self.join_recording_after(leftover);
         if result.is_ok() {
             self.play_feedback(crate::audio_feedback::SoundType::Stop);
-            self.spawn_summaries(vec![session_id], leftover, Some(meeting_id));
+            self.spawn_summaries(vec![session_id], drained, Some(meeting_id));
         }
         result
+    }
+
+    /// Wait for the transcriber to finish its queued utterances, then join
+    /// the ended session's line audio into one recording. The returned handle
+    /// finishes when the transcriber has; the joining runs on after it.
+    fn join_recording_after(&self, worker: Option<JoinHandle<()>>) -> Option<JoinHandle<()>> {
+        let store = Arc::clone(&self.store);
+        std::thread::Builder::new()
+            .name("meet-drain".into())
+            .spawn(move || {
+                if let Some(worker) = worker {
+                    if worker.join().is_err() {
+                        error!("meet-transcriber panicked");
+                    }
+                }
+                crate::meeting::recording::spawn_compact_pending(store);
+            })
+            .map_err(|e| error!("spawn meet-drain: {e}"))
+            .ok()
     }
 
     /// Start/end cue for every trigger (UI, shortcut, tray, CLI). No-op
@@ -1068,6 +1090,7 @@ impl MeetingManager {
             .map(|s| s.id)
             .collect();
         self.spawn_summaries(ids, None, None);
+        crate::meeting::recording::spawn_compact_pending(Arc::clone(&self.store));
         Ok(())
     }
 }

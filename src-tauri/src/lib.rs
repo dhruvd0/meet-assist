@@ -165,6 +165,7 @@ fn initialize_core_logic(app_handle: &AppHandle) {
         Ok(_) => {}
         Err(e) => log::error!("meeting recovery failed: {e:#}"),
     }
+    meeting::recording::spawn_compact_pending(meeting_store.clone());
     let meeting_manager = Arc::new(meeting::session::MeetingManager::new(
         app_handle,
         meeting_store.clone(),
@@ -703,7 +704,7 @@ pub fn run(cli_args: CliArgs) {
             commands::meeting::update_meeting_title,
             commands::meeting::update_meeting_context,
             commands::meeting::delete_meeting,
-            commands::meeting::get_line_audio_path,
+            commands::meeting::get_session_audio_path,
             commands::meeting::move_meeting,
             commands::meeting::undo_filing,
             commands::meeting::list_interventions,

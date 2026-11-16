@@ -97,14 +97,35 @@ pub fn delete_meeting(mm: Mm<'_>, id: i64) -> Result<(), String> {
     mm.store().delete_meeting(id).map_err(err)
 }
 
-/// File path of a transcript line's recorded audio, if one was saved.
+/// File the webview can play for a session's recording, if it has one.
+/// `as_wav` asks for a decoded copy, for a webview that cannot play Opus.
 #[tauri::command]
 #[specta::specta]
-pub fn get_line_audio_path(mm: Mm<'_>, line_id: i64) -> Result<Option<String>, String> {
-    mm.store()
-        .line_audio_path(line_id)
-        .map(|p| p.map(|p| p.to_string_lossy().into_owned()))
-        .map_err(err)
+pub async fn get_session_audio_path(
+    mm: Mm<'_>,
+    session_id: i64,
+    as_wav: bool,
+) -> Result<Option<String>, String> {
+    let store = mm.store().clone_handle();
+    tauri::async_runtime::spawn_blocking(move || {
+        let ogg = store.session_audio_path(session_id).map_err(err)?;
+        if !ogg.is_file() {
+            return Ok(None);
+        }
+        if !as_wav {
+            return Ok(Some(ogg.to_string_lossy().into_owned()));
+        }
+        let wav = std::env::temp_dir()
+            .join("case-playback")
+            .join(format!("session-{session_id}.wav"));
+        if !wav.is_file() {
+            std::fs::create_dir_all(wav.parent().unwrap_or(&wav)).map_err(|e| e.to_string())?;
+            crate::meeting::recording::decode_to_wav(&ogg, &wav).map_err(err)?;
+        }
+        Ok(Some(wav.to_string_lossy().into_owned()))
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 /// The user's choice of project for a meeting (`None` = Unfiled).

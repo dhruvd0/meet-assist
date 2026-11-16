@@ -4,7 +4,6 @@ import {
   CalendarDays,
   ChevronRight,
   Loader2,
-  Pause,
   Play,
   Square,
 } from "lucide-react";
@@ -24,7 +23,8 @@ import { TranscriptThread } from "./TranscriptThread";
 import { NotesMarkdown } from "./NotesMarkdown";
 import { ObserverStatus } from "./ObserverStatus";
 import { MeetingUsageSummary } from "./MeetingUsageSummary";
-import { useTranscriptPlayer } from "./useTranscriptPlayer";
+import { PlayerBar } from "./PlayerBar";
+import { useMeetingPlayer } from "./useMeetingPlayer";
 
 /** One meeting as a page of notes: summary first, transcript last. */
 export const MeetingDetail: React.FC = () => {
@@ -43,7 +43,7 @@ export const MeetingDetail: React.FC = () => {
   const [title, setTitle] = useState("");
   const isLive = detail !== null && live.meeting_id === detail.meeting.id;
   const [showTranscript, setShowTranscript] = useState(isLive);
-  const player = useTranscriptPlayer(detail?.lines ?? []);
+  const player = useMeetingPlayer(detail);
 
   // A meeting that is recording opens with its transcript showing.
   const meetingId = detail?.meeting.id;
@@ -119,251 +119,246 @@ export const MeetingDetail: React.FC = () => {
   );
 
   return (
-    // Nudges sit in a right rail when the window has room, inline otherwise.
-    <div
-      key={m.id}
-      className="w-full max-w-[1100px] mx-auto px-8 pt-2 pb-32 page-in select-text cursor-auto @min-[960px]:grid @min-[960px]:grid-cols-[minmax(0,1fr)_288px] @min-[960px]:gap-12"
-    >
-      <article className="w-full max-w-[720px] min-w-0 mx-auto @min-[960px]:mx-0 @min-[960px]:justify-self-end">
-        {editing ? (
-          <textarea
-            autoFocus
-            rows={1}
-            value={title}
-            onChange={(e) => setTitle(e.target.value.replace(/\n/g, ""))}
-            onBlur={commit}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                commit();
-              }
-              if (e.key === "Escape") setEditing(false);
-            }}
-            className="w-full -mx-2 px-2 rounded-lg bg-surface resize-none font-serif text-[32px] leading-tight tracking-[-0.01em] text-text focus:outline-none [field-sizing:content]"
-          />
-        ) : (
-          <h1
-            title={t("meetings.rename")}
-            onClick={() => {
-              setTitle(m.title);
-              setEditing(true);
-            }}
-            className="font-serif text-[32px] leading-tight tracking-[-0.01em] text-text text-balance cursor-text"
-          >
-            {m.title}
-          </h1>
-        )}
+    <>
+      {/* Nudges sit in a right rail when the window has room, inline otherwise. */}
+      <div
+        key={m.id}
+        className="w-full max-w-[1100px] mx-auto px-8 pt-2 pb-32 page-in select-text cursor-auto @min-[960px]:grid @min-[960px]:grid-cols-[minmax(0,1fr)_288px] @min-[960px]:gap-12"
+      >
+        <article className="w-full max-w-[720px] min-w-0 mx-auto @min-[960px]:mx-0 @min-[960px]:justify-self-end">
+          {editing ? (
+            <textarea
+              autoFocus
+              rows={1}
+              value={title}
+              onChange={(e) => setTitle(e.target.value.replace(/\n/g, ""))}
+              onBlur={commit}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  commit();
+                }
+                if (e.key === "Escape") setEditing(false);
+              }}
+              className="w-full -mx-2 px-2 rounded-lg bg-surface resize-none font-serif text-[32px] leading-tight tracking-[-0.01em] text-text focus:outline-none [field-sizing:content]"
+            />
+          ) : (
+            <h1
+              title={t("meetings.rename")}
+              onClick={() => {
+                setTitle(m.title);
+                setEditing(true);
+              }}
+              className="font-serif text-[32px] leading-tight tracking-[-0.01em] text-text text-balance cursor-text"
+            >
+              {m.title}
+            </h1>
+          )}
 
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 h-8 px-3 rounded-full border border-line font-mono text-[12px] text-muted">
-            <CalendarDays className="w-3.5 h-3.5" />
-            {when}
-          </span>
-          <MeetingProjectPicker meeting={m} />
-          {m.input_mode === "text_tester" && (
-            <Badge variant="secondary">{t("meetings.tester.badge")}</Badge>
-          )}
-          {(status === "live" || status === "paused") && (
-            <Badge variant={status === "live" ? "primary" : "secondary"}>
-              {status === "live" && (
-                <span className="w-1.5 h-1.5 rounded-full bg-accent live-dot" />
-              )}
-              {t(`meetings.status.${status}`)}
-            </Badge>
-          )}
-          {!isLive && (
-            <div className="ms-auto flex items-center gap-2">
-              {status === "paused" && (
-                <Button
-                  variant="ghost"
-                  disabled={pending !== null}
-                  onClick={() => end(m.id)}
-                >
-                  {pending === "end" ? (
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                  ) : (
-                    <Square className="w-3 h-3" />
-                  )}
-                  {t("meetings.controls.end")}
-                </Button>
-              )}
-              <Button
-                variant="secondary"
-                disabled={otherRunning || pending !== null}
-                onClick={() => startMeeting(m.project_id, m.id)}
-              >
-                {pending === "start" ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <Play className="w-3.5 h-3.5" />
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 h-8 px-3 rounded-full border border-line font-mono text-[12px] text-muted">
+              <CalendarDays className="w-3.5 h-3.5" />
+              {when}
+            </span>
+            <MeetingProjectPicker meeting={m} />
+            {m.input_mode === "text_tester" && (
+              <Badge variant="secondary">{t("meetings.tester.badge")}</Badge>
+            )}
+            {(status === "live" || status === "paused") && (
+              <Badge variant={status === "live" ? "primary" : "secondary"}>
+                {status === "live" && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-accent live-dot" />
                 )}
-                {t("meetings.continue")}
-              </Button>
-            </div>
-          )}
-        </div>
+                {t(`meetings.status.${status}`)}
+              </Badge>
+            )}
+            {!isLive && (
+              <div className="ms-auto flex items-center gap-2">
+                {status === "paused" && (
+                  <Button
+                    variant="ghost"
+                    disabled={pending !== null}
+                    onClick={() => end(m.id)}
+                  >
+                    {pending === "end" ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : (
+                      <Square className="w-3 h-3" />
+                    )}
+                    {t("meetings.controls.end")}
+                  </Button>
+                )}
+                <Button
+                  variant="secondary"
+                  disabled={otherRunning || pending !== null}
+                  onClick={() => startMeeting(m.project_id, m.id)}
+                >
+                  {pending === "start" ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Play className="w-3.5 h-3.5" />
+                  )}
+                  {t("meetings.continue")}
+                </Button>
+              </div>
+            )}
+          </div>
 
-        <div className="mt-6 space-y-2 empty:hidden">
-          {isLive && observer.readiness === "ready" && (
-            <ObserverStatus recording={live.status === "live"} />
-          )}
-          {!isLive && usage && <MeetingUsageSummary usage={usage} />}
-          {captureWarning?.source === "system_audio" &&
-            captureWarning.meeting_id === m.id && (
-              <Alert variant="warning">
-                {t("meetings.capture.systemAudioUnavailable", {
-                  message: captureWarning.message,
-                })}{" "}
-                {t("meetings.capture.systemAudioHint")}
+          <div className="mt-6 space-y-2 empty:hidden">
+            {isLive && observer.readiness === "ready" && (
+              <ObserverStatus recording={live.status === "live"} />
+            )}
+            {!isLive && usage && <MeetingUsageSummary usage={usage} />}
+            {captureWarning?.source === "system_audio" &&
+              captureWarning.meeting_id === m.id && (
+                <Alert variant="warning">
+                  {t("meetings.capture.systemAudioUnavailable", {
+                    message: captureWarning.message,
+                  })}{" "}
+                  {t("meetings.capture.systemAudioHint")}
+                </Alert>
+              )}
+            {observer.readiness !== "ready" && isLive && (
+              <Alert variant="info">
+                {t(`meetings.observer.readiness.${observer.readiness}`, {
+                  detail: observer.detail ?? "",
+                })}
               </Alert>
             )}
-          {observer.readiness !== "ready" && isLive && (
-            <Alert variant="info">
-              {t(`meetings.observer.readiness.${observer.readiness}`, {
-                detail: observer.detail ?? "",
-              })}
-            </Alert>
-          )}
-          {observer.tools_unavailable && (
-            <Alert variant="info">
-              {t("meetings.observer.toolsUnavailable")}
-            </Alert>
-          )}
-          {observer.last_error && (
-            <Alert variant="warning">
-              {observer.consecutive_failures >= 3
-                ? t("meetings.observer.failing", {
-                    count: observer.consecutive_failures,
-                  })
-                : t("meetings.observer.lastError")}{" "}
-              {observer.last_error}
-            </Alert>
-          )}
-        </div>
+            {observer.tools_unavailable && (
+              <Alert variant="info">
+                {t("meetings.observer.toolsUnavailable")}
+              </Alert>
+            )}
+            {observer.last_error && (
+              <Alert variant="warning">
+                {observer.consecutive_failures >= 3
+                  ? t("meetings.observer.failing", {
+                      count: observer.consecutive_failures,
+                    })
+                  : t("meetings.observer.lastError")}{" "}
+                {observer.last_error}
+              </Alert>
+            )}
+          </div>
 
-        {m.input_mode === "text_tester" && testerSessionId != null && (
-          <LiveTesterPanel
-            key={`${m.id}-${testerSessionId}`}
-            meetingId={m.id}
-            sessionId={testerSessionId}
-          />
-        )}
-
-        {/* With one session the session notes already say it all. */}
-        {m.rolling_summary && detail.sessions.length > 1 && (
-          <DocSection title={t("meetings.summary.rolling")}>
-            <NotesMarkdown text={m.rolling_summary} />
-          </DocSection>
-        )}
-
-        {summarized.map((s) => (
-          <DocSection
-            key={s.id}
-            title={
-              detail.sessions.length > 1
-                ? `${t("meetings.summary.title")} · ${t(
-                    "meetings.transcript.session",
-                    { n: detail.sessions.indexOf(s) + 1 },
-                  )}`
-                : t("meetings.summary.title")
-            }
-          >
-            <SessionSummary
-              session={s}
-              meetingEnded={m.status === "ended"}
-              onRetry={() => summarize(s.id)}
+          {m.input_mode === "text_tester" && testerSessionId != null && (
+            <LiveTesterPanel
+              key={`${m.id}-${testerSessionId}`}
+              meetingId={m.id}
+              sessionId={testerSessionId}
             />
+          )}
+
+          {/* With one session the session notes already say it all. */}
+          {m.rolling_summary && detail.sessions.length > 1 && (
+            <DocSection title={t("meetings.summary.rolling")}>
+              <NotesMarkdown text={m.rolling_summary} />
+            </DocSection>
+          )}
+
+          {summarized.map((s) => (
+            <DocSection
+              key={s.id}
+              title={
+                detail.sessions.length > 1
+                  ? `${t("meetings.summary.title")} · ${t(
+                      "meetings.transcript.session",
+                      { n: detail.sessions.indexOf(s) + 1 },
+                    )}`
+                  : t("meetings.summary.title")
+              }
+            >
+              <SessionSummary
+                session={s}
+                meetingEnded={m.status === "ended"}
+                onRetry={() => summarize(s.id)}
+              />
+            </DocSection>
+          ))}
+
+          <ContextEditor meetingId={m.id} context={m.context} />
+
+          {reportsView && (
+            <DocSection title={reportTitle} className="@min-[960px]:hidden">
+              {reportsView}
+            </DocSection>
+          )}
+
+          <DocSection title={nudgesTitle} className="@min-[960px]:hidden">
+            <InterventionTimeline items={detail.interventions} />
           </DocSection>
-        ))}
 
-        <ContextEditor meetingId={m.id} context={m.context} />
-
-        {reportsView && (
-          <DocSection title={reportTitle} className="@min-[960px]:hidden">
-            {reportsView}
-          </DocSection>
-        )}
-
-        <DocSection title={nudgesTitle} className="@min-[960px]:hidden">
-          <InterventionTimeline items={detail.interventions} />
-        </DocSection>
-
-        <DocSection
-          title={t("meetings.transcript.title")}
-          action={
-            <div className="flex items-center gap-1">
-              {detail.lines.length > 0 && (
+          <DocSection
+            title={t("meetings.transcript.title")}
+            action={
+              <div className="flex items-center gap-1">
                 <button
                   type="button"
-                  onClick={() => {
-                    if (player.playingId !== null) return player.stop();
-                    setShowTranscript(true);
-                    player.playFrom(detail.lines[0].id);
-                  }}
-                  className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full border border-line text-xs text-muted hover:text-text hover:border-line-strong transition-colors cursor-pointer"
+                  onClick={() => setShowTranscript((v) => !v)}
+                  aria-expanded={showTranscript}
+                  className="inline-flex items-center gap-1 h-7 px-2 rounded-lg text-xs text-faint hover:text-text hover:bg-surface transition-colors cursor-pointer"
                 >
-                  {player.playingId !== null ? (
-                    <Pause className="w-3 h-3 fill-current" />
-                  ) : (
-                    <Play className="w-3 h-3 fill-current" />
-                  )}
-                  {player.playingId !== null
-                    ? t("meetings.transcript.stopAll")
-                    : t("meetings.transcript.playAll")}
+                  {showTranscript
+                    ? t("meetings.transcript.hide")
+                    : t("meetings.transcript.show", {
+                        count: detail.lines.length,
+                      })}
+                  <ChevronRight
+                    className={`w-3.5 h-3.5 transition-transform ${showTranscript ? "rotate-90" : ""}`}
+                  />
                 </button>
-              )}
-              <button
-                type="button"
-                onClick={() => setShowTranscript((v) => !v)}
-                aria-expanded={showTranscript}
-                className="inline-flex items-center gap-1 h-7 px-2 rounded-lg text-xs text-faint hover:text-text hover:bg-surface transition-colors cursor-pointer"
-              >
-                {showTranscript
-                  ? t("meetings.transcript.hide")
-                  : t("meetings.transcript.show", {
-                      count: detail.lines.length,
-                    })}
-                <ChevronRight
-                  className={`w-3.5 h-3.5 transition-transform ${showTranscript ? "rotate-90" : ""}`}
-                />
-              </button>
-            </div>
-          }
-        >
-          {showTranscript && (
-            <TranscriptThread
-              detail={detail}
-              autoscroll={isLive && live.status === "live"}
-              playingId={player.playingId}
-              onPlay={player.play}
-            />
-          )}
-        </DocSection>
-      </article>
-
-      <aside className="hidden @min-[960px]:block min-w-0">
-        <div className="sticky top-0 pt-[7px] max-h-[calc(100vh-3rem)] overflow-y-auto pb-24">
-          {reportsView && (
-            <section aria-label={reportTitle} className="mb-8">
-              <h2 className="flex items-center h-8 text-[13px] font-medium text-muted">
-                {reportTitle}
-              </h2>
-              <div className="mt-2">{reportsView}</div>
-            </section>
-          )}
-          <h2 className="flex items-center gap-2 h-8 text-[13px] font-medium text-muted">
-            {nudgesTitle}
-            {detail.interventions.length > 0 && (
-              <span className="font-mono text-[11px] text-faint tabular">
-                {detail.interventions.length}
-              </span>
+              </div>
+            }
+          >
+            {showTranscript && (
+              <TranscriptThread
+                detail={detail}
+                autoscroll={isLive && live.status === "live"}
+                playingId={player.activeLineId}
+                paused={!player.playing}
+                focusId={player.focusLineId}
+                playable={player.playableLines}
+                onPlay={player.playLine}
+              />
             )}
-          </h2>
-          <div className="mt-2">
-            <InterventionTimeline items={detail.interventions} compact />
+          </DocSection>
+        </article>
+
+        <aside className="hidden @min-[960px]:block min-w-0">
+          <div className="sticky top-0 pt-[7px] max-h-[calc(100vh-3rem)] overflow-y-auto pb-24">
+            {reportsView && (
+              <section aria-label={reportTitle} className="mb-8">
+                <h2 className="flex items-center h-8 text-[13px] font-medium text-muted">
+                  {reportTitle}
+                </h2>
+                <div className="mt-2">{reportsView}</div>
+              </section>
+            )}
+            <h2 className="flex items-center gap-2 h-8 text-[13px] font-medium text-muted">
+              {nudgesTitle}
+              {detail.interventions.length > 0 && (
+                <span className="font-mono text-[11px] text-faint tabular">
+                  {detail.interventions.length}
+                </span>
+              )}
+            </h2>
+            <div className="mt-2">
+              <InterventionTimeline items={detail.interventions} compact />
+            </div>
           </div>
-        </div>
-      </aside>
-    </div>
+        </aside>
+      </div>
+      {player.available && (
+        <PlayerBar
+          player={player}
+          raised={live.meeting_id !== null}
+          onNudge={(marker) => {
+            setShowTranscript(true);
+            player.playNudge(marker);
+          }}
+        />
+      )}
+    </>
   );
 };
