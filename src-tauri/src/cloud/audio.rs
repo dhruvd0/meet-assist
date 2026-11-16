@@ -153,7 +153,12 @@ async fn check(res: reqwest::Response) -> Result<String, SyncError> {
             .ok()
             .and_then(|v| v["message"].as_str().map(str::to_string))
             .unwrap_or(text);
-        return Err(SyncError::Other(format!("HTTP {status}: {message}")));
+        // Shown to the user as the reason backup is paused.
+        return Err(SyncError::Other(if message.is_empty() {
+            format!("HTTP {status}")
+        } else {
+            message
+        }));
     }
     Ok(text)
 }

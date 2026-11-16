@@ -290,6 +290,10 @@ impl CloudService {
             Ok(report) => {
                 let message = report.refused.or(refused);
                 *self.audio_refused.lock().unwrap() = message.clone();
+                // More to upload: go again without waiting out the interval.
+                if enabled && report.waiting > 0 && message.is_none() {
+                    self.kick.notify_one();
+                }
                 self.update(|s| {
                     s.audio_waiting = report.waiting as i64;
                     s.audio_message = message;
