@@ -737,6 +737,17 @@ async cloudSignOut() : Promise<Result<CloudStatus, string>> {
 async cloudSyncNow() : Promise<void> {
     await TAURI_INVOKE("cloud_sync_now");
 },
+/**
+ * Turn recording backup on or off for this device.
+ */
+async changeCloudAudioBackupSetting(enabled: boolean) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("change_cloud_audio_backup_setting", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async listProjects() : Promise<Result<Project[], string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("list_projects") };
@@ -962,7 +973,8 @@ async deleteMeeting(id: number) : Promise<Result<null, string>> {
 }
 },
 /**
- * File the webview can play for a session's recording, if it has one.
+ * File the webview can play for a session's recording, if it has one. A
+ * recording made on another device is downloaded from the account first.
  * `as_wav` asks for a decoded copy, for a webview that cannot play Opus.
  */
 async getSessionAudioPath(sessionId: number, asWav: boolean) : Promise<Result<string | null, string>> {
@@ -1131,7 +1143,11 @@ meeting_jev_enabled?: boolean; meeting_sensitivity?: MeetingSensitivity; meeting
 /**
  * Seconds of non-stop speech before the segmenter cuts a new line.
  */
-meeting_max_line_secs?: number; meeting_beep_enabled?: boolean; app_language?: string; theme?: Theme; experimental_enabled?: boolean; keyboard_implementation?: KeyboardImplementation; show_tray_icon?: boolean; filler_word_removal_enabled?: boolean; custom_filler_words?: string[] | null; 
+meeting_max_line_secs?: number; meeting_beep_enabled?: boolean; 
+/**
+ * Copy session recordings to the signed-in account's cloud storage.
+ */
+cloud_audio_backup_enabled?: boolean; app_language?: string; theme?: Theme; experimental_enabled?: boolean; keyboard_implementation?: KeyboardImplementation; show_tray_icon?: boolean; filler_word_removal_enabled?: boolean; custom_filler_words?: string[] | null; 
 /**
  * Fresh installs default from the OS locale; existing stores are migrated
  * in `apply_settings_migrations`.
@@ -1168,7 +1184,15 @@ export type CloudStatus = { state: CloudState; email: string | null; last_synced
 /**
  * Bumped whenever a pull changed local data, so the UI knows to reload.
  */
-revision: number }
+revision: number; 
+/**
+ * Recordings on this device not yet backed up.
+ */
+audio_waiting: number; 
+/**
+ * Why recording backup is not running, when it is not.
+ */
+audio_message: string | null }
 export type CustomSounds = { start: boolean; stop: boolean }
 export type DetectionScores = { loop_score: number; stuck: number; info: number; idea: number }
 export type EfficiencyIssue = { 

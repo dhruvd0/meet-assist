@@ -146,6 +146,8 @@ const settingUpdaters: {
     commands.changeMeetingMaxLineSetting(value as number),
   meeting_beep_enabled: (value) =>
     commands.changeMeetingBeepSetting(value as boolean),
+  cloud_audio_backup_enabled: (value) =>
+    commands.changeCloudAudioBackupSetting(value as boolean),
   log_level: (value) => commands.setLogLevel(value as any),
   app_language: (value) => commands.changeAppLanguageSetting(value as string),
   theme: (value) => commands.changeThemeSetting(value as string),

@@ -1,11 +1,12 @@
 //! CASE accounts on Supabase Auth. The session lives in the OS keychain, not
 //! in the settings store or SQLite.
 
-use super::{ANON_KEY, SUPABASE_URL};
+use super::{anon_key, supabase_url};
 use serde::{Deserialize, Serialize};
 
 const KEYCHAIN_SERVICE: &str = "com.case.app.cloud";
 const KEYCHAIN_ACCOUNT: &str = "session";
+const KEYCHAIN_DEV_ACCOUNT: &str = "session-dev";
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Session {
@@ -100,8 +101,8 @@ pub async fn refresh(http: &reqwest::Client, session: &Session) -> Result<Sessio
 /// depend on it succeeding.
 pub async fn sign_out(http: &reqwest::Client, session: &Session) {
     let res = http
-        .post(format!("{SUPABASE_URL}/auth/v1/logout"))
-        .header("apikey", ANON_KEY)
+        .post(format!("{}/auth/v1/logout", supabase_url()))
+        .header("apikey", anon_key())
         .bearer_auth(&session.access_token)
         .send()
         .await;
@@ -116,8 +117,8 @@ async fn token_request(
     body: serde_json::Value,
 ) -> Result<Session, AuthError> {
     let res = http
-        .post(format!("{SUPABASE_URL}/auth/v1/{path}"))
-        .header("apikey", ANON_KEY)
+        .post(format!("{}/auth/v1/{path}", supabase_url()))
+        .header("apikey", anon_key())
         .json(&body)
         .send()
         .await
@@ -158,7 +159,14 @@ async fn token_request(
 }
 
 fn entry() -> keyring::Result<keyring::Entry> {
-    keyring::Entry::new(KEYCHAIN_SERVICE, KEYCHAIN_ACCOUNT)
+    // A debug build pointed at another Supabase must not replace the real
+    // account's session.
+    let account = if super::using_dev_backend() {
+        KEYCHAIN_DEV_ACCOUNT
+    } else {
+        KEYCHAIN_ACCOUNT
+    };
+    keyring::Entry::new(KEYCHAIN_SERVICE, account)
 }
 
 pub fn load() -> Option<Session> {

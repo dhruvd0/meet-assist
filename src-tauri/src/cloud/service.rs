@@ -1,6 +1,7 @@
 //! The app-facing cloud service: account state, the background loop, and
 //! settings sync. Signed out, the loop never touches the network.
 
+use super::audio::{self, Storage};
 use super::auth::{self, AuthError, Session};
 use super::local;
 use super::sync::{run_cycle, Remote, SyncError};
@@ -70,6 +71,10 @@ pub struct CloudStatus {
     pub message: Option<String>,
     /// Bumped whenever a pull changed local data, so the UI knows to reload.
     pub revision: u32,
+    /// Recordings on this device not yet backed up.
+    pub audio_waiting: i64,
+    /// Why recording backup is not running, when it is not.
+    pub audio_message: Option<String>,
 }
 
 pub struct CloudService {
@@ -80,6 +85,9 @@ pub struct CloudService {
     status: Mutex<CloudStatus>,
     kick: Notify,
     cycle: tokio::sync::Mutex<()>,
+    /// The server refused a recording upload; uploads wait until the user
+    /// turns backup on again, signs in again, or restarts.
+    audio_refused: Mutex<Option<String>>,
 }
 
 impl CloudService {
@@ -96,6 +104,8 @@ impl CloudService {
             pending: 0,
             message: None,
             revision: 0,
+            audio_waiting: 0,
+            audio_message: None,
         };
         let http = reqwest::Client::builder()
             .timeout(Duration::from_secs(30))
@@ -109,6 +119,7 @@ impl CloudService {
             status: Mutex::new(status),
             kick: Notify::new(),
             cycle: tokio::sync::Mutex::new(()),
+            audio_refused: Mutex::new(None),
         })
     }
 
@@ -179,6 +190,7 @@ impl CloudService {
         let session = result.map_err(|e| e.to_string())?;
         let user = session.email.clone();
         self.set_session(Some(session));
+        *self.audio_refused.lock().unwrap() = None;
         self.update(|s| {
             s.state = CloudState::Idle;
             s.email = Some(user);
@@ -260,7 +272,78 @@ impl CloudService {
             self.requeue_pending_sources();
         }
         let settings_changed = self.sync_settings(&remote).await?;
-        Ok(report.pulled > 0 || settings_changed)
+        let restored = self.sync_audio(session).await?;
+        Ok(report.pulled > 0 || settings_changed || restored)
+    }
+
+    /// Back up and restore recordings. A failure here is reported on its own
+    /// and never fails the sync of the meetings themselves. Returns whether a
+    /// recording from another device became playable.
+    async fn sync_audio(&self, session: &Session) -> Result<bool, SyncError> {
+        let storage = Storage {
+            http: &self.http,
+            session,
+        };
+        let enabled = get_settings(&self.app).cloud_audio_backup_enabled;
+        let refused = self.audio_refused.lock().unwrap().clone();
+        match audio::run(&self.store, &storage, enabled && refused.is_none()).await {
+            Ok(report) => {
+                let message = report.refused.or(refused);
+                *self.audio_refused.lock().unwrap() = message.clone();
+                // More to upload: go again without waiting out the interval.
+                if enabled && report.waiting > 0 && message.is_none() {
+                    self.kick.notify_one();
+                }
+                self.update(|s| {
+                    s.audio_waiting = report.waiting as i64;
+                    s.audio_message = message;
+                });
+                Ok(report.restored > 0)
+            }
+            Err(SyncError::Unauthorized) => Err(SyncError::Unauthorized),
+            Err(e) => {
+                log::warn!("recording backup: {e}");
+                self.update(|s| s.audio_message = Some(e.to_string()));
+                Ok(false)
+            }
+        }
+    }
+
+    /// Try refused recording uploads again (the user turned backup back on).
+    pub fn resume_audio_backup(&self) {
+        *self.audio_refused.lock().unwrap() = None;
+        self.update(|s| s.audio_message = None);
+        self.sync_now();
+    }
+
+    /// Download a session's recording from the account, for a device that
+    /// has only its line positions so far.
+    pub async fn fetch_session_audio(&self, session_id: i64) -> Result<(), String> {
+        let mut session = self
+            .session()
+            .ok_or("Sign in to download this recording.")?;
+        if session.expires_soon() {
+            session = self
+                .refresh(&session)
+                .await
+                .ok_or("Sign in again to download this recording.")?;
+        }
+        let uid = self
+            .store
+            .session_uid(session_id)
+            .map_err(|e| format!("{e:#}"))?
+            .ok_or("This recording was never backed up.")?;
+        let dest = self
+            .store
+            .session_audio_path(session_id)
+            .map_err(|e| format!("{e:#}"))?;
+        let storage = Storage {
+            http: &self.http,
+            session: &session,
+        };
+        audio::fetch(&storage, &uid, &dest)
+            .await
+            .map_err(|e| e.to_string())
     }
 
     async fn refresh(&self, session: &Session) -> Option<Session> {

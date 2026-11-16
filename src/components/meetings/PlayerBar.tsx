@@ -1,6 +1,6 @@
 import React, { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Pause, Play } from "lucide-react";
+import { Loader2, Pause, Play } from "lucide-react";
 import { formatElapsed } from "./LiveDock";
 import type { MeetingPlayer } from "./useMeetingPlayer";
 import type { NudgeMarker } from "./recordingTimeline";
@@ -48,14 +48,19 @@ export const PlayerBar: React.FC<{
         <button
           type="button"
           onClick={player.toggle}
+          disabled={player.loading}
           aria-label={
-            player.playing
-              ? t("meetings.player.pause")
-              : t("meetings.player.play")
+            player.loading
+              ? t("meetings.player.loading")
+              : player.playing
+                ? t("meetings.player.pause")
+                : t("meetings.player.play")
           }
           className="w-9 h-9 shrink-0 rounded-full inline-flex items-center justify-center bg-accent/15 text-accent hover:bg-accent/25 transition-colors cursor-pointer"
         >
-          {player.playing ? (
+          {player.loading ? (
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          ) : player.playing ? (
             <Pause className="w-3.5 h-3.5 fill-current" />
           ) : (
             <Play className="w-3.5 h-3.5 fill-current ms-0.5" />

@@ -4,7 +4,7 @@
 
 use super::auth::Session;
 use super::local::{self, Entity, Outgoing, ENTITIES};
-use super::{ANON_KEY, SUPABASE_URL};
+use super::{anon_key, supabase_url};
 use crate::meeting::store::ProjectStore;
 use serde_json::Value;
 
@@ -65,8 +65,8 @@ pub struct Remote<'a> {
 impl Remote<'_> {
     fn request(&self, method: reqwest::Method, table: &str) -> reqwest::RequestBuilder {
         self.http
-            .request(method, format!("{SUPABASE_URL}/rest/v1/{table}"))
-            .header("apikey", ANON_KEY)
+            .request(method, format!("{}/rest/v1/{table}", supabase_url()))
+            .header("apikey", anon_key())
             .bearer_auth(&self.session.access_token)
     }
 

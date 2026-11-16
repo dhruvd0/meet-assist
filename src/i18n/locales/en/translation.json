@@ -161,7 +161,9 @@
       "play": "Play recording",
       "pause": "Pause recording",
       "seek": "Position in recording",
-      "nudge": "{{kind}} at {{time}}"
+      "nudge": "{{kind}} at {{time}}",
+      "loading": "Loading recording",
+      "loadFailed": "Couldn't load the recording: {{error}}"
     },
     "errors": {
       "load": "Could not load meetings.",
@@ -922,6 +924,14 @@
       "offline": "Offline. Changes are saved here and will sync when you are back online",
       "error": "Sync failed",
       "account_mismatch": "This computer already syncs with a different account. Sign in with that account to sync, or sign out"
+    },
+    "recordings": {
+      "title": "Recordings",
+      "label": "Back up recordings",
+      "description": "Copy each meeting's recording to your account so it can be played on your other computers. Recordings include the voices of everyone in the meeting.",
+      "waiting_one": "{{count}} recording waiting to upload",
+      "waiting_other": "{{count}} recordings waiting to upload",
+      "paused": "Backup paused: {{message}}"
     }
   }
 }

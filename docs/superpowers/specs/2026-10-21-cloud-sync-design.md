@@ -12,7 +12,7 @@ CASE stays offline-first. The local SQLite database and the local settings store
 ## Non-goals
 
 - Real-time sync, collaborative editing, or sharing between accounts.
-- Syncing API keys, audio, source chunks (the full-text index), observer internals, or device-specific settings.
+- Syncing API keys, source chunks (the full-text index), observer internals, or device-specific settings.
 - Merging two accounts' data on one device.
 
 ## Backend
@@ -22,6 +22,7 @@ Supabase project `case` (ref `fjohdmmgmvcjdoswkvsq`, region ap-northeast-2), sch
 - URL `https://fjohdmmgmvcjdoswkvsq.supabase.co`, publishable key `sb_publishable_81VLvYMSAX1a8yPqhQzsaA_bqP4VJob`. Both are public by design; access control is row-level security.
 - Tables `projects`, `sources`, `meetings`, `sessions`, `transcript_lines`, `interventions`: `id uuid` (client-generated), `user_id` (defaults to `auth.uid()`), `updated_at bigint` (client ms), `deleted boolean` (tombstone), `synced_at timestamptz` (server-stamped pull cursor), plus the content columns. Parent links are uuids (`project_id`, `meeting_id`, `session_id`), with no remote foreign keys so rows can arrive in any order.
 - `user_settings(user_id pk, updated_at bigint, data jsonb, synced_at)`.
+- Recordings: private storage bucket `meeting-audio` (`supabase/migrations/20261116000000_meeting_audio.sql`), one folder per user. `<user id>/<session id>.ogg` is the session's recording (Ogg Opus) and `<user id>/<session id>.json` lists where each transcript line sits in it. The app writes the `.json` last, so its presence means the upload finished. A device uploads its own recordings in the background (setting `cloud_audio_backup_enabled`, on by default), reads other devices' `.json` files during sync so their lines become playable, and downloads an `.ogg` only when the user plays it. Deleting a meeting removes both files. An upload the server refuses pauses backup and shows the reason on the Account tab; nothing is deleted to make room.
 - A trigger stamps `synced_at = now()` on every write and drops an update whose `updated_at` is older than the stored row. That makes the server last-writer-wins and makes every push idempotent.
 - RLS limits every operation to `user_id = auth.uid()`. `anon` has no access. `authenticated` has select, insert, update. There is no delete grant, so deletes are tombstones.
 
